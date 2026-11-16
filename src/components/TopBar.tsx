@@ -1,14 +1,23 @@
 import React from 'react'
-import { Menu, MessageSquare, Search, Plus } from 'lucide-react'
+import { Menu, MessageSquare, Search, Plus, LogOut } from 'lucide-react'
 import type { ActiveTab } from './Sidebar'
+import type { CurrentUser } from './LoginView'
 
 interface TopBarProps {
   activeTab: ActiveTab
   onToggleMobile: () => void
   onNewLeadClick: () => void
+  currentUser?: CurrentUser
+  onLogout?: () => void
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ activeTab, onToggleMobile, onNewLeadClick }) => {
+export const TopBar: React.FC<TopBarProps> = ({ 
+  activeTab, 
+  onToggleMobile, 
+  onNewLeadClick,
+  currentUser,
+  onLogout 
+}) => {
   const getTabTitle = (tab: ActiveTab) => {
     switch (tab) {
       case 'kanban': return { title: 'Funil Comercial de Vendas', breadcrumb: 'Comercial' }
@@ -44,7 +53,7 @@ export const TopBar: React.FC<TopBarProps> = ({ activeTab, onToggleMobile, onNew
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5 sm:gap-3">
         {/* WhatsApp Online Indicator */}
         <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -54,11 +63,29 @@ export const TopBar: React.FC<TopBarProps> = ({ activeTab, onToggleMobile, onNew
         {/* Quick New Lead Button */}
         <button
           onClick={onNewLeadClick}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-orange-600/20 cursor-pointer"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-orange-600/20 cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>Novo Lead</span>
         </button>
+
+        {/* Mobile/Quick User Info & Logout */}
+        {currentUser && (
+          <div className="flex items-center gap-2 pl-1 border-l border-slate-200">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-white font-bold text-xs flex items-center justify-center shrink-0">
+              {currentUser.avatarLetter}
+            </div>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                title="Sair / Trocar usuário"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </header>
   )

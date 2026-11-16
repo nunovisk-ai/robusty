@@ -7,12 +7,40 @@ import { KanbanView } from './components/KanbanView'
 import { OrdersView } from './components/OrdersView'
 import { CalendarView } from './components/CalendarView'
 import { SettingsView } from './components/SettingsView'
+import { LoginView, type CurrentUser } from './components/LoginView'
 import type { Opportunity, OpportunityStage, Order, Appointment, Product, Vehicle } from './types'
 
 export function App() {
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(() => {
+    try {
+      const saved = localStorage.getItem('robusty_auth_user')
+      return saved ? JSON.parse(saved) : null
+    } catch {
+      return null
+    }
+  })
+
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban')
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [selectedVehicleForBudget, setSelectedVehicleForBudget] = useState<string | undefined>()
+
+  const handleLoginSuccess = (user: CurrentUser) => {
+    setCurrentUser(user)
+    try {
+      localStorage.setItem('robusty_auth_user', JSON.stringify(user))
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handleLogout = () => {
+    setCurrentUser(null)
+    try {
+      localStorage.removeItem('robusty_auth_user')
+    } catch (e) {
+      console.error(e)
+    }
+  }
 
   // Inbound Opportunities (WhatsApp, Instagram, Balcão)
   const [opportunities, setOpportunities] = useState<Opportunity[]>([
@@ -225,6 +253,10 @@ export function App() {
     setActiveTab('budget')
   }
 
+  if (!currentUser) {
+    return <LoginView onLoginSuccess={handleLoginSuccess} />
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans selection:bg-orange-500 selection:text-white">
       {/* Sidebar Navigation */}
@@ -235,6 +267,8 @@ export function App() {
         orderCount={orders.length}
         isMobileOpen={isMobileSidebarOpen}
         setIsMobileOpen={setIsMobileSidebarOpen}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* Main Area */}
@@ -243,6 +277,8 @@ export function App() {
           activeTab={activeTab}
           onToggleMobile={() => setIsMobileSidebarOpen(true)}
           onNewLeadClick={() => setActiveTab('budget')}
+          currentUser={currentUser}
+          onLogout={handleLogout}
         />
 
         <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto">

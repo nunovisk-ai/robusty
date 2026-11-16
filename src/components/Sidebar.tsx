@@ -6,8 +6,10 @@ import {
   Truck, 
   Calendar, 
   Settings,
-  X
+  X,
+  LogOut
 } from 'lucide-react'
+import type { CurrentUser } from './LoginView'
 
 export type ActiveTab = 'kanban' | 'budget' | 'catalog' | 'orders' | 'calendar' | 'settings'
 
@@ -18,6 +20,8 @@ interface SidebarProps {
   orderCount: number
   isMobileOpen: boolean
   setIsMobileOpen: (open: boolean) => void
+  currentUser?: CurrentUser
+  onLogout?: () => void
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
@@ -26,7 +30,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   leadCount,
   orderCount,
   isMobileOpen,
-  setIsMobileOpen
+  setIsMobileOpen,
+  currentUser,
+  onLogout
 }) => {
   const navSections = [
     {
@@ -108,17 +114,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Operator Profile Card */}
-      <div className="mx-4 mt-4 p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-white font-bold text-xs flex items-center justify-center shadow-xs">
-          N
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold text-slate-900 truncate">Norlando Vendas</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+      <div className="mx-4 mt-4 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+            {currentUser?.avatarLetter || 'R'}
           </div>
-          <span className="text-[10px] text-slate-500 block truncate">Atendimento Comercial</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-900 truncate">
+                {currentUser?.name || 'Colaborador'}
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+            </div>
+            <span className="text-[10px] text-slate-500 block truncate">
+              {currentUser?.roleLabel || 'Robusty CRM'}
+            </span>
+          </div>
         </div>
+
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            title="Sair do sistema (Trocar usuário)"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer shrink-0"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Navigation Sections */}
