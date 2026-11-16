@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { Navbar, ActiveTab } from './components/Navbar'
+import { Sidebar, type ActiveTab } from './components/Sidebar'
+import { TopBar } from './components/TopBar'
 import { CatalogView } from './components/CatalogView'
 import { BudgetBuilderView } from './components/BudgetBuilderView'
 import { KanbanView } from './components/KanbanView'
@@ -7,14 +8,15 @@ import { OrdersView } from './components/OrdersView'
 import { CalendarView } from './components/CalendarView'
 import { SetupView } from './components/SetupView'
 import { DatabaseSetupModal } from './components/DatabaseSetupModal'
-import { Opportunity, OpportunityStage, Order, Appointment, Product, Vehicle } from './types'
+import type { Opportunity, OpportunityStage, Order, Appointment, Product, Vehicle } from './types'
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('catalog')
+  const [activeTab, setActiveTab] = useState<ActiveTab>('kanban')
   const [isSqlModalOpen, setIsSqlModalOpen] = useState(false)
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [selectedVehicleForBudget, setSelectedVehicleForBudget] = useState<string | undefined>()
 
-  // Initial Sample Opportunities (Simulating Inbound Leads from WhatsApp & Instagram)
+  // Sample Opportunities (Inbound Leads from WhatsApp & Instagram)
   const [opportunities, setOpportunities] = useState<Opportunity[]>([
     {
       id: 'opp-1',
@@ -87,7 +89,7 @@ export function App() {
     },
   ])
 
-  // Operational Orders (Igor & Loja)
+  // Operational Orders
   const [orders, setOrders] = useState<Order[]>([
     {
       id: 'ord-101',
@@ -151,14 +153,12 @@ export function App() {
     },
   ])
 
-  // Move opportunity stage in Kanban
   const handleMoveStage = (oppId: string, newStage: OpportunityStage) => {
     setOpportunities((prev) =>
       prev.map((o) => (o.id === oppId ? { ...o, stage: newStage, updated_at: new Date().toISOString() } : o))
     )
   }
 
-  // Convert Won Opportunity to Operational Order
   const handleConvertToOrder = (opp: Opportunity) => {
     const nextOrderNumber = orders.length > 0 ? Math.max(...orders.map((o) => o.order_number)) + 1 : 1001
     const newOrder: Order = {
@@ -180,7 +180,6 @@ export function App() {
     setActiveTab('orders')
   }
 
-  // Save new proposal from Budget Builder to Kanban
   const handleSaveBudgetToKanban = (data: any) => {
     const newOpp: Opportunity = {
       id: `opp-${Date.now()}`,
@@ -209,9 +208,9 @@ export function App() {
     }
 
     setOpportunities((prev) => [newOpp, ...prev])
+    setActiveTab('kanban')
   }
 
-  // Add Appointment
   const handleAddAppointment = (aptData: Omit<Appointment, 'id'>) => {
     const newApt: Appointment = {
       ...aptData,
@@ -221,7 +220,7 @@ export function App() {
     return true
   }
 
-  const handleSelectProductForBudget = (prod: Product, vehicle?: Vehicle) => {
+  const handleSelectProductForBudget = (_prod: Product, vehicle?: Vehicle) => {
     if (vehicle) {
       setSelectedVehicleForBudget(vehicle.id)
     }
@@ -229,81 +228,92 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-orange-500 selection:text-slate-950">
-      {/* Top Navigation */}
-      <Navbar
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans selection:bg-orange-500 selection:text-white">
+      {/* Sleek Fixed Sidebar */}
+      <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenSqlModal={() => setIsSqlModalOpen(true)}
+        leadCount={opportunities.length}
+        orderCount={orders.length}
+        isMobileOpen={isMobileSidebarOpen}
+        setIsMobileOpen={setIsMobileSidebarOpen}
       />
 
-      {/* Main Content View */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'catalog' && (
-          <CatalogView
-            onSelectForBudget={handleSelectProductForBudget}
-            onNavigateToBudget={() => setActiveTab('budget')}
-          />
-        )}
+      {/* Main Content Area (Offset by sidebar width on desktop) */}
+      <div className="md:pl-64 flex-1 flex flex-col min-w-0">
+        {/* Top Bar */}
+        <TopBar
+          activeTab={activeTab}
+          onToggleMobile={() => setIsMobileSidebarOpen(true)}
+        />
 
-        {activeTab === 'budget' && (
-          <BudgetBuilderView
-            initialVehicleId={selectedVehicleForBudget}
-            onSaveToKanban={handleSaveBudgetToKanban}
-          />
-        )}
+        {/* View Container */}
+        <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto">
+          {activeTab === 'kanban' && (
+            <KanbanView
+              opportunities={opportunities}
+              onMoveStage={handleMoveStage}
+              onConvertToOrder={handleConvertToOrder}
+              onOpenNewBudget={() => setActiveTab('budget')}
+            />
+          )}
 
-        {activeTab === 'kanban' && (
-          <KanbanView
-            opportunities={opportunities}
-            onMoveStage={handleMoveStage}
-            onConvertToOrder={handleConvertToOrder}
-            onOpenNewBudget={() => setActiveTab('budget')}
-          />
-        )}
+          {activeTab === 'budget' && (
+            <BudgetBuilderView
+              initialVehicleId={selectedVehicleForBudget}
+              onSaveToKanban={handleSaveBudgetToKanban}
+            />
+          )}
 
-        {activeTab === 'orders' && (
-          <OrdersView
-            orders={orders}
-            onUpdateOrderStatus={(ordId, nextSt) => {
-              setOrders((prev) =>
-                prev.map((o) => (o.id === ordId ? { ...o, status: nextSt } : o))
-              )
-            }}
-            onToggleInvoiceRequest={(ordId) => {
-              setOrders((prev) =>
-                prev.map((o) =>
-                  o.id === ordId ? { ...o, invoice_status: 'solicitada_ao_igor' } : o
+          {activeTab === 'catalog' && (
+            <CatalogView
+              onSelectForBudget={handleSelectProductForBudget}
+              onNavigateToBudget={() => setActiveTab('budget')}
+            />
+          )}
+
+          {activeTab === 'orders' && (
+            <OrdersView
+              orders={orders}
+              onUpdateOrderStatus={(ordId, nextSt) => {
+                setOrders((prev) =>
+                  prev.map((o) => (o.id === ordId ? { ...o, status: nextSt } : o))
                 )
-              )
-            }}
-          />
-        )}
+              }}
+              onToggleInvoiceRequest={(ordId) => {
+                setOrders((prev) =>
+                  prev.map((o) =>
+                    o.id === ordId ? { ...o, invoice_status: 'solicitada_ao_igor' } : o
+                  )
+                )
+              }}
+            />
+          )}
 
-        {activeTab === 'calendar' && (
-          <CalendarView
-            appointments={appointments}
-            onAddAppointment={handleAddAppointment}
-          />
-        )}
+          {activeTab === 'calendar' && (
+            <CalendarView
+              appointments={appointments}
+              onAddAppointment={handleAddAppointment}
+            />
+          )}
 
-        {activeTab === 'setup' && (
-          <SetupView onOpenSqlModal={() => setIsSqlModalOpen(true)} />
-        )}
-      </main>
+          {activeTab === 'setup' && (
+            <SetupView onOpenSqlModal={() => setIsSqlModalOpen(true)} />
+          )}
+        </main>
 
-      {/* SQL Script / Setup Modal */}
+        {/* Footer */}
+        <footer className="border-t border-slate-200/80 bg-white py-4 px-6 text-center text-xs text-slate-400">
+          Robusty CRM © 2026 — Fabricação e Comercialização de Bagageiros Automotivos
+        </footer>
+      </div>
+
+      {/* SQL Migration Modal */}
       <DatabaseSetupModal
         isOpen={isSqlModalOpen}
         onClose={() => setIsSqlModalOpen(false)}
       />
-
-      {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-600">
-        <p>
-          Robusty CRM © 2026 — Gestão Comercial, Bagageiros e Operação Integrada.
-        </p>
-      </footer>
     </div>
   )
 }

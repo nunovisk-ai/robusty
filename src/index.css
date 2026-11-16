@@ -2,39 +2,40 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 220 20% 10%;
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 220 20% 10%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 10%;
-    --primary: 25 95% 53%; /* Robusty Orange/Amber accent */
+    --popover-foreground: 222 47% 11%;
+    --primary: 24 95% 53%; /* Robusty Orange #f97316 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 215 16% 93%;
-    --secondary-foreground: 220 20% 15%;
-    --muted: 215 16% 93%;
-    --muted-foreground: 220 10% 45%;
-    --accent: 215 16% 93%;
-    --accent-foreground: 220 20% 15%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 215 16% 89%;
-    --input: 215 16% 89%;
-    --ring: 25 95% 53%;
-    --radius: 0.625rem;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222 47% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 24 95% 53%;
+    --radius: 0.75rem;
   }
 }
 
 body {
   margin: 0;
   padding: 0;
-  background-color: #0d1117;
-  color: #f0f6fc;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
 }
 
-/* Custom scrollbars */
+/* Custom scrollbars for Kommo-style Kanban */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -43,9 +44,9 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: #cbd5e1;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: #94a3b8;
 }
