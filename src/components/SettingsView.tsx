@@ -146,26 +146,35 @@ export const SettingsView: React.FC = () => {
         <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
           <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
             <Users className="w-4 h-4 text-orange-600" />
-            <h3 className="font-bold text-sm text-slate-900">Usuários & Responsabilidades</h3>
+            <h3 className="font-bold text-sm text-slate-900">Usuários Autorizados & Responsabilidades</h3>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1">
-              <div className="text-xs font-bold text-slate-900">Norlando</div>
-              <div className="text-[11px] text-orange-600 font-semibold">Comercial / Vendas</div>
-              <p className="text-[10px] text-slate-500">Atendimento WhatsApp, qualificação e elaboração de orçamentos.</p>
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-bold text-slate-900">João Ricardo</div>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">Admin</span>
+              </div>
+              <div className="text-[11px] text-purple-600 font-semibold truncate">joaoricardo@grupomixfer.com.br</div>
+              <p className="text-[10px] text-slate-500">Diretoria, supervisão global, métricas financeiras e parametrização do CRM.</p>
             </div>
 
             <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1">
-              <div className="text-xs font-bold text-slate-900">Igor</div>
-              <div className="text-[11px] text-blue-600 font-semibold">Gestão, Logística & Fiscal</div>
-              <p className="text-[10px] text-slate-500">Cotação de fretes, links de pagamento, transportadoras e notas fiscais.</p>
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-bold text-slate-900">Norlando</div>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">Comercial</span>
+              </div>
+              <div className="text-[11px] text-orange-600 font-semibold truncate">norlando@ironparts.com.br</div>
+              <p className="text-[10px] text-slate-500">Atendimento WhatsApp, qualificação de leads, negociações e orçamentos.</p>
             </div>
 
             <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1">
-              <div className="text-xs font-bold text-slate-900">Loja Física</div>
-              <div className="text-[11px] text-emerald-600 font-semibold">Instalação & Produção</div>
-              <p className="text-[10px] text-slate-500">Execução de montagens em veículos e preparação para coleta.</p>
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-bold text-slate-900">Igor</div>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Logística & Fiscal</span>
+              </div>
+              <div className="text-[11px] text-blue-600 font-semibold truncate">igor@grupomixfer.com.br</div>
+              <p className="text-[10px] text-slate-500">Cotação de fretes, links de pagamento, despacho com transportadoras e NF-e.</p>
             </div>
           </div>
         </div>

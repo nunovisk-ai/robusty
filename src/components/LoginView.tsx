@@ -6,8 +6,6 @@ import {
   EyeOff, 
   LogIn, 
   ShieldCheck, 
-  Users, 
-  ArrowRight,
   AlertCircle,
   CheckCircle2
 } from 'lucide-react'
@@ -23,38 +21,34 @@ export interface CurrentUser {
   avatarLetter: string
 }
 
-export const PRESET_USERS: CurrentUser[] = [
+// Senha padrão oficial compartilhada entre os 3 usuários
+export const DEFAULT_APP_PASSWORD = 'Robusty@2026'
+
+// 3 Usuários autorizados cadastrados
+export const AUTHORIZED_USERS: CurrentUser[] = [
+  {
+    id: 'user-joao-ricardo',
+    email: 'joaoricardo@grupomixfer.com.br',
+    name: 'João Ricardo',
+    role: 'admin',
+    roleLabel: 'Diretoria & Administração',
+    avatarLetter: 'J',
+  },
   {
     id: 'user-norlando',
-    email: 'norlando@robusty.com.br',
-    name: 'Norlando Vendas',
+    email: 'norlando@ironparts.com.br',
+    name: 'Norlando',
     role: 'comercial_norlando',
-    roleLabel: 'Comercial & Atendimento WhatsApp',
+    roleLabel: 'Comercial & Vendas WhatsApp',
     avatarLetter: 'N',
   },
   {
     id: 'user-igor',
-    email: 'igor@robusty.com.br',
-    name: 'Igor Gestão',
+    email: 'igor@grupomixfer.com.br',
+    name: 'Igor',
     role: 'gestao_igor',
-    roleLabel: 'Logística, Cotações & Fiscal',
+    roleLabel: 'Logística, Fretes & Fiscal',
     avatarLetter: 'I',
-  },
-  {
-    id: 'user-loja',
-    email: 'loja@robusty.com.br',
-    name: 'Operador Oficina',
-    role: 'loja_instalacao',
-    roleLabel: 'Instalação Física & Montagem',
-    avatarLetter: 'L',
-  },
-  {
-    id: 'user-admin',
-    email: 'admin@robusty.com.br',
-    name: 'Administrador Robusty',
-    role: 'admin',
-    roleLabel: 'Acesso Global & Gestão',
-    avatarLetter: 'A',
   },
 ]
 
@@ -71,77 +65,67 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
-  const handlePresetSelect = (preset: CurrentUser) => {
-    setEmail(preset.email)
-    setPassword('••••••••')
-    setErrorMessage(null)
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMessage(null)
     setSuccessMessage(null)
 
-    if (!email.trim()) {
-      setErrorMessage('Por favor, informe seu e-mail de acesso.')
+    const normalizedEmail = email.trim().toLowerCase()
+
+    if (!normalizedEmail) {
+      setErrorMessage('Por favor, informe seu e-mail corporativo.')
+      return
+    }
+
+    if (!password) {
+      setErrorMessage('Por favor, digite sua senha de acesso.')
       return
     }
 
     setIsLoading(true)
 
     try {
-      // 1. Check if matches one of the team presets
-      const matchedPreset = PRESET_USERS.find(
-        (u) => u.email.toLowerCase() === email.trim().toLowerCase()
+      // 1. Procurar nos 3 usuários autorizados
+      const matchedUser = AUTHORIZED_USERS.find(
+        (u) => u.email.toLowerCase() === normalizedEmail
       )
 
-      // Try Supabase auth if user typed a real password
-      if (password && password !== '••••••••') {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: password,
-        })
-
-        if (!error && data.user) {
-          const userObj: CurrentUser = matchedPreset || {
-            id: data.user.id,
-            email: data.user.email || email,
-            name: data.user.user_metadata?.full_name || email.split('@')[0],
-            role: (data.user.user_metadata?.role as UserRole) || 'comercial_norlando',
-            roleLabel: 'Colaborador Robusty',
-            avatarLetter: (data.user.email || 'R')[0].toUpperCase(),
-          }
-          setSuccessMessage(`Bem-vindo(a), ${userObj.name}! Redirecionando...`)
-          setTimeout(() => onLoginSuccess(userObj), 600)
-          return
-        }
+      if (!matchedUser) {
+        setErrorMessage('E-mail não autorizado ou não cadastrado no sistema.')
+        setIsLoading(false)
+        return
       }
 
-      // 2. Fallback / direct profile login for development & configured employee access
-      if (matchedPreset) {
-        setSuccessMessage(`Acesso autorizado para ${matchedPreset.name}! Redirecionando...`)
+      // 2. Verificar senha padrão oficial
+      if (password === DEFAULT_APP_PASSWORD) {
+        setSuccessMessage(`Bem-vindo(a), ${matchedUser.name}! Carregando painel...`)
         setTimeout(() => {
-          onLoginSuccess(matchedPreset)
+          onLoginSuccess(matchedUser)
         }, 500)
         return
       }
 
-      // 3. If custom email entered without preset
-      const customUser: CurrentUser = {
-        id: `user-${Date.now()}`,
-        email: email.trim(),
-        name: email.split('@')[0].replace('.', ' '),
-        role: 'comercial_norlando',
-        roleLabel: 'Comercial & Vendas',
-        avatarLetter: email[0].toUpperCase(),
+      // 3. Tentar também autenticação via Supabase Auth
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password: password,
+        })
+
+        if (!error && data.user) {
+          setSuccessMessage(`Bem-vindo(a), ${matchedUser.name}! Carregando painel...`)
+          setTimeout(() => {
+            onLoginSuccess(matchedUser)
+          }, 500)
+          return
+        }
+      } catch {
+        // Fallback para erro de senha
       }
 
-      setSuccessMessage(`Acesso autorizado! Redirecionando...`)
-      setTimeout(() => {
-        onLoginSuccess(customUser)
-      }, 500)
+      setErrorMessage('Senha incorreta. Verifique suas credenciais.')
     } catch (err: any) {
-      setErrorMessage(err.message || 'Erro ao autenticar. Verifique seus dados.')
+      setErrorMessage(err.message || 'Erro ao autenticar. Tente novamente.')
     } finally {
       setIsLoading(false)
     }
@@ -174,7 +158,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               Acesso ao Sistema
             </h1>
             <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-              Entre com suas credenciais para gerenciar leads, orçamentos, pedidos e instalações.
+              Entre com suas credenciais para gerenciar leads, orçamentos, pedidos e operações.
             </p>
           </div>
         </div>
@@ -212,7 +196,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="exemplo@robusty.com.br"
+                  placeholder="seu.email@empresa.com.br"
                   className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-orange-500 focus:ring-3 focus:ring-orange-500/15 transition-all"
                 />
               </div>
@@ -285,52 +269,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               )}
             </button>
           </form>
-
-          {/* Quick Employee Selector for fast login / switching */}
-          <div className="pt-4 border-t border-slate-100 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5 text-slate-400" />
-                <span>Acesso Rápido de Empregados</span>
-              </span>
-              <span className="text-[10px] text-orange-600 font-semibold">1 clique</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              {PRESET_USERS.map((user) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() => handlePresetSelect(user)}
-                  className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-orange-50/70 hover:border-orange-200 text-left transition-all group cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-lg bg-orange-500/10 text-orange-700 font-bold text-xs flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white transition-colors">
-                      {user.avatarLetter}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[11px] font-bold text-slate-900 truncate leading-tight group-hover:text-orange-950">
-                        {user.name.split(' ')[0]}
-                      </div>
-                      <div className="text-[9px] text-slate-400 truncate leading-tight mt-0.5">
-                        {user.role === 'comercial_norlando' && 'Comercial'}
-                        {user.role === 'gestao_igor' && 'Logística & Gestão'}
-                        {user.role === 'loja_instalacao' && 'Oficina'}
-                        {user.role === 'admin' && 'Administrador'}
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Security & System Info Footer */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400 px-2">
           <div className="flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="text-[11px]">Conexão Criptografada (SSL / JWT)</span>
+            <span className="text-[11px]">Conexão Segura & Autenticada</span>
           </div>
           <span className="text-[10px] text-slate-500">
             Robusty CRM © 2026
