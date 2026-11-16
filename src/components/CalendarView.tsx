@@ -12,7 +12,7 @@ import {
 
 interface CalendarViewProps {
   appointments: Appointment[]
-  onAddAppointment: (apt: Omit<Appointment, 'id'>) => boolean
+  onAddAppointment: (apt: Omit<Appointment, 'id'>) => boolean | Promise<boolean>
 }
 
 const TIME_SLOTS = [
