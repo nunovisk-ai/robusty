@@ -5,21 +5,15 @@ import {
   Package, 
   Truck, 
   Calendar, 
-  Database,
-  ExternalLink,
-  ChevronRight,
-  ShieldCheck,
-  UserCheck,
-  Menu,
+  Settings,
   X
 } from 'lucide-react'
 
-export type ActiveTab = 'kanban' | 'budget' | 'catalog' | 'orders' | 'calendar' | 'setup'
+export type ActiveTab = 'kanban' | 'budget' | 'catalog' | 'orders' | 'calendar' | 'settings'
 
 interface SidebarProps {
   activeTab: ActiveTab
   setActiveTab: (tab: ActiveTab) => void
-  onOpenSqlModal: () => void
   leadCount: number
   orderCount: number
   isMobileOpen: boolean
@@ -29,7 +23,6 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ 
   activeTab, 
   setActiveTab, 
-  onOpenSqlModal,
   leadCount,
   orderCount,
   isMobileOpen,
@@ -42,32 +35,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {
           id: 'kanban' as ActiveTab,
           label: 'Funil de Vendas',
-          description: 'Kanban do Norlando',
+          description: 'Gestão de Leads Inbound',
           icon: <Kanban className="w-4 h-4" />,
-          badge: leadCount > 0 ? `${leadCount} leads` : undefined,
+          badge: leadCount > 0 ? `${leadCount}` : undefined,
           badgeColor: 'bg-orange-100 text-orange-700 border-orange-200',
         },
         {
           id: 'budget' as ActiveTab,
           label: 'Novo Orçamento',
-          description: 'Proposta & Cálculo CEP',
+          description: 'Proposta Comercial',
           icon: <Calculator className="w-4 h-4" />,
         },
         {
           id: 'catalog' as ActiveTab,
           label: 'Catálogo de Produtos',
-          description: 'Tabela Oficial Fev/2026',
+          description: 'Bagageiros & Acessórios',
           icon: <Package className="w-4 h-4" />,
         },
       ],
     },
     {
-      title: 'OPERAÇÃO & LOGÍSTICA',
+      title: 'OPERAÇÃO',
       items: [
         {
           id: 'orders' as ActiveTab,
           label: 'Pedidos & Expedição',
-          description: 'Igor & Loja Física',
+          description: 'Logística & Loja Física',
           icon: <Truck className="w-4 h-4" />,
           badge: orderCount > 0 ? `${orderCount}` : undefined,
           badgeColor: 'bg-blue-100 text-blue-700 border-blue-200',
@@ -75,9 +68,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {
           id: 'calendar' as ActiveTab,
           label: 'Agenda de Instalações',
-          description: '1 Baia Exclusiva',
+          description: 'Montagens na Oficina',
           icon: <Calendar className="w-4 h-4" />,
-          badge: '1 Vaga',
+          badge: '1 Baia',
           badgeColor: 'bg-emerald-100 text-emerald-700 border-emerald-200',
         },
       ],
@@ -86,10 +79,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'SISTEMA',
       items: [
         {
-          id: 'setup' as ActiveTab,
-          label: 'Supabase & VPS',
-          description: 'Banco & Conexões',
-          icon: <Database className="w-4 h-4" />,
+          id: 'settings' as ActiveTab,
+          label: 'Configurações',
+          description: 'Empresa & Regras',
+          icon: <Settings className="w-4 h-4" />,
         },
       ],
     },
@@ -102,7 +95,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex items-center gap-2.5">
           <img
             src="/robusty-logo.png"
-            alt="Robusty Logo"
+            alt="Robusty"
             className="h-9 w-auto object-contain"
           />
         </div>
@@ -114,9 +107,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </div>
 
-      {/* Operator Profile Card (Kommo Style) */}
+      {/* Operator Profile Card */}
       <div className="mx-4 mt-4 p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-white font-bold text-xs flex items-center justify-center shadow-sm">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-white font-bold text-xs flex items-center justify-center shadow-xs">
           N
         </div>
         <div className="flex-1 min-w-0">
@@ -144,9 +137,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     setActiveTab(item.id)
                     setIsMobileOpen(false)
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all ${
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-orange-50 text-orange-600 font-semibold shadow-xs'
+                      ? 'bg-orange-50 text-orange-600 font-bold shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                   }`}
                 >
@@ -165,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
 
                   {item.badge && (
-                    <span className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-md border ${item.badgeColor}`}>
+                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md border ${item.badgeColor}`}>
                       {item.badge}
                     </span>
                   )}
@@ -176,23 +169,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ))}
       </div>
 
-      {/* Footer Info: Supabase Status */}
-      <div className="p-4 border-t border-slate-100 bg-slate-50/50 space-y-2">
-        <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[11px] font-medium text-slate-700">Supabase Cloud</span>
-          </div>
-          <span className="text-[10px] font-mono text-slate-400">Postgres 16</span>
+      {/* Clean Footer Status */}
+      <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          <span className="text-[11px] font-medium text-slate-600">Sistema Conectado</span>
         </div>
-
-        <button
-          onClick={onOpenSqlModal}
-          className="w-full py-1.5 px-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
-        >
-          <Database className="w-3 h-3 text-emerald-600" />
-          <span>Script SQL de Migração</span>
-        </button>
+        <span className="text-[10px] font-mono text-slate-400 font-semibold">v1.0</span>
       </div>
     </div>
   )

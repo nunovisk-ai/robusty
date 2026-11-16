@@ -6,17 +6,15 @@ import { BudgetBuilderView } from './components/BudgetBuilderView'
 import { KanbanView } from './components/KanbanView'
 import { OrdersView } from './components/OrdersView'
 import { CalendarView } from './components/CalendarView'
-import { SetupView } from './components/SetupView'
-import { DatabaseSetupModal } from './components/DatabaseSetupModal'
+import { SettingsView } from './components/SettingsView'
 import type { Opportunity, OpportunityStage, Order, Appointment, Product, Vehicle } from './types'
 
 export function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban')
-  const [isSqlModalOpen, setIsSqlModalOpen] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [selectedVehicleForBudget, setSelectedVehicleForBudget] = useState<string | undefined>()
 
-  // Sample Opportunities (Inbound Leads from WhatsApp & Instagram)
+  // Inbound Opportunities (WhatsApp, Instagram, Balcão)
   const [opportunities, setOpportunities] = useState<Opportunity[]>([
     {
       id: 'opp-1',
@@ -89,7 +87,7 @@ export function App() {
     },
   ])
 
-  // Operational Orders
+  // Operational Orders (Igor & Loja)
   const [orders, setOrders] = useState<Order[]>([
     {
       id: 'ord-101',
@@ -229,26 +227,24 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans selection:bg-orange-500 selection:text-white">
-      {/* Sleek Fixed Sidebar */}
+      {/* Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onOpenSqlModal={() => setIsSqlModalOpen(true)}
         leadCount={opportunities.length}
         orderCount={orders.length}
         isMobileOpen={isMobileSidebarOpen}
         setIsMobileOpen={setIsMobileSidebarOpen}
       />
 
-      {/* Main Content Area (Offset by sidebar width on desktop) */}
+      {/* Main Area */}
       <div className="md:pl-64 flex-1 flex flex-col min-w-0">
-        {/* Top Bar */}
         <TopBar
           activeTab={activeTab}
           onToggleMobile={() => setIsMobileSidebarOpen(true)}
+          onNewLeadClick={() => setActiveTab('budget')}
         />
 
-        {/* View Container */}
         <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto">
           {activeTab === 'kanban' && (
             <KanbanView
@@ -298,22 +294,15 @@ export function App() {
             />
           )}
 
-          {activeTab === 'setup' && (
-            <SetupView onOpenSqlModal={() => setIsSqlModalOpen(true)} />
+          {activeTab === 'settings' && (
+            <SettingsView />
           )}
         </main>
 
-        {/* Footer */}
         <footer className="border-t border-slate-200/80 bg-white py-4 px-6 text-center text-xs text-slate-400">
           Robusty CRM © 2026 — Fabricação e Comercialização de Bagageiros Automotivos
         </footer>
       </div>
-
-      {/* SQL Migration Modal */}
-      <DatabaseSetupModal
-        isOpen={isSqlModalOpen}
-        onClose={() => setIsSqlModalOpen(false)}
-      />
     </div>
   )
 }
