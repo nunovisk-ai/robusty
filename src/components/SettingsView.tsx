@@ -30,7 +30,7 @@ export const SettingsView: React.FC = () => {
       {/* Header */}
       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-nexo flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-black text-[#121212] tracking-tight">
+          <h2 className="text-xl font-bold text-[#121212] tracking-tight">
             Configurações da Empresa & Operação
           </h2>
           <p className="text-xs text-slate-500 font-medium mt-1">
@@ -39,7 +39,7 @@ export const SettingsView: React.FC = () => {
         </div>
 
         {saved && (
-          <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold animate-fade-in shadow-xs">
+          <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold animate-fade-in shadow-xs">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>Configurações salvas com sucesso!</span>
           </div>
@@ -51,7 +51,7 @@ export const SettingsView: React.FC = () => {
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-4">
           <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
             <Building2 className="w-4 h-4 text-[#EA580C]" />
-            <h3 className="font-extrabold text-sm text-[#121212]">Dados da Robusty</h3>
+            <h3 className="font-bold text-sm text-[#121212]">Dados da Robusty</h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -91,7 +91,7 @@ export const SettingsView: React.FC = () => {
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-4">
           <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
             <Percent className="w-4 h-4 text-[#EA580C]" />
-            <h3 className="font-extrabold text-sm text-[#121212]">Políticas Comerciais & Descontos</h3>
+            <h3 className="font-bold text-sm text-[#121212]">Políticas Comerciais & Descontos</h3>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -104,7 +104,7 @@ export const SettingsView: React.FC = () => {
                   max="15"
                   value={pixDiscount}
                   onChange={(e) => setPixDiscount(parseInt(e.target.value) || 0)}
-                  className="w-20 bg-white border border-slate-200 rounded-full px-3 py-1.5 text-xs text-slate-900 font-black font-mono text-center"
+                  className="w-20 bg-white border border-slate-200 rounded-full px-3 py-1.5 text-xs text-slate-900 font-bold font-mono text-center"
                 />
                 <span className="text-xs text-slate-500 font-bold">% à vista</span>
               </div>
@@ -119,7 +119,7 @@ export const SettingsView: React.FC = () => {
                   max="10"
                   value={boletoDiscount}
                   onChange={(e) => setBoletoDiscount(parseInt(e.target.value) || 0)}
-                  className="w-20 bg-white border border-slate-200 rounded-full px-3 py-1.5 text-xs text-slate-900 font-black font-mono text-center"
+                  className="w-20 bg-white border border-slate-200 rounded-full px-3 py-1.5 text-xs text-slate-900 font-bold font-mono text-center"
                 />
                 <span className="text-xs text-slate-500 font-bold">% à vista</span>
               </div>
@@ -134,7 +134,7 @@ export const SettingsView: React.FC = () => {
                   max="15"
                   value={maxManualDiscount}
                   onChange={(e) => setMaxManualDiscount(parseInt(e.target.value) || 0)}
-                  className="w-20 bg-white border border-slate-200 rounded-full px-3 py-1.5 text-xs text-slate-900 font-black font-mono text-center"
+                  className="w-20 bg-white border border-slate-200 rounded-full px-3 py-1.5 text-xs text-slate-900 font-bold font-mono text-center"
                 />
                 <span className="text-xs text-slate-500 font-bold">% manual</span>
               </div>
@@ -146,14 +146,14 @@ export const SettingsView: React.FC = () => {
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-4">
           <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
             <Users className="w-4 h-4 text-[#EA580C]" />
-            <h3 className="font-extrabold text-sm text-[#121212]">Usuários Autorizados & Responsabilidades</h3>
+            <h3 className="font-bold text-sm text-[#121212]">Usuários Autorizados & Responsabilidades</h3>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             {/* Joao Ricardo */}
             <div className="p-4 rounded-2xl border border-slate-100 bg-[#F8F9FA] space-y-2 hover:border-[#FED7AA] hover:shadow-xs transition-all">
               <div className="flex items-center justify-between">
-                <div className="w-9 h-9 rounded-xl bg-purple-600 text-white font-black text-xs flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-purple-600 text-white font-bold text-xs flex items-center justify-center">
                   J
                 </div>
                 <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -173,7 +173,7 @@ export const SettingsView: React.FC = () => {
             {/* Norlando */}
             <div className="p-4 rounded-2xl border border-slate-100 bg-[#F8F9FA] space-y-2 hover:border-[#FED7AA] hover:shadow-xs transition-all">
               <div className="flex items-center justify-between">
-                <div className="w-9 h-9 rounded-xl bg-[#EA580C] text-white font-black text-xs flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-[#EA580C] text-white font-bold text-xs flex items-center justify-center">
                   N
                 </div>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -193,7 +193,7 @@ export const SettingsView: React.FC = () => {
             {/* Igor */}
             <div className="p-4 rounded-2xl border border-slate-100 bg-[#F8F9FA] space-y-2 hover:border-[#FED7AA] hover:shadow-xs transition-all">
               <div className="flex items-center justify-between">
-                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white font-black text-xs flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
                   I
                 </div>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -216,7 +216,7 @@ export const SettingsView: React.FC = () => {
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-4">
           <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
             <MessageSquare className="w-4 h-4 text-[#EA580C]" />
-            <h3 className="font-extrabold text-sm text-[#121212]">Canais de Entrada Conectados (Inbound)</h3>
+            <h3 className="font-bold text-sm text-[#121212]">Canais de Entrada Conectados (Inbound)</h3>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">

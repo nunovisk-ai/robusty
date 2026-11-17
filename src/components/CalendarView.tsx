@@ -87,7 +87,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-nexo flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-xl font-black text-[#121212] tracking-tight">
+            <h2 className="text-xl font-bold text-[#121212] tracking-tight">
               Agenda de Instalações na Oficina
             </h2>
             <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60">

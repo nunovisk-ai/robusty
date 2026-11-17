@@ -264,7 +264,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             <span className="text-[11px] text-slate-500">Conexão Segura & Autenticada</span>
           </div>
           <span className="text-[10px] text-slate-400 font-medium">
-            Robusty CRM © 2026
+            CRM Robusty © 2026
           </span>
         </div>
       </div>

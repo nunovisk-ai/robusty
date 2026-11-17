@@ -69,7 +69,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-nexo flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-xl font-black text-[#121212] tracking-tight">
+            <h2 className="text-xl font-bold text-[#121212] tracking-tight">
               Funil Operacional de Pedidos (Igor & Loja)
             </h2>
           </div>
@@ -82,7 +82,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         <div className="flex items-center gap-1.5 bg-[#F8F9FA] p-1.5 rounded-full border border-slate-200/60 self-start md:self-auto">
           <button
             onClick={() => setFilterType('all')}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
               filterType === 'all' ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -90,7 +90,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           </button>
           <button
             onClick={() => setFilterType('transportadora_envio')}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-4 py-2 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
               filterType === 'transportadora_envio' ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -99,7 +99,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           </button>
           <button
             onClick={() => setFilterType('instalacao_loja')}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-4 py-2 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
               filterType === 'instalacao_loja' ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -112,7 +112,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       {/* Operational Flow Legend Banners */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="p-5 rounded-2xl bg-blue-50/50 border border-blue-200/60 shadow-xs">
-          <div className="flex items-center gap-2 text-xs font-black text-blue-900 uppercase tracking-wider mb-2">
+          <div className="flex items-center gap-2 text-xs font-bold text-blue-900 uppercase tracking-wider mb-2">
             <Truck className="w-4 h-4 text-blue-600" />
             <span>Caminho A: Envio por Transportadora (Igor)</span>
           </div>
@@ -126,7 +126,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         </div>
 
         <div className="p-5 rounded-2xl bg-emerald-50/50 border border-emerald-200/60 shadow-xs">
-          <div className="flex items-center gap-2 text-xs font-black text-emerald-900 uppercase tracking-wider mb-2">
+          <div className="flex items-center gap-2 text-xs font-bold text-emerald-900 uppercase tracking-wider mb-2">
             <Wrench className="w-4 h-4 text-emerald-600" />
             <span>Caminho B: Instalação na Loja Física (Loja)</span>
           </div>
@@ -156,7 +156,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
               >
                 <div className="space-y-2.5">
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="font-mono text-xs font-extrabold px-3 py-1 rounded-full bg-slate-100 text-slate-800">
+                    <span className="font-mono text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-800">
                       Pedido #{order.order_number}
                     </span>
                     {getStatusBadge(order.status)}

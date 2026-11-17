@@ -159,7 +159,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
         <div className="p-4 rounded-2xl bg-[#FFF8F3] border border-[#FED7AA] flex items-start gap-3 shadow-xs">
           <AlertTriangle className="w-5 h-5 text-[#EA580C] shrink-0 mt-0.5" />
           <div className="text-xs text-[#9A3412]">
-            <span className="font-extrabold text-[#7C2D12] block mb-0.5">Nota Técnica para {selectedVehicle.model}:</span>
+            <span className="font-bold text-[#7C2D12] block mb-0.5">Nota Técnica para {selectedVehicle.model}:</span>
             {selectedVehicle.notes}
           </div>
         </div>
@@ -262,8 +262,8 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
-                      <span className="text-[#EA580C] font-bold">PIX (10% MAX):</span>
-                      <span className="font-black text-[#EA580C] font-mono text-sm">{formatCurrency(p.max_discount_price_10pct)}</span>
+                      <span className="text-[#EA580C] font-semibold">PIX (10% MAX):</span>
+                      <span className="font-bold text-[#EA580C] font-mono text-sm">{formatCurrency(p.max_discount_price_10pct)}</span>
                     </div>
 
                     {p.installation_cost > 0 && (

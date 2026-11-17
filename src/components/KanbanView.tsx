@@ -166,10 +166,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               {/* Column Header */}
               <div className="flex items-center justify-between pb-3 pt-1 px-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-extrabold text-sm text-[#121212] tracking-tight">
+                  <h3 className="font-semibold text-sm text-[#121212] tracking-tight">
                     {col.title}
                   </h3>
-                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${col.countColor}`}>
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${col.countColor}`}>
                     {colOpps.length}
                   </span>
                 </div>
@@ -188,8 +188,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               </div>
 
               {/* Subtotal of Column */}
-              <div className="px-1 pb-3 text-xs font-bold text-slate-500">
-                Total: <span className="text-slate-800 font-extrabold">{formatCurrency(colTotal)}</span>
+              <div className="px-1 pb-3 text-xs font-medium text-slate-500">
+                Total: <span className="text-slate-800 font-semibold">{formatCurrency(colTotal)}</span>
               </div>
 
               {/* Column Cards Container */}
@@ -206,11 +206,11 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     >
                       {/* Row 1: Avatar, Name & Vehicle (Exact Nexo image_7.png layout) */}
                       <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#EA580C] to-[#FB923C] text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#EA580C] to-[#FB923C] text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
                           {getInitials(opp.contact?.full_name)}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <h4 className="font-bold text-sm text-[#121212] tracking-tight truncate leading-tight group-hover:text-[#EA580C] transition-colors">
+                          <h4 className="font-semibold text-sm text-[#121212] tracking-tight truncate leading-tight group-hover:text-[#EA580C] transition-colors">
                             {opp.contact?.full_name || 'Lead sem nome'}
                           </h4>
                           <p className="text-xs text-slate-500 truncate font-medium mt-0.5">
@@ -281,10 +281,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       {/* Row 6: Total Value & Primary Step Action */}
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                         <div>
-                          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                          <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
                             Orçamento
                           </div>
-                          <div className="text-base font-extrabold text-[#121212]">
+                          <div className="text-base font-bold text-[#121212]">
                             {formatCurrency(opp.final_total)}
                           </div>
                         </div>

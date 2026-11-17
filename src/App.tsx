@@ -426,7 +426,7 @@ export function App() {
         </main>
 
         <footer className="border-t border-slate-200/80 bg-white py-4 px-6 text-center text-xs text-slate-400">
-          Robusty CRM © 2026 — Fabricação e Comercialização de Bagageiros Automotivos
+          CRM Robusty © 2026 — Fabricação e Comercialização de Bagageiros Automotivos
         </footer>
       </div>
     </div>

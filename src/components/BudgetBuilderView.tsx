@@ -232,7 +232,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 <span>2. Veículo do Cliente (Regra de Dependência)</span>
               </h3>
               {selectedVehicle && (
-                <span className="text-xs font-extrabold text-[#EA580C] bg-[#FFF3EA] px-3 py-1 rounded-full">
+                <span className="text-xs font-semibold text-[#EA580C] bg-[#FFF3EA] px-3 py-1 rounded-full">
                   {selectedVehicle.model}
                 </span>
               )}
@@ -248,7 +248,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   }}
                   className={`p-3.5 rounded-2xl text-left border transition-all cursor-pointer ${
                     selectedVehicleId === v.id
-                      ? 'bg-[#FFF3EA] border-[#EA580C] text-[#EA580C] font-extrabold shadow-xs'
+                      ? 'bg-[#FFF3EA] border-[#EA580C] text-[#EA580C] font-semibold shadow-xs'
                       : 'bg-slate-50/70 border-slate-200/70 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
                   }`}
                 >
@@ -558,7 +558,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
             <div className="mb-4">
               <div className="flex items-center justify-between text-xs mb-1">
                 <span className="text-slate-600 font-bold">Desconto Manual:</span>
-                <span className="font-mono text-[#EA580C] font-extrabold">{discountPercent}%</span>
+                <span className="font-mono text-[#EA580C] font-bold">{discountPercent}%</span>
               </div>
               <input
                 type="range"
@@ -600,14 +600,14 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               )}
 
               <div className="pt-3 border-t border-slate-200 flex justify-between items-baseline">
-                <span className="font-extrabold text-sm text-[#121212]">VALOR TOTAL:</span>
-                <span className="font-black text-2xl text-[#EA580C] font-sans">
+                <span className="font-bold text-sm text-[#121212]">VALOR TOTAL:</span>
+                <span className="font-bold text-2xl text-[#EA580C] font-sans">
                   {formatCurrency(budget.finalTotal)}
                 </span>
               </div>
 
               {budget.savingsVs10x > 0 && (
-                <div className="text-[11px] text-emerald-700 text-right font-sans font-extrabold pt-0.5">
+                <div className="text-[11px] text-emerald-700 text-right font-sans font-semibold pt-0.5">
                   Economia cliente: {formatCurrency(budget.savingsVs10x)}
                 </div>
               )}
