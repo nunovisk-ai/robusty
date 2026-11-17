@@ -2090,28 +2090,26 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 </button>
               </div>
 
-              {/* Botões Principais: Salvar no Funil + Criar Pedido */}
+              {/* Botões Principais: Salvar + Gerar Pedido */}
               <div className="grid grid-cols-2 gap-2">
                 {/* Botão Salvar (Cria/atualiza o card no Funil de Vendas) */}
                 <button
                   type="button"
                   onClick={handleSave}
-                  disabled={items.length === 0}
-                  className="py-3 px-3 rounded-xl text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] text-white shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-98"
+                  className="py-3 px-3 rounded-xl text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] text-white shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
                 >
                   <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>Salvar Orçamento</span>
+                  <span>Salvar</span>
                 </button>
 
-                {/* Botão Criar Pedido (Integra diretamente com o Funil de Pedidos) */}
+                {/* Botão Gerar Pedido (Integra diretamente com o Funil de Pedidos) */}
                 <button
                   type="button"
                   onClick={handleGenerateOrderAction}
-                  disabled={items.length === 0}
-                  className="py-3 px-3 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-98"
+                  className="py-3 px-3 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
                 >
                   <Truck className="w-4 h-4 shrink-0" />
-                  <span>Criar Pedido</span>
+                  <span>Gerar Pedido</span>
                 </button>
               </div>
 

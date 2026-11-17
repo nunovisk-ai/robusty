@@ -504,7 +504,7 @@ export function App() {
       total_weight_kg: data.totalWeightKg,
       customer_email: data.customerEmail,
       address: data.address,
-      items: data.items.map((i: any) => ({
+      items: (data.items || []).filter((i: any) => i && i.product).map((i: any) => ({
         id: `item-${i.product.id}`,
         opportunity_id: data.id,
         product_id: i.product.id,
@@ -560,19 +560,19 @@ export function App() {
       return
     }
 
-    // Persistir no Supabase
-    await saveOpportunityToSupabase({
+    // Persistir no Supabase em segundo plano (não bloqueia UI)
+    saveOpportunityToSupabase({
       customerName: data.customerName,
-      customerPhone: data.customerPhone,
+      customerPhone: data.customerPhone || '',
       vehicleModel: data.vehicleModel,
       vehicleId: data.vehicleId,
       fulfillmentType: data.fulfillment,
-      subtotal: data.budget.subtotal,
-      freightValue: data.budget.freightValue,
-      installationValue: data.budget.installationValue,
-      discountValue: data.budget.discountValue,
-      discountPercent: data.budget.discountPercent,
-      finalTotal: data.budget.finalTotal,
+      subtotal: data.budget?.subtotal ?? 0,
+      freightValue: data.budget?.freightValue ?? 0,
+      installationValue: data.budget?.installationValue ?? 0,
+      discountValue: data.budget?.discountValue ?? 0,
+      discountPercent: data.budget?.discountPercent ?? 0,
+      finalTotal: data.budget?.finalTotal ?? 0,
       paymentMethod: data.paymentMethod,
       cep: data.address?.cep,
       street: data.address?.street,
@@ -580,7 +580,7 @@ export function App() {
       neighborhood: data.address?.neighborhood,
       city: data.address?.city,
       state: data.address?.state,
-    })
+    }).catch((err) => console.warn('Supabase sync skipped:', err))
 
     setEditingOpportunity(null)
     setActiveTab('kanban')
@@ -633,7 +633,7 @@ export function App() {
       total_weight_kg: data.totalWeightKg,
       customer_email: data.customerEmail,
       address: data.address,
-      items: data.items.map((i: any) => ({
+      items: (data.items || []).filter((i: any) => i && i.product).map((i: any) => ({
         id: `item-${i.product.id}`,
         opportunity_id: data.id,
         product_id: i.product.id,

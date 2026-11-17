@@ -45,8 +45,8 @@ export async function saveOpportunityToSupabase(payload: {
   state?: string
 }): Promise<Opportunity | null> {
   try {
-    const cleanPhone = payload.customerPhone.replace(/\D/g, '')
-    const phoneE164 = cleanPhone.startsWith('55') ? `+${cleanPhone}` : `+55${cleanPhone}`
+    const cleanPhone = (payload.customerPhone || '').replace(/\D/g, '')
+    const phoneE164 = cleanPhone ? (cleanPhone.startsWith('55') ? `+${cleanPhone}` : `+55${cleanPhone}`) : '+5511999999999'
 
     // 1. Upsert Contact
     const { data: contactData, error: contactError } = await supabase
