@@ -17,6 +17,7 @@ import {
   FaInstagram, 
   FaFacebook, 
   FaStore, 
+  FaGlobe,
   FaTruck, 
   FaVanShuttle, 
   FaCarSide, 
@@ -263,18 +264,53 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     }
   }
 
-  // Ícones das plataformas de leads usando biblioteca Font Awesome (react-icons/fa6)
-  const renderPlatformIconFA = (origin?: string) => {
+  // Helper para o badge de origem no topo do card (ícone + nome)
+  const getOriginBadge = (origin?: string) => {
     switch (origin) {
       case 'whatsapp_inbound':
-        return <FaWhatsapp className="w-3.5 h-3.5 text-[#25D366] shrink-0" />
+        return {
+          label: 'WhatsApp',
+          Icon: FaWhatsapp,
+          bgClasses: 'bg-emerald-50 text-[#15803D] border-emerald-200/90',
+          iconColor: 'text-[#25D366]'
+        }
       case 'instagram_direct':
-        return <FaInstagram className="w-3.5 h-3.5 text-[#E1306C] shrink-0" />
+        return {
+          label: 'Instagram',
+          Icon: FaInstagram,
+          bgClasses: 'bg-pink-50 text-[#BE185D] border-pink-200/90',
+          iconColor: 'text-[#E1306C]'
+        }
       case 'meta_lead_ads':
-        return <FaFacebook className="w-3.5 h-3.5 text-[#1877F2] shrink-0" />
+        return {
+          label: 'Facebook Ads',
+          Icon: FaFacebook,
+          bgClasses: 'bg-blue-50 text-[#1D4ED8] border-blue-200/90',
+          iconColor: 'text-[#1877F2]'
+        }
+      case 'site_form':
+      case 'site':
+        return {
+          label: 'Site Oficial',
+          Icon: FaGlobe,
+          bgClasses: 'bg-sky-50 text-[#0369A1] border-sky-200/90',
+          iconColor: 'text-sky-600'
+        }
       case 'loja_presencial':
+      case 'manual':
+        return {
+          label: 'Loja Balcão',
+          Icon: FaStore,
+          bgClasses: 'bg-amber-50 text-[#B45309] border-amber-200/90',
+          iconColor: 'text-amber-600'
+        }
       default:
-        return <FaStore className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+        return {
+          label: 'Atendimento Direto',
+          Icon: FaGlobe,
+          bgClasses: 'bg-slate-100 text-slate-700 border-slate-200/90',
+          iconColor: 'text-slate-500'
+        }
     }
   }
 
@@ -297,6 +333,149 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     if (!clean) return null
     const full = clean.startsWith('55') ? clean : `55${clean}`
     return `https://wa.me/${full}`
+  }
+
+  const getInstagramUrl = (val?: string) => {
+    if (!val) return null
+    const clean = val.trim()
+    if (!clean) return null
+    if (clean.startsWith('http://') || clean.startsWith('https://')) return clean
+    const handle = clean.replace(/^@/, '')
+    return `https://instagram.com/${handle}`
+  }
+
+  const getFacebookUrl = (val?: string) => {
+    if (!val) return null
+    const clean = val.trim()
+    if (!clean) return null
+    if (clean.startsWith('http://') || clean.startsWith('https://')) return clean
+    return `https://facebook.com/${clean}`
+  }
+
+  const getWebsiteUrl = (val?: string) => {
+    if (!val) return null
+    const clean = val.trim()
+    if (!clean) return null
+    if (clean.startsWith('http://') || clean.startsWith('https://')) return clean
+    return `https://${clean}`
+  }
+
+  interface SocialLinksProps {
+    phone?: string
+    instagram?: string
+    facebook?: string
+    website?: string
+    clientName?: string
+    isCompact?: boolean
+  }
+
+  const renderSocialDock = ({
+    phone,
+    instagram,
+    facebook,
+    website,
+    clientName,
+    isCompact = false
+  }: SocialLinksProps) => {
+    const waUrl = getWhatsAppLink(phone)
+    const igUrl = getInstagramUrl(instagram)
+    const fbUrl = getFacebookUrl(facebook)
+    const webUrl = getWebsiteUrl(website)
+
+    const iconSize = isCompact ? 'w-2.5 h-2.5' : 'w-3 h-3'
+    const btnPadding = isCompact ? 'p-1 rounded-md' : 'p-1.5 rounded-lg'
+
+    return (
+      <div className="flex items-center gap-1">
+        {/* WhatsApp */}
+        {waUrl ? (
+          <a
+            href={waUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            title={`WhatsApp: Conversar com ${clientName || 'cliente'}`}
+            className={`${btnPadding} bg-emerald-50 hover:bg-[#25D366] text-[#25D366] hover:text-white border border-emerald-200 hover:border-[#25D366] transition-all cursor-pointer shadow-2xs flex items-center justify-center`}
+          >
+            <FaWhatsapp className={iconSize} />
+          </a>
+        ) : (
+          <span
+            onClick={(e) => e.stopPropagation()}
+            title="WhatsApp não informado"
+            className={`${btnPadding} bg-slate-50 text-slate-300 border border-slate-150 cursor-not-allowed opacity-40 flex items-center justify-center`}
+          >
+            <FaWhatsapp className={iconSize} />
+          </span>
+        )}
+
+        {/* Instagram */}
+        {igUrl ? (
+          <a
+            href={igUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            title={`Instagram: Abrir perfil de ${clientName || 'cliente'}`}
+            className={`${btnPadding} bg-pink-50 hover:bg-[#E1306C] text-[#E1306C] hover:text-white border border-pink-200 hover:border-[#E1306C] transition-all cursor-pointer shadow-2xs flex items-center justify-center`}
+          >
+            <FaInstagram className={iconSize} />
+          </a>
+        ) : (
+          <span
+            onClick={(e) => e.stopPropagation()}
+            title="Instagram não informado"
+            className={`${btnPadding} bg-slate-50 text-slate-300 border border-slate-150 cursor-not-allowed opacity-40 flex items-center justify-center`}
+          >
+            <FaInstagram className={iconSize} />
+          </span>
+        )}
+
+        {/* Facebook */}
+        {fbUrl ? (
+          <a
+            href={fbUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            title={`Facebook: Abrir página de ${clientName || 'cliente'}`}
+            className={`${btnPadding} bg-blue-50 hover:bg-[#1877F2] text-[#1877F2] hover:text-white border border-blue-200 hover:border-[#1877F2] transition-all cursor-pointer shadow-2xs flex items-center justify-center`}
+          >
+            <FaFacebook className={iconSize} />
+          </a>
+        ) : (
+          <span
+            onClick={(e) => e.stopPropagation()}
+            title="Facebook não informado"
+            className={`${btnPadding} bg-slate-50 text-slate-300 border border-slate-150 cursor-not-allowed opacity-40 flex items-center justify-center`}
+          >
+            <FaFacebook className={iconSize} />
+          </span>
+        )}
+
+        {/* Website */}
+        {webUrl ? (
+          <a
+            href={webUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            title={`Site: Visitar página de ${clientName || 'cliente'}`}
+            className={`${btnPadding} bg-sky-50 hover:bg-sky-600 text-sky-600 hover:text-white border border-sky-200 hover:border-sky-600 transition-all cursor-pointer shadow-2xs flex items-center justify-center`}
+          >
+            <FaGlobe className={iconSize} />
+          </a>
+        ) : (
+          <span
+            onClick={(e) => e.stopPropagation()}
+            title="Website não informado"
+            className={`${btnPadding} bg-slate-50 text-slate-300 border border-slate-150 cursor-not-allowed opacity-40 flex items-center justify-center`}
+          >
+            <FaGlobe className={iconSize} />
+          </span>
+        )}
+      </div>
+    )
   }
 
   // Filtrar Oportunidades de Vendas (Nome, Telefone, Veículo, Número do Pedido, Transportadora)
@@ -484,11 +663,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 onDragOver={(e) => handleDragOver(e, col.id)}
                 onDragLeave={() => handleDragLeave(col.id)}
                 onDrop={(e) => handleDropOpportunity(e, col.id)}
-                style={{ 
-                  boxShadow: isDragTarget ? `0 0 0 2.5px ${col.stripeColor}` : undefined,
-                }}
                 className={`w-[290px] flex-shrink-0 bg-slate-100/90 rounded-2xl border border-slate-200/90 flex flex-col h-full max-h-full shadow-2xs transition-all duration-200 overflow-hidden ${
-                  isDragTarget ? 'bg-slate-200/60' : ''
+                  isDragTarget ? 'bg-slate-200/70 ring-2 ring-slate-300/80 shadow-inner' : ''
                 }`}
               >
                 {/* Faixa superior colorida da etapa (Elemento dedicado - NUNCA apaga) */}
@@ -531,8 +707,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       const isWonStage = col.id === 'venda_ganha'
                       const canMovePrev = colIdx > 0
                       const canMoveNext = colIdx < SALES_STAGES.length - 1 && !isWonStage && col.id !== 'venda_perdida'
-
-                      const oppWhatsappUrl = getWhatsAppLink(opp.contact?.phone_e164)
+                      const originBadge = getOriginBadge(opp.contact?.origin)
+                      const OriginIcon = originBadge.Icon
 
                       return (
                         <div
@@ -540,7 +716,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           draggable={true}
                           onDragStart={(e) => handleDragStart(e, opp.id)}
                           onDragEnd={handleDragEnd}
-                          className={`bg-white rounded-xl border border-slate-200/90 hover:border-[#EA580C] shadow-2xs hover:shadow-md transition-all duration-150 cursor-grab active:cursor-grabbing group select-none ${
+                          onClick={() => onSelectOpportunity?.(opp)}
+                          className={`bg-white rounded-xl border border-slate-200/90 hover:border-[#EA580C] shadow-2xs hover:shadow-md transition-all duration-150 cursor-pointer active:cursor-grabbing group select-none ${
                             density === 'compact' ? 'p-2.5 space-y-2' : 'p-3.5 space-y-2.5'
                           } ${
                             draggedItemId === opp.id ? 'opacity-30 scale-95 -rotate-1 shadow-2xl ring-2 ring-orange-500/20' : 'hover:-translate-y-0.5'
@@ -549,48 +726,49 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           {density === 'compact' ? (
                             /* Layout Compacto (Alta Densidade) */
                             <>
+                              {/* Linha 1: Headline #ROB-xxxx + Badge Origem */}
                               <div className="flex items-center justify-between gap-1">
-                                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1 shadow-2xs">
-                                  {renderVehicleIcon(vehicle.iconType)}
-                                  <span className="truncate max-w-[100px]">{vehicle.modelName}</span>
-                                </span>
-                                <span className="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                <span className="font-mono font-bold text-[10px] text-slate-800 tracking-tight">
                                   #ROB-{opp.order_number || 1040}
+                                </span>
+                                <span 
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border flex items-center gap-1 shadow-2xs ${originBadge.bgClasses}`}
+                                  title={getOriginTitle(opp.contact?.origin)}
+                                >
+                                  <OriginIcon className={`w-2.5 h-2.5 ${originBadge.iconColor} shrink-0`} />
+                                  <span className="truncate max-w-[80px]">{originBadge.label}</span>
                                 </span>
                               </div>
 
-                              <div className="flex items-start justify-between gap-2">
-                                <h4 
-                                  onClick={() => onSelectOpportunity?.(opp)}
-                                  className="font-heading font-bold text-xs text-slate-900 hover:text-[#EA580C] transition-colors cursor-pointer truncate"
-                                  title="Clique para abrir e editar orçamento"
-                                >
-                                  {opp.contact?.full_name || 'Cliente'}
-                                </h4>
-                                <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
+                              {/* Linha 2: Veículo (Pill Preto) + Valor Verde */}
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1 shadow-2xs">
+                                  {renderVehicleIcon(vehicle.iconType)}
+                                  <span className="truncate max-w-[90px]">{vehicle.modelName}</span>
+                                </span>
+                                <span className="font-mono text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.5 rounded border border-emerald-300">
                                   {formatCurrency(opp.final_total)}
                                 </span>
                               </div>
 
+                              {/* Linha 3: Nome do Cliente */}
+                              <h4 
+                                className="font-heading font-bold text-xs text-slate-900 group-hover:text-[#EA580C] transition-colors truncate"
+                                title={opp.contact?.full_name || 'Cliente'}
+                              >
+                                {opp.contact?.full_name || 'Cliente'}
+                              </h4>
+
+                              {/* Linha 4: Doca Social Compacta + Ações */}
                               <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">
-                                <div className="flex items-center gap-1.5">
-                                  <span title={getOriginTitle(opp.contact?.origin)}>
-                                    {renderPlatformIconFA(opp.contact?.origin)}
-                                  </span>
-                                  {oppWhatsappUrl && (
-                                    <a
-                                      href={oppWhatsappUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      onClick={(e) => e.stopPropagation()}
-                                      title={`Conversar com ${opp.contact?.full_name} no WhatsApp`}
-                                      className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-600 text-[#25D366] hover:text-white border border-emerald-200 hover:border-emerald-600 transition-colors text-[10px] font-bold cursor-pointer"
-                                    >
-                                      <FaWhatsapp className="w-2.5 h-2.5" />
-                                      <span>Zap</span>
-                                    </a>
-                                  )}
-                                </div>
+                                {renderSocialDock({
+                                  phone: opp.contact?.phone_e164,
+                                  instagram: opp.instagram_url || opp.contact?.instagram_url || opp.contact?.instagram_handle,
+                                  facebook: opp.facebook_url || opp.contact?.facebook_url,
+                                  website: opp.website_url || opp.contact?.website_url,
+                                  clientName: opp.contact?.full_name,
+                                  isCompact: true
+                                })}
 
                                 <div className="flex items-center gap-1">
                                   {canMovePrev && (
@@ -612,7 +790,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                         e.stopPropagation()
                                         onConvertToOrder && onConvertToOrder(opp)
                                       }}
-                                      className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                                      className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
                                     >
                                       <CheckCircle2 className="w-2.5 h-2.5" />
                                       <span>Pedido</span>
@@ -635,38 +813,45 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           ) : (
                             /* Layout Detalhado (Padrão Completo) */
                             <>
-                              {/* Linha 1: Modelo do Veículo em destaque (Pill Preto) + Número do Pedido + Responsável */}
+                              {/* Linha 1: Headline #ROB-xxxx no topo à esquerda + Badge completo de Origem no topo à direita */}
+                              <div className="flex items-center justify-between gap-1.5 pb-0.5">
+                                <span className="font-mono font-bold text-xs text-slate-800 tracking-tight flex items-center gap-1">
+                                  <span className="text-slate-400 font-normal">#</span>
+                                  ROB-{opp.order_number || 1040}
+                                </span>
+                                <span 
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1.5 shadow-2xs ${originBadge.bgClasses}`}
+                                  title={getOriginTitle(opp.contact?.origin)}
+                                >
+                                  <OriginIcon className={`w-3 h-3 ${originBadge.iconColor} shrink-0`} />
+                                  <span className="truncate max-w-[110px]">{originBadge.label}</span>
+                                </span>
+                              </div>
+
+                              {/* Linha 2: Modelo do Veículo em destaque (Pill Preto) + Responsável */}
                               <div className="flex items-center justify-between gap-1 flex-wrap">
                                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1.5 shadow-2xs">
                                   {renderVehicleIcon(vehicle.iconType)}
-                                  <span>{vehicle.modelName}</span>
+                                  <span className="truncate max-w-[120px]">{vehicle.modelName}</span>
                                 </span>
 
-                                <div className="flex items-center gap-1">
-                                  <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                                    #ROB-{opp.order_number || 1040}
-                                  </span>
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
-                                    🔵 {opp.assigned_to || 'Norlando'}
-                                  </span>
-                                </div>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1">
+                                  <span className="text-[8px]">🔵</span>
+                                  <span>{opp.assigned_to || 'Norlando'}</span>
+                                </span>
                               </div>
 
-                              {/* Linha 2: Nome do Cliente & Valor */}
-                              <div className="flex items-start justify-between gap-2">
+                              {/* Linha 3: Nome do Cliente */}
+                              <div>
                                 <h4 
-                                  onClick={() => onSelectOpportunity?.(opp)}
-                                  className="font-heading font-bold text-xs text-slate-900 hover:text-[#EA580C] transition-colors cursor-pointer leading-snug line-clamp-2"
-                                  title="Clique para abrir e editar orçamento"
+                                  className="font-heading font-bold text-xs text-slate-900 group-hover:text-[#EA580C] transition-colors leading-snug line-clamp-2"
+                                  title={opp.contact?.full_name || 'Cliente'}
                                 >
-                                  {opp.contact?.full_name || 'Cliente'}
+                                  {opp.contact?.full_name || 'Cliente Sem Nome'}
                                 </h4>
-                                <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
-                                  {formatCurrency(opp.final_total)}
-                                </span>
                               </div>
 
-                              {/* Linha 3: Caixa de Descrição do Produto & Especificações */}
+                              {/* Linha 4: Caixa de Descrição do Produto & Especificações */}
                               <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-[11px] space-y-0.5">
                                 <p className="font-medium text-slate-800 truncate">
                                   Bagageiro {vehicle.modelName} Modelo EXTREME
@@ -674,56 +859,30 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                 <div className="flex items-center justify-between text-[10px] text-slate-500">
                                   <span>
                                     {opp.fulfillment_type === 'instalacao_loja' 
-                                      ? 'Caminho B: Instalação na Loja' 
-                                      : 'Caminho A: Entrega Transportadora'}
+                                      ? 'Instalação na Loja' 
+                                      : 'Entrega Transportadora'}
                                   </span>
                                   <span className="font-mono">Preto Epóxi</span>
                                 </div>
                               </div>
 
-                              {/* Linha 4: Badges Operacionais */}
-                              <div className="flex flex-wrap gap-1">
-                                <span className="text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 font-medium">
-                                  📦 {opp.fulfillment_type === 'instalacao_loja' ? 'Instalação Loja' : 'Cotação Igor'}
+                              {/* Linha 5: Badge do Preço em destaque verde (substituindo Cotação Igor e Nota Fiscal) */}
+                              <div className="flex items-center justify-between pt-0.5">
+                                <span className="text-[11px] font-semibold text-slate-500">Valor Total:</span>
+                                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-100/90 px-2.5 py-0.5 rounded-lg border border-emerald-300 shadow-2xs">
+                                  {formatCurrency(opp.final_total)}
                                 </span>
-                                {opp.fulfillment_type === 'transportadora_envio' && (
-                                  <span className="text-[9px] bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 font-medium">
-                                    🧾 Nota Fiscal
-                                  </span>
-                                )}
                               </div>
 
-                              {/* Linha 5: Rodapé com Ícone da Plataforma (FontAwesome) + WhatsApp Direto + Ações */}
+                              {/* Linha 6: Rodapé com Doca de Redes Sociais + Ações de Avanço de Etapa (Sem botão Detalhes) */}
                               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                                <div className="flex items-center gap-1.5">
-                                  <button 
-                                    title={getOriginTitle(opp.contact?.origin)} 
-                                    className="p-1 hover:bg-slate-100 rounded transition-colors cursor-pointer"
-                                  >
-                                    {renderPlatformIconFA(opp.contact?.origin)}
-                                  </button>
-
-                                  {oppWhatsappUrl && (
-                                    <a
-                                      href={oppWhatsappUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      onClick={(e) => e.stopPropagation()}
-                                      title={`Abrir WhatsApp com ${opp.contact?.full_name}`}
-                                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-[#25D366] hover:text-white border border-emerald-200 hover:border-emerald-600 transition-colors text-[10px] font-bold cursor-pointer"
-                                    >
-                                      <FaWhatsapp className="w-3 h-3" />
-                                      <span>WhatsApp</span>
-                                    </a>
-                                  )}
-
-                                  <button 
-                                    onClick={() => onSelectOpportunity?.(opp)}
-                                    className="text-[11px] text-slate-500 hover:text-slate-900 font-medium cursor-pointer"
-                                  >
-                                    Detalhes
-                                  </button>
-                                </div>
+                                {renderSocialDock({
+                                  phone: opp.contact?.phone_e164,
+                                  instagram: opp.instagram_url || opp.contact?.instagram_url || opp.contact?.instagram_handle,
+                                  facebook: opp.facebook_url || opp.contact?.facebook_url,
+                                  website: opp.website_url || opp.contact?.website_url,
+                                  clientName: opp.contact?.full_name,
+                                })}
 
                                 <div className="flex items-center gap-1">
                                   {canMovePrev && (
@@ -745,7 +904,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                         e.stopPropagation()
                                         onConvertToOrder && onConvertToOrder(opp)
                                       }}
-                                      className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                                      className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
                                     >
                                       <CheckCircle2 className="w-3 h-3" />
                                       <span>Gerar Pedido</span>
@@ -757,7 +916,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                         onMoveStage(opp.id, SALES_STAGES[colIdx + 1].id)
                                       }}
                                       title="Avançar etapa" 
-                                      className="p-1 bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white rounded transition-colors cursor-pointer"
+                                      className="p-1 bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white rounded-lg transition-colors cursor-pointer"
                                     >
                                       <ArrowRight className="w-3.5 h-3.5" />
                                     </button>
@@ -791,11 +950,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 onDragOver={(e) => handleDragOver(e, col.id)}
                 onDragLeave={() => handleDragLeave(col.id)}
                 onDrop={(e) => handleDropOrder(e, col.id)}
-                style={{ 
-                  boxShadow: isDragTarget ? `0 0 0 2.5px ${col.stripeColor}` : undefined,
-                }}
                 className={`w-[290px] flex-shrink-0 bg-slate-100/90 rounded-2xl border border-slate-200/90 flex flex-col h-full max-h-full shadow-2xs transition-all duration-200 overflow-hidden ${
-                  isDragTarget ? 'bg-slate-200/60' : ''
+                  isDragTarget ? 'bg-slate-200/70 ring-2 ring-slate-300/80 shadow-inner' : ''
                 }`}
               >
                 {/* Faixa superior colorida da etapa (Elemento dedicado - NUNCA apaga) */}
@@ -839,6 +995,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       const ordTotal = getOrderTotal(ord)
                       const canMovePrev = colIdx > 0
                       const canMoveNext = colIdx < ORDER_STAGES.length - 1 && col.id !== 'pedido_concluido' && col.id !== 'pedido_cancelado'
+                      const originBadge = getOriginBadge(ord.contact?.origin || linkedOpp?.contact?.origin)
+                      const OriginIcon = originBadge.Icon
 
                       const handleOpenOrderDetails = () => {
                         if (onSelectOpportunity) {
@@ -872,15 +1030,14 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         }
                       }
 
-                      const ordWhatsappUrl = getWhatsAppLink(ord.contact?.phone_e164 || linkedOpp?.contact?.phone_e164)
-
                       return (
                         <div
                           key={ord.id}
                           draggable={true}
                           onDragStart={(e) => handleDragStart(e, ord.id)}
                           onDragEnd={handleDragEnd}
-                          className={`bg-white rounded-xl border border-slate-200/90 hover:border-[#EA580C] shadow-2xs hover:shadow-md transition-all duration-150 cursor-grab active:cursor-grabbing group select-none ${
+                          onClick={handleOpenOrderDetails}
+                          className={`bg-white rounded-xl border border-slate-200/90 hover:border-[#EA580C] shadow-2xs hover:shadow-md transition-all duration-150 cursor-pointer active:cursor-grabbing group select-none ${
                             density === 'compact' ? 'p-2.5 space-y-2' : 'p-3.5 space-y-2.5'
                           } ${
                             draggedItemId === ord.id ? 'opacity-30 scale-95 -rotate-1 shadow-2xl ring-2 ring-orange-500/20' : 'hover:-translate-y-0.5'
@@ -889,48 +1046,49 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           {density === 'compact' ? (
                             /* Layout Compacto (Alta Densidade) */
                             <>
+                              {/* Linha 1: Headline #ROB-xxxx + Badge Origem */}
                               <div className="flex items-center justify-between gap-1">
-                                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1 shadow-2xs">
-                                  {renderVehicleIcon(vehicle.iconType)}
-                                  <span className="truncate max-w-[100px]">{vehicle.modelName}</span>
-                                </span>
-                                <span className="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                <span className="font-mono font-bold text-[10px] text-slate-800 tracking-tight">
                                   #ROB-{ord.order_number}
+                                </span>
+                                <span 
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border flex items-center gap-1 shadow-2xs ${originBadge.bgClasses}`}
+                                  title={getOriginTitle(ord.contact?.origin || linkedOpp?.contact?.origin)}
+                                >
+                                  <OriginIcon className={`w-2.5 h-2.5 ${originBadge.iconColor} shrink-0`} />
+                                  <span className="truncate max-w-[80px]">{originBadge.label}</span>
                                 </span>
                               </div>
 
-                              <div className="flex items-start justify-between gap-2">
-                                <h4 
-                                  onClick={handleOpenOrderDetails}
-                                  className="font-heading font-bold text-xs text-slate-900 hover:text-[#EA580C] transition-colors cursor-pointer truncate"
-                                  title="Clique para abrir e editar pedido"
-                                >
-                                  {ord.contact?.full_name || 'Cliente'}
-                                </h4>
-                                <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
+                              {/* Linha 2: Veículo (Pill Preto) + Valor Verde */}
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1 shadow-2xs">
+                                  {renderVehicleIcon(vehicle.iconType)}
+                                  <span className="truncate max-w-[90px]">{vehicle.modelName}</span>
+                                </span>
+                                <span className="font-mono text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.5 rounded border border-emerald-300">
                                   {formatCurrency(ordTotal)}
                                 </span>
                               </div>
 
+                              {/* Linha 3: Nome do Cliente */}
+                              <h4 
+                                className="font-heading font-bold text-xs text-slate-900 group-hover:text-[#EA580C] transition-colors truncate"
+                                title={ord.contact?.full_name || linkedOpp?.contact?.full_name || 'Cliente'}
+                              >
+                                {ord.contact?.full_name || linkedOpp?.contact?.full_name || 'Cliente'}
+                              </h4>
+
+                              {/* Linha 4: Doca Social Compacta + Ações */}
                               <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">
-                                <div className="flex items-center gap-1.5">
-                                  <span title={getOriginTitle(ord.contact?.origin)}>
-                                    {renderPlatformIconFA(ord.contact?.origin)}
-                                  </span>
-                                  {ordWhatsappUrl && (
-                                    <a
-                                      href={ordWhatsappUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      onClick={(e) => e.stopPropagation()}
-                                      title={`Conversar com ${ord.contact?.full_name} no WhatsApp`}
-                                      className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-600 text-[#25D366] hover:text-white border border-emerald-200 hover:border-emerald-600 transition-colors text-[10px] font-bold cursor-pointer"
-                                    >
-                                      <FaWhatsapp className="w-2.5 h-2.5" />
-                                      <span>Zap</span>
-                                    </a>
-                                  )}
-                                </div>
+                                {renderSocialDock({
+                                  phone: ord.contact?.phone_e164 || linkedOpp?.contact?.phone_e164,
+                                  instagram: ord.instagram_url || ord.contact?.instagram_url || ord.contact?.instagram_handle || linkedOpp?.instagram_url || linkedOpp?.contact?.instagram_url,
+                                  facebook: ord.facebook_url || ord.contact?.facebook_url || linkedOpp?.facebook_url || linkedOpp?.contact?.facebook_url,
+                                  website: ord.website_url || ord.contact?.website_url || linkedOpp?.website_url || linkedOpp?.contact?.website_url,
+                                  clientName: ord.contact?.full_name || linkedOpp?.contact?.full_name,
+                                  isCompact: true
+                                })}
 
                                 <div className="flex items-center gap-1">
                                   {canMovePrev && onUpdateOrderStatus && (
@@ -964,38 +1122,45 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           ) : (
                             /* Layout Detalhado (Espelho Fiel do Card de Vendas) */
                             <>
-                              {/* Linha 1: Modelo do Veículo em destaque (Pill Preto) + Número do Pedido + Responsável */}
+                              {/* Linha 1: Headline #ROB-xxxx no topo à esquerda + Badge completo de Origem no topo à direita */}
+                              <div className="flex items-center justify-between gap-1.5 pb-0.5">
+                                <span className="font-mono font-bold text-xs text-slate-800 tracking-tight flex items-center gap-1">
+                                  <span className="text-slate-400 font-normal">#</span>
+                                  ROB-{ord.order_number}
+                                </span>
+                                <span 
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1.5 shadow-2xs ${originBadge.bgClasses}`}
+                                  title={getOriginTitle(ord.contact?.origin || linkedOpp?.contact?.origin)}
+                                >
+                                  <OriginIcon className={`w-3 h-3 ${originBadge.iconColor} shrink-0`} />
+                                  <span className="truncate max-w-[110px]">{originBadge.label}</span>
+                                </span>
+                              </div>
+
+                              {/* Linha 2: Modelo do Veículo em destaque (Pill Preto) + Responsável */}
                               <div className="flex items-center justify-between gap-1 flex-wrap">
                                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1.5 shadow-2xs">
                                   {renderVehicleIcon(vehicle.iconType)}
-                                  <span>{vehicle.modelName}</span>
+                                  <span className="truncate max-w-[120px]">{vehicle.modelName}</span>
                                 </span>
 
-                                <div className="flex items-center gap-1">
-                                  <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                                    #ROB-{ord.order_number}
-                                  </span>
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
-                                    🔵 {ord.assigned_to || linkedOpp?.assigned_to || 'Igor'}
-                                  </span>
-                                </div>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1">
+                                  <span className="text-[8px]">🔵</span>
+                                  <span>{ord.assigned_to || linkedOpp?.assigned_to || 'Igor'}</span>
+                                </span>
                               </div>
 
-                              {/* Linha 2: Cliente & Valor em Destaque Verde */}
-                              <div className="flex items-start justify-between gap-2">
+                              {/* Linha 3: Cliente */}
+                              <div>
                                 <h4 
-                                  onClick={handleOpenOrderDetails}
-                                  className="font-heading font-bold text-xs text-slate-900 hover:text-[#EA580C] transition-colors cursor-pointer leading-snug line-clamp-2"
-                                  title="Clique para abrir e editar pedido espelho"
+                                  className="font-heading font-bold text-xs text-slate-900 group-hover:text-[#EA580C] transition-colors leading-snug line-clamp-2"
+                                  title={ord.contact?.full_name || linkedOpp?.contact?.full_name || 'Cliente'}
                                 >
-                                  {ord.contact?.full_name || 'Cliente'}
+                                  {ord.contact?.full_name || linkedOpp?.contact?.full_name || 'Cliente'}
                                 </h4>
-                                <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
-                                  {formatCurrency(ordTotal)}
-                                </span>
                               </div>
 
-                              {/* Linha 3: Caixa de Descrição do Produto & Especificações */}
+                              {/* Linha 4: Caixa de Descrição do Produto & Especificações */}
                               <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-[11px] space-y-0.5">
                                 <p className="font-medium text-slate-800 truncate">
                                   Bagageiro {vehicle.modelName} Modelo EXTREME
@@ -1003,54 +1168,30 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                 <div className="flex items-center justify-between text-[10px] text-slate-500">
                                   <span>
                                     {ord.fulfillment_type === 'instalacao_loja' 
-                                      ? 'Caminho B: Instalação na Loja' 
-                                      : 'Caminho A: Entrega Transportadora'}
+                                      ? 'Instalação na Loja' 
+                                      : 'Entrega Transportadora'}
                                   </span>
                                   <span className="font-mono">Preto Epóxi</span>
                                 </div>
                               </div>
 
-                              {/* Linha 4: Tags Operacionais */}
-                              <div className="flex flex-wrap gap-1">
-                                <span className="text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 font-medium">
-                                  📦 {ord.fulfillment_type === 'instalacao_loja' ? 'Instalação Loja' : 'Cotação Igor'}
-                                </span>
-                                <span className="text-[9px] bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 font-medium">
-                                  🧾 Nota Fiscal
+                              {/* Linha 5: Badge do Preço em destaque verde (substituindo Cotação Igor e Nota Fiscal) */}
+                              <div className="flex items-center justify-between pt-0.5">
+                                <span className="text-[11px] font-semibold text-slate-500">Valor do Pedido:</span>
+                                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-100/90 px-2.5 py-0.5 rounded-lg border border-emerald-300 shadow-2xs">
+                                  {formatCurrency(ordTotal)}
                                 </span>
                               </div>
 
-                              {/* Linha 5: Rodapé com Ícone da Plataforma (FontAwesome) + WhatsApp Direto + Ações */}
+                              {/* Linha 6: Rodapé com Doca de Redes Sociais + Ações de Avanço de Etapa (Sem botão Detalhes) */}
                               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                                <div className="flex items-center gap-1.5">
-                                  <button 
-                                    title={getOriginTitle(ord.contact?.origin)} 
-                                    className="p-1 hover:bg-slate-100 rounded transition-colors cursor-pointer"
-                                  >
-                                    {renderPlatformIconFA(ord.contact?.origin)}
-                                  </button>
-
-                                  {ordWhatsappUrl && (
-                                    <a
-                                      href={ordWhatsappUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      onClick={(e) => e.stopPropagation()}
-                                      title={`Abrir WhatsApp com ${ord.contact?.full_name}`}
-                                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-[#25D366] hover:text-white border border-emerald-200 hover:border-emerald-600 transition-colors text-[10px] font-bold cursor-pointer"
-                                    >
-                                      <FaWhatsapp className="w-3 h-3" />
-                                      <span>WhatsApp</span>
-                                    </a>
-                                  )}
-
-                                  <button 
-                                    onClick={handleOpenOrderDetails}
-                                    className="text-[11px] text-slate-500 hover:text-slate-900 font-medium cursor-pointer"
-                                  >
-                                    Detalhes
-                                  </button>
-                                </div>
+                                {renderSocialDock({
+                                  phone: ord.contact?.phone_e164 || linkedOpp?.contact?.phone_e164,
+                                  instagram: ord.instagram_url || ord.contact?.instagram_url || ord.contact?.instagram_handle || linkedOpp?.instagram_url || linkedOpp?.contact?.instagram_url,
+                                  facebook: ord.facebook_url || ord.contact?.facebook_url || linkedOpp?.facebook_url || linkedOpp?.contact?.facebook_url,
+                                  website: ord.website_url || ord.contact?.website_url || linkedOpp?.website_url || linkedOpp?.contact?.website_url,
+                                  clientName: ord.contact?.full_name || linkedOpp?.contact?.full_name,
+                                })}
 
                                 <div className="flex items-center gap-1">
                                   {canMovePrev && onUpdateOrderStatus && (

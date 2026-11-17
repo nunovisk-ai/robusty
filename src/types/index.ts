@@ -90,6 +90,9 @@ export interface Contact {
   phone_e164: string
   whatsapp_id?: string
   instagram_handle?: string
+  instagram_url?: string
+  facebook_url?: string
+  website_url?: string
   email?: string
   document?: string
   origin: LeadOrigin
@@ -160,6 +163,9 @@ export interface Opportunity {
   installation_time?: string
   shipping_carrier_name?: string
   shipping_tracking_code?: string
+  instagram_url?: string
+  facebook_url?: string
+  website_url?: string
   total_weight_kg?: number
   customer_email?: string
   address?: Partial<Address>
@@ -189,6 +195,9 @@ export interface Order {
   invoice_key?: string
   shipping_carrier_name?: string
   shipping_tracking_code?: string
+  instagram_url?: string
+  facebook_url?: string
+  website_url?: string
   pickup_date?: string
   pickup_time?: string
   installation_date?: string
