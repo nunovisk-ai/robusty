@@ -49,6 +49,7 @@ import {
   FaInstagram, 
   FaFacebook, 
   FaStore, 
+  FaUser,
   FaGlobe, 
   FaVanShuttle, 
   FaTruck, 
@@ -712,13 +713,14 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 type="button"
                 key={resp}
                 onClick={() => setAssignedTo(resp)}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   isSelected
                     ? 'bg-[#EA580C] text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                 }`}
               >
-                {resp}
+                {resp === 'Loja' ? <FaStore className="w-3 h-3" /> : <FaUser className="w-2.5 h-2.5" />}
+                <span>{resp}</span>
               </button>
             )
           })}
@@ -1774,8 +1776,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               </div>
               <div className="flex justify-between items-center gap-2">
                 <span className="text-slate-500">Responsável:</span>
-                <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-[10px]">
-                  {assignedTo}
+                <span className="font-semibold text-slate-700 text-xs flex items-center gap-1.5">
+                  {assignedTo === 'Loja' ? (
+                    <FaStore className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  ) : (
+                    <FaUser className="w-3 h-3 text-slate-400 shrink-0" />
+                  )}
+                  <span>{assignedTo}</span>
                 </span>
               </div>
               {(instagramUrl.trim() || facebookUrl.trim() || websiteUrl.trim()) && (
