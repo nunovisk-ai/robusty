@@ -343,7 +343,7 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans selection:bg-orange-500 selection:text-white">
+    <div className="min-h-screen bg-[#F8F9FA] flex flex-col font-sans selection:bg-[#EA580C] selection:text-white">
       {/* Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}

@@ -196,49 +196,49 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         {/* Left Column: Form & Item Picker */}
         <div className="lg:col-span-7 space-y-5">
           {/* Step 1: Customer Contact Info */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
               1. Dados do Contato
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">Nome do Cliente:</label>
+                <label className="text-[11px] font-bold text-slate-600 block mb-1">Nome do Cliente:</label>
                 <input
                   type="text"
                   placeholder="Ex: Carlos Eduardo"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-orange-500 transition-colors"
+                  className="w-full bg-slate-50 border border-slate-200/80 rounded-full px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
                 />
               </div>
               <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">WhatsApp / Telefone:</label>
+                <label className="text-[11px] font-bold text-slate-600 block mb-1">WhatsApp / Telefone:</label>
                 <input
                   type="text"
                   placeholder="(11) 99999-9999"
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-orange-500 font-mono transition-colors"
+                  className="w-full bg-slate-50 border border-slate-200/80 rounded-full px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
                 />
               </div>
             </div>
           </div>
 
           {/* Step 2: Select Vehicle */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-                <Car className="w-4 h-4 text-orange-600" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                <Car className="w-4 h-4 text-[#EA580C]" />
                 <span>2. Veículo do Cliente (Regra de Dependência)</span>
               </h3>
               {selectedVehicle && (
-                <span className="text-xs font-bold text-orange-600">
+                <span className="text-xs font-extrabold text-[#EA580C] bg-[#FFF3EA] px-3 py-1 rounded-full">
                   {selectedVehicle.model}
                 </span>
               )}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {vehicles.map((v) => (
                 <button
                   key={v.id}
@@ -246,13 +246,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     setSelectedVehicleId(v.id)
                     setItems([]) // clear incompatible items
                   }}
-                  className={`p-3 rounded-xl text-left border transition-all cursor-pointer ${
+                  className={`p-3.5 rounded-2xl text-left border transition-all cursor-pointer ${
                     selectedVehicleId === v.id
-                      ? 'bg-orange-50 border-orange-500 text-orange-950 font-bold shadow-xs'
-                      : 'bg-slate-50/70 border-slate-200/80 text-slate-700 hover:bg-slate-100'
+                      ? 'bg-[#FFF3EA] border-[#EA580C] text-[#EA580C] font-extrabold shadow-xs'
+                      : 'bg-slate-50/70 border-slate-200/70 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
                   }`}
                 >
-                  <div className="text-xs leading-tight">{v.model}</div>
+                  <div className="text-xs font-bold leading-tight">{v.model}</div>
                   <div className="text-[10px] text-slate-400 font-normal mt-0.5">{v.make}</div>
                 </button>
               ))}
@@ -432,7 +432,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
             {/* Sheet Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
               <div className="flex items-center gap-2">
-                <img src="/robusty-logo.png" alt="Robusty" className="h-7 w-auto object-contain" />
+                <img src={`${import.meta.env.BASE_URL}robusty-logo.png`} alt="Robusty" className="h-7 w-auto object-contain" />
               </div>
               <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
                 PROPOSTA OFICIAL
@@ -518,41 +518,38 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
                 Condição de Pagamento:
               </label>
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => setPaymentMethod('pix')}
-                  className={`py-2 px-1 text-center rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  className={`py-2.5 px-1 text-center rounded-full text-xs font-bold border transition-all cursor-pointer ${
                     paymentMethod === 'pix'
-                      ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
-                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-sm shadow-orange-500/20'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
                   <div>PIX (10%)</div>
-                  <div className="text-[9px] font-normal opacity-90">Máximo</div>
                 </button>
 
                 <button
                   onClick={() => setPaymentMethod('boleto')}
-                  className={`py-2 px-1 text-center rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  className={`py-2.5 px-1 text-center rounded-full text-xs font-bold border transition-all cursor-pointer ${
                     paymentMethod === 'boleto'
-                      ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
-                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-sm shadow-orange-500/20'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
                   <div>Boleto (5%)</div>
-                  <div className="text-[9px] font-normal opacity-90">À vista</div>
                 </button>
 
                 <button
                   onClick={() => setPaymentMethod('cartao_link_igor')}
-                  className={`py-2 px-1 text-center rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  className={`py-2.5 px-1 text-center rounded-full text-xs font-bold border transition-all cursor-pointer ${
                     paymentMethod === 'cartao_link_igor'
-                      ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
-                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-sm shadow-orange-500/20'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
                   <div>10x Cartão</div>
-                  <div className="text-[9px] font-normal opacity-90">Sem juros</div>
                 </button>
               </div>
             </div>
@@ -560,8 +557,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
             {/* Manual Discount Slider */}
             <div className="mb-4">
               <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-slate-600 font-medium">Desconto Manual:</span>
-                <span className="font-mono text-orange-600 font-bold">{discountPercent}%</span>
+                <span className="text-slate-600 font-bold">Desconto Manual:</span>
+                <span className="font-mono text-[#EA580C] font-extrabold">{discountPercent}%</span>
               </div>
               <input
                 type="range"
@@ -570,19 +567,19 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 step="1"
                 value={discountPercent}
                 onChange={(e) => setDiscountPercent(parseInt(e.target.value))}
-                className="w-full accent-orange-600 cursor-pointer"
+                className="w-full accent-[#EA580C] cursor-pointer"
               />
             </div>
 
             {/* Financial Summary Breakdown */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-1.5 font-mono text-xs mb-4">
+            <div className="bg-[#F8F9FA] p-5 rounded-2xl border border-slate-100 space-y-2 font-mono text-xs mb-5">
               <div className="flex justify-between text-slate-600">
                 <span>Subtotal Produtos:</span>
-                <span className="text-slate-900 font-bold">{formatCurrency(budget.subtotal)}</span>
+                <span className="text-[#121212] font-bold">{formatCurrency(budget.subtotal)}</span>
               </div>
 
               {budget.discountValue > 0 && (
-                <div className="flex justify-between text-emerald-700 font-semibold">
+                <div className="flex justify-between text-emerald-700 font-bold">
                   <span>Desconto ({budget.discountPercent}%):</span>
                   <span>-{formatCurrency(budget.discountValue)}</span>
                 </div>
@@ -591,40 +588,40 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               {fulfillment === 'transportadora_envio' && (
                 <div className="flex justify-between text-slate-600">
                   <span>Frete Transportadora:</span>
-                  <span className="text-slate-900">+{formatCurrency(budget.freightValue)}</span>
+                  <span className="text-[#121212] font-bold">+{formatCurrency(budget.freightValue)}</span>
                 </div>
               )}
 
               {fulfillment === 'instalacao_loja' && (
                 <div className="flex justify-between text-slate-600">
                   <span>Instalação Loja:</span>
-                  <span className="text-slate-900">+{formatCurrency(budget.installationValue)}</span>
+                  <span className="text-[#121212] font-bold">+{formatCurrency(budget.installationValue)}</span>
                 </div>
               )}
 
-              <div className="pt-2 border-t border-slate-200 flex justify-between items-baseline">
-                <span className="font-extrabold text-sm text-slate-900">TOTAL:</span>
-                <span className="font-extrabold text-xl text-orange-600">
+              <div className="pt-3 border-t border-slate-200 flex justify-between items-baseline">
+                <span className="font-extrabold text-sm text-[#121212]">VALOR TOTAL:</span>
+                <span className="font-black text-2xl text-[#EA580C] font-sans">
                   {formatCurrency(budget.finalTotal)}
                 </span>
               </div>
 
               {budget.savingsVs10x > 0 && (
-                <div className="text-[11px] text-emerald-700 text-right font-sans font-bold pt-0.5">
+                <div className="text-[11px] text-emerald-700 text-right font-sans font-extrabold pt-0.5">
                   Economia cliente: {formatCurrency(budget.savingsVs10x)}
                 </div>
               )}
             </div>
 
-            {/* Actions */}
-            <div className="space-y-2">
+            {/* Actions (Nexo Pill Buttons) */}
+            <div className="space-y-2.5">
               <button
                 onClick={handleCopyProposal}
                 disabled={items.length === 0}
-                className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                className={`w-full py-3 px-5 rounded-full text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   copied
                     ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20 disabled:opacity-50'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 disabled:opacity-50 active:scale-98'
                 }`}
               >
                 {copied ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
@@ -634,15 +631,15 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               <button
                 onClick={handleSaveToCrm}
                 disabled={items.length === 0}
-                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                className="w-full py-3 px-5 rounded-full text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] text-white shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-98"
               >
-                <Plus className="w-4 h-4 text-orange-400" />
+                <Plus className="w-4 h-4 stroke-[2.5]" />
                 <span>Salvar como Card no Funil de Vendas</span>
               </button>
 
               {savedSuccess && (
-                <div className="text-center text-xs text-emerald-700 py-1 font-bold">
-                  Card de oportunidade criado no Funil do Norlando!
+                <div className="text-center text-xs text-emerald-700 py-1 font-bold animate-fade-in">
+                  Card de oportunidade salvo no banco Supabase e adicionado ao Pipeline!
                 </div>
               )}
             </div>

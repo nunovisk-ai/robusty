@@ -2,51 +2,50 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 24 95% 53%; /* Robusty Orange #f97316 */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222 47% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222 47% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 24 95% 53%;
-    --radius: 0.75rem;
+    --background: #F8F9FA;
+    --foreground: #121212;
+    --card: #FFFFFF;
+    --card-foreground: #121212;
+    --primary: #EA580C;
+    --primary-hero: #FF5C00;
+    --primary-accent: #F97316;
+    --primary-light: #FFF3EA;
+    --border: #F1F5F9;
+    --radius: 1rem;
   }
 }
 
 body {
   margin: 0;
   padding: 0;
-  background-color: #f8fafc;
-  color: #0f172a;
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: #F8F9FA;
+  color: #121212;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
-/* Custom scrollbars for Kommo-style Kanban */
+/* Custom smooth scrollbars for Nexo Kanban */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #E2E8F0;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #CBD5E1;
+}
+
+/* Nexo pill animations & shadows */
+.shadow-nexo {
+  box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.04), 0 1px 4px -1px rgba(0, 0, 0, 0.02);
+}
+
+.shadow-nexo-hover:hover {
+  box-shadow: 0 10px 25px -5px rgba(234, 88, 12, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
 }
