@@ -16,7 +16,8 @@ import {
   Mail,
   User,
   Weight,
-  Download
+  Download,
+  ExternalLink
 } from 'lucide-react'
 import { FaWhatsapp } from 'react-icons/fa6'
 
@@ -131,6 +132,38 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     URL.revokeObjectURL(url)
   }
 
+  const handleOpenInNewTab = () => {
+    const printableElement = document.getElementById('commercial-proposal-printable')
+    if (!printableElement) return
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Proposta Comercial ROB-${data.orderNumber} - Robusty Bagageiros</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #ffffff; color: #1e293b; }
+    .font-mono { font-family: 'Geist Mono', monospace; }
+    @media print {
+      @page { margin: 12mm; size: A4; }
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body class="p-8 max-w-4xl mx-auto">
+  ${printableElement.innerHTML}
+</body>
+</html>`
+
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+  }
+
   const handleAttachToOrder = () => {
     if (onAttachProposal) {
       const doc: AttachedDocument = {
@@ -206,6 +239,15 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             >
               <Paperclip className="w-3.5 h-3.5 text-slate-500" />
               <span>{attached ? 'Anexado aos Documentos!' : 'Anexar ao Pedido'}</span>
+            </button>
+
+            <button
+              onClick={handleOpenInNewTab}
+              title="Abrir proposta em nova aba do navegador"
+              className="px-3.5 py-1.5 rounded-full text-xs font-bold border border-slate-200 hover:border-slate-400 text-slate-700 hover:bg-slate-50 bg-white transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+              <span>Abrir em Nova Aba</span>
             </button>
 
             <button
