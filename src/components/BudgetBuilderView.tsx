@@ -8,7 +8,10 @@ import type {
   LeadOrigin, 
   Order, 
   Appointment, 
-  AttachedDocument 
+  AttachedDocument,
+  OpportunityComment,
+  OpportunityHistoryEvent,
+  OpportunityTask
 } from '../types'
 import { fetchVehicles, fetchProducts, calculateBudget, getMaxDiscountForPaymentMethod } from '../services/catalogService'
 import { lookupCep } from '../services/cepService'
@@ -42,7 +45,10 @@ import {
   Eye,
   User,
   Share2,
-  ExternalLink
+  ExternalLink,
+  MessageSquare,
+  History,
+  ListTodo
 } from 'lucide-react'
 import { 
   FaWhatsapp, 
@@ -57,7 +63,7 @@ import {
   FaTruckPickup 
 } from 'react-icons/fa6'
 
-type BudgetFormTab = 'contact' | 'products' | 'fulfillment' | 'documents'
+type BudgetFormTab = 'contact' | 'products' | 'fulfillment' | 'documents' | 'history'
 
 interface BudgetBuilderViewProps {
   initialVehicleId?: string
@@ -227,6 +233,40 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false)
   const [attachmentToDelete, setAttachmentToDelete] = useState<AttachedDocument | null>(null)
   const nfFileInputRef = useRef<HTMLInputElement | null>(null)
+
+  // 5. Histórico, Comentários & Tarefas (Aba 5)
+  const [comments, setComments] = useState<OpportunityComment[]>(() => {
+    return initialOpportunity?.comments || []
+  })
+  const [newCommentText, setNewCommentText] = useState('')
+  const [commentAuthor, setCommentAuthor] = useState<'Norlando' | 'Igor' | 'Loja'>(assignedTo)
+
+  const [history, setHistory] = useState<OpportunityHistoryEvent[]>(() => {
+    if (initialOpportunity?.history && initialOpportunity.history.length > 0) {
+      return initialOpportunity.history
+    }
+    return [
+      {
+        id: `hist-init-${Date.now()}`,
+        opportunity_id: initialOpportunity?.id,
+        type: 'created',
+        description: `Orçamento #ROB-${orderNumber} criado no CRM`,
+        user: assignedTo,
+        created_at: initialOpportunity?.created_at || new Date().toISOString()
+      }
+    ]
+  })
+
+  const [tasks, setTasks] = useState<OpportunityTask[]>(() => {
+    return initialOpportunity?.tasks || []
+  })
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskDate, setNewTaskDate] = useState(() => {
+    return new Date().toISOString().split('T')[0]
+  })
+  const [newTaskTime, setNewTaskTime] = useState('14:00')
+  const [newTaskAssignee, setNewTaskAssignee] = useState<'Norlando' | 'Igor' | 'Loja'>(assignedTo)
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'comments' | 'history'>('all')
 
   // Modais Padronizados
   const [conflictModalOpen, setConflictModalOpen] = useState(false)
@@ -491,6 +531,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       discountPercent: budget.discountPercent,
       cardInstallments,
       attachments,
+      comments,
+      history,
+      tasks,
     }
   }
 
@@ -645,6 +688,97 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     window.open(url, '_blank')
   }
 
+  const handleAddComment = () => {
+    if (!newCommentText.trim()) return
+    const comment: OpportunityComment = {
+      id: `comm-${Date.now()}`,
+      opportunity_id: initialOpportunity?.id,
+      author: commentAuthor,
+      text: newCommentText.trim(),
+      created_at: new Date().toISOString()
+    }
+    setComments((prev) => [comment, ...prev])
+    setNewCommentText('')
+  }
+
+  const handleAddTask = () => {
+    if (!newTaskTitle.trim()) return
+    const task: OpportunityTask = {
+      id: `task-${Date.now()}`,
+      opportunity_id: initialOpportunity?.id,
+      order_number: orderNumber,
+      client_name: customerName || 'Cliente',
+      title: newTaskTitle.trim(),
+      due_date: newTaskDate,
+      due_time: newTaskTime,
+      assigned_to: newTaskAssignee,
+      completed: false,
+      created_at: new Date().toISOString()
+    }
+    setTasks((prev) => [task, ...prev])
+    setNewTaskTitle('')
+  }
+
+  const handleToggleTask = (taskId: string) => {
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id === taskId) {
+          const nextCompleted = !t.completed
+          return {
+            ...t,
+            completed: nextCompleted,
+            completed_at: nextCompleted ? new Date().toISOString() : undefined
+          }
+        }
+        return t
+      })
+    )
+  }
+
+  const handleDeleteTask = (taskId: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== taskId))
+  }
+
+  // Linha do tempo unificada ordenada da mais recente para a mais antiga
+  const timelineItems = useMemo(() => {
+    const list: Array<{
+      id: string
+      date: string
+      title: string
+      content: string
+      author?: string
+      isComment: boolean
+    }> = []
+
+    if (historyFilter === 'all' || historyFilter === 'comments') {
+      comments.forEach((c) => {
+        list.push({
+          id: c.id,
+          date: c.created_at,
+          title: `Observação registrada por ${c.author}`,
+          content: c.text,
+          author: c.author,
+          isComment: true
+        })
+      })
+    }
+
+    if (historyFilter === 'all' || historyFilter === 'history') {
+      history.forEach((h) => {
+        list.push({
+          id: h.id,
+          date: h.created_at,
+          title: h.type === 'stage_change' ? 'Mudança de Etapa' : 'Histórico do CRM',
+          content: h.description,
+          author: h.user,
+          isComment: false
+        })
+      })
+    }
+
+    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [comments, history, historyFilter])
+
   const handleConfirmDeleteAttachment = () => {
     if (attachmentToDelete) {
       setAttachments((prev) => prev.filter((a) => a.id !== attachmentToDelete.id))
@@ -770,12 +904,12 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         </div>
       </div>
 
-      {/* Segmented 4-Tab Navigation: 1. Contato & Redes | 2. Veículo & Produtos | 3. Modalidade & Entrega/Coleta | 4. Documentos & NFs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-nexo">
+      {/* Segmented 5-Tab Navigation: 1. Contato & Redes | 2. Veículo & Produtos | 3. Modalidade & Entrega/Coleta | 4. Documentos & NFs | 5. Histórico & Tarefas */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-nexo">
         <button
           type="button"
           onClick={() => setActiveFormTab('contact')}
-          className={`flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeFormTab === 'contact'
               ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -788,7 +922,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         <button
           type="button"
           onClick={() => setActiveFormTab('products')}
-          className={`flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeFormTab === 'products'
               ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -797,7 +931,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           <Car className="w-4 h-4 shrink-0" />
           <span className="truncate">2. Veículo & Produtos</span>
           {items.length > 0 && (
-            <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${
+            <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
               activeFormTab === 'products' ? 'bg-white/20 text-white' : 'bg-orange-50 text-[#EA580C]'
             }`}>
               {items.length}
@@ -808,14 +942,14 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         <button
           type="button"
           onClick={() => setActiveFormTab('fulfillment')}
-          className={`flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeFormTab === 'fulfillment'
               ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
           <Truck className="w-4 h-4 shrink-0" />
-          <span className="truncate">3. Modalidade & Entrega/Coleta</span>
+          <span className="truncate">3. Modalidade & Entrega</span>
           {installationConflict && (
             <span className="ml-auto w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Conflito de horário detectado" />
           )}
@@ -824,7 +958,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         <button
           type="button"
           onClick={() => setActiveFormTab('documents')}
-          className={`flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeFormTab === 'documents'
               ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -832,11 +966,31 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         >
           <FileText className="w-4 h-4 shrink-0" />
           <span className="truncate">4. Documentos & NFs</span>
-          <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${
+          <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
             activeFormTab === 'documents' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
           }`}>
             {attachments.length}
           </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveFormTab('history')}
+          className={`flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeFormTab === 'history'
+              ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <History className="w-4 h-4 shrink-0" />
+          <span className="truncate">5. Histórico & Tarefas</span>
+          {(comments.length > 0 || tasks.filter((t) => !t.completed).length > 0) && (
+            <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+              activeFormTab === 'history' ? 'bg-white/20 text-white' : 'bg-orange-50 text-[#EA580C]'
+            }`}>
+              {tasks.filter((t) => !t.completed).length > 0 ? `${tasks.filter((t) => !t.completed).length} tar` : `${comments.length}`}
+            </span>
+          )}
         </button>
       </div>
 
@@ -1740,8 +1894,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 )}
               </div>
 
-              {/* Navegação de Retorno */}
-              <div className="flex items-center justify-start">
+              {/* Navegação de Abas */}
+              <div className="flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => setActiveFormTab('fulfillment')}
@@ -1749,6 +1903,339 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>3. Modalidade & Entrega/Coleta</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveFormTab('history')}
+                  className="px-4 py-2.5 rounded-xl bg-[#EA580C] hover:bg-[#c2410c] text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
+                >
+                  <span>5. Histórico & Tarefas</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* TAB 5: HISTÓRICO, COMENTÁRIOS & TAREFAS */}
+          {activeFormTab === 'history' && (
+            <>
+              {/* Card 1: Tarefas & Lembretes */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-[#EA580C]">
+                      <ListTodo className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Tarefas & Lembretes</h3>
+                      <p className="text-xs text-slate-500">Defina tarefas com prazo e responsável para receber alertas e notificações no CRM.</p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                    {tasks.filter((t) => !t.completed).length} pendente(s)
+                  </span>
+                </div>
+
+                {/* Formulário de Criação de Tarefa */}
+                <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200 space-y-3">
+                  <div className="text-xs font-bold text-slate-700">Nova Tarefa / Lembrete:</div>
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5">
+                    <div className="md:col-span-12">
+                      <input
+                        type="text"
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        placeholder="Ex: Ligar para confirmar medidas, enviar fotos de instalação..."
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EA580C]/20 focus:border-[#EA580C] transition-all"
+                      />
+                    </div>
+                    <div className="md:col-span-4">
+                      <CustomDatePicker
+                        value={newTaskDate}
+                        onChange={(d) => setNewTaskDate(d)}
+                        placeholder="Data do lembrete"
+                      />
+                    </div>
+                    <div className="md:col-span-3">
+                      <select
+                        value={newTaskTime}
+                        onChange={(e) => setNewTaskTime(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#EA580C]/20 focus:border-[#EA580C]"
+                      >
+                        {TIME_SLOTS.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="md:col-span-3">
+                      <select
+                        value={newTaskAssignee}
+                        onChange={(e) => setNewTaskAssignee(e.target.value as any)}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#EA580C]/20 focus:border-[#EA580C]"
+                      >
+                        <option value="Norlando">Norlando</option>
+                        <option value="Igor">Igor</option>
+                        <option value="Loja">Loja</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <button
+                        type="button"
+                        onClick={handleAddTask}
+                        disabled={!newTaskTitle.trim()}
+                        className="w-full py-2.5 px-3 bg-[#EA580C] hover:bg-[#c2410c] disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Criar</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lista de Tarefas */}
+                {tasks.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400 italic border border-dashed border-slate-200 rounded-xl">
+                    Nenhuma tarefa cadastrada. Adicione uma tarefa acima para gerar alertas para a equipe.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {tasks.map((task) => {
+                      const today = new Date().toISOString().split('T')[0]
+                      const isOverdue = !task.completed && task.due_date < today
+                      const isToday = !task.completed && task.due_date === today
+
+                      return (
+                        <div
+                          key={task.id}
+                          className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                            task.completed
+                              ? 'bg-slate-50/60 border-slate-200 opacity-70'
+                              : isOverdue
+                              ? 'bg-rose-50/40 border-rose-200'
+                              : isToday
+                              ? 'bg-amber-50/40 border-amber-200'
+                              : 'bg-white border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleTask(task.id)}
+                              className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                                task.completed
+                                  ? 'bg-emerald-500 border-emerald-500 text-white'
+                                  : 'border-slate-300 hover:border-[#EA580C] bg-white'
+                              }`}
+                            >
+                              {task.completed && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                            </button>
+                            <div className="min-w-0">
+                              <p className={`text-xs font-semibold truncate ${task.completed ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                                {task.title}
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
+                                  {task.assigned_to === 'Loja' ? <FaStore className="w-2.5 h-2.5 text-amber-600" /> : <FaUser className="w-2.5 h-2.5 text-slate-400" />}
+                                  {task.assigned_to}
+                                </span>
+                                <span>•</span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  task.completed
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : isOverdue
+                                    ? 'bg-rose-50 text-rose-700 border border-rose-200 animate-pulse'
+                                    : isToday
+                                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                    : 'bg-slate-100 text-slate-600'
+                                }`}>
+                                  {task.completed
+                                    ? 'Concluída'
+                                    : isOverdue
+                                    ? `⚠️ Atrasada: ${task.due_date} às ${task.due_time}`
+                                    : isToday
+                                    ? `⏰ Hoje às ${task.due_time}`
+                                    : `📅 ${task.due_date} às ${task.due_time}`}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTask(task.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                            title="Excluir tarefa"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Card 2: Comentários & Observações */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-sky-100 flex items-center justify-center text-sky-600">
+                      <MessageSquare className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Comentários & Observações Internas</h3>
+                      <p className="text-xs text-slate-500">Múltiplos comentários salvos com autor, data e hora de registro.</p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                    {comments.length} registro(s)
+                  </span>
+                </div>
+
+                {/* Caixa de Entrada de Comentário */}
+                <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-slate-700">Registrar como:</span>
+                    <div className="flex items-center gap-1.5">
+                      {(['Norlando', 'Igor', 'Loja'] as const).map((author) => (
+                        <button
+                          key={author}
+                          type="button"
+                          onClick={() => setCommentAuthor(author)}
+                          className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                            commentAuthor === author
+                              ? 'bg-[#EA580C] text-white shadow-2xs'
+                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {author === 'Loja' ? <FaStore className="w-2.5 h-2.5" /> : <FaUser className="w-2.5 h-2.5" />}
+                          <span>{author}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <textarea
+                    value={newCommentText}
+                    onChange={(e) => setNewCommentText(e.target.value)}
+                    placeholder="Adicione uma observação sobre o cliente, negociação de valores, detalhes do veículo..."
+                    rows={3}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EA580C]/20 focus:border-[#EA580C] transition-all resize-none"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleAddComment}
+                      disabled={!newCommentText.trim()}
+                      className="px-4 py-2 bg-[#EA580C] hover:bg-[#c2410c] disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Adicionar Comentário</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Linha do Tempo & Histórico Completo do Lead */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4 flex-wrap gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center text-violet-600">
+                      <History className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Linha do Tempo & Histórico</h3>
+                      <p className="text-xs text-slate-500">Histórico completo de tudo que aconteceu com o lead, com data e hora.</p>
+                    </div>
+                  </div>
+
+                  {/* Filtro de Histórico */}
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setHistoryFilter('all')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                        historyFilter === 'all'
+                          ? 'bg-white text-slate-900 shadow-2xs'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      Todos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHistoryFilter('comments')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                        historyFilter === 'comments'
+                          ? 'bg-white text-slate-900 shadow-2xs'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      Comentários
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHistoryFilter('history')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                        historyFilter === 'history'
+                          ? 'bg-white text-slate-900 shadow-2xs'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      Etapas
+                    </button>
+                  </div>
+                </div>
+
+                {/* Timeline Feed */}
+                {timelineItems.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400 italic border border-dashed border-slate-200 rounded-xl">
+                    Nenhum registro encontrado para este filtro.
+                  </div>
+                ) : (
+                  <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                    {timelineItems.map((item) => (
+                      <div key={item.id} className="relative">
+                        <div className={`absolute -left-6 top-1 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[10px] shadow-2xs ${
+                          item.isComment
+                            ? 'bg-sky-500 text-white'
+                            : 'bg-orange-500 text-white'
+                        }`}>
+                          {item.isComment ? (
+                            <MessageSquare className="w-2.5 h-2.5" />
+                          ) : (
+                            <Clock className="w-2.5 h-2.5" />
+                          )}
+                        </div>
+                        <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-200/80 space-y-1">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-slate-800">{item.title}</span>
+                            <span className="text-[10px] font-mono text-slate-500">
+                              {new Date(item.date).toLocaleString('pt-BR')}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 whitespace-pre-wrap">{item.content}</p>
+                          {item.author && (
+                            <div className="pt-1 border-t border-slate-200/50 flex items-center gap-1.5 text-[10px] text-slate-500">
+                              <span>Registrado por:</span>
+                              <strong className="text-slate-700">{item.author}</strong>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Navegação de Retorno */}
+              <div className="flex items-center justify-start">
+                <button
+                  type="button"
+                  onClick={() => setActiveFormTab('documents')}
+                  className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>4. Documentos & NFs</span>
                 </button>
               </div>
             </>
