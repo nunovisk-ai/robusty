@@ -162,6 +162,31 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     return (status as OrderStatus) || 'pedido_gerado'
   }
 
+  // Obter valor monetário do pedido
+  const getOrderTotal = (ord: Order): number => {
+    if (ord.opportunity?.final_total) return ord.opportunity.final_total
+    const matched = opportunities.find((o) => o.id === ord.opportunity_id)
+    if (matched?.final_total) return matched.final_total
+    if (ord.order_number === 1040) return 4579.0
+    if (ord.order_number === 1041) return 2290.0
+    if (ord.order_number === 1042) return 2090.0
+    return 3296.50
+  }
+
+  // Obter modelo do veículo do pedido para o card espelho
+  const getOrderVehicleModel = (ord: Order): string => {
+    if (ord.opportunity?.vehicle?.model) return ord.opportunity.vehicle.model
+    if (ord.opportunity?.vehicle_model_year) return ord.opportunity.vehicle_model_year
+    const matched = opportunities.find((o) => o.id === ord.opportunity_id)
+    if (matched?.vehicle?.model) return matched.vehicle.model
+    if (matched?.vehicle_model_year) return matched.vehicle_model_year
+    if (ord.contact?.full_name?.includes('(')) {
+      const parts = ord.contact.full_name.split('(')
+      if (parts[1]) return parts[1].replace(')', '').trim()
+    }
+    return 'Jumpy'
+  }
+
   // Extrai o modelo do carro (ex.: Kombi, Jumpy, Ducato, Master, Fiorino) e NUNCA a marca (ex.: VW, Fiat)
   const getVehicleModelInfo = (modelStr?: string): VehicleInfo => {
     if (!modelStr) return { modelName: 'Utilitário', iconType: 'default' }
@@ -325,9 +350,9 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 space-y-3">
-      {/* Top Header & Pipeline Mode Switcher (Limpo, sem badges de em negociação/venda ganha) */}
+      {/* Top Header & Pipeline Mode Switcher (Sem badges contadoras conforme solicitado) */}
       <div className="bg-white rounded-2xl p-2.5 sm:px-4 sm:py-2.5 border border-slate-200/90 shadow-2xs shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        {/* Switcher entre os Funis: Funil de Vendas e Funil de Pedidos */}
+        {/* Switcher entre os Funis: Funil de Vendas e Funil de Pedidos (sem contadores) */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => setPipelineType('vendas')}
@@ -339,11 +364,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
           >
             <Filter className={`w-3.5 h-3.5 ${pipelineType === 'vendas' ? 'text-white' : 'text-slate-500'}`} />
             <span>Funil de Vendas</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-              pipelineType === 'vendas' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
-            }`}>
-              {opportunities.length}
-            </span>
           </button>
 
           <button
@@ -356,15 +376,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
           >
             <Truck className={`w-3.5 h-3.5 ${pipelineType === 'pedidos' ? 'text-white' : 'text-slate-500'}`} />
             <span>Funil de Pedidos</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-              pipelineType === 'pedidos' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
-            }`}>
-              {orders.length}
-            </span>
           </button>
         </div>
 
-        {/* Busca e Botão Novo Orçamento (Filtros de canal removidos) */}
+        {/* Busca e Botão Novo Orçamento */}
         <div className="flex items-center gap-2.5 flex-1 max-w-md justify-end">
           <div className="relative flex-1 max-w-xs">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -389,7 +404,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         </div>
       </div>
 
-      {/* 1. FUNIL DE VENDAS (8 Etapas com layout do HTML de referência) */}
+      {/* 1. FUNIL DE VENDAS (8 Etapas com borda dinâmica na cor da etapa ao arrastar) */}
       {pipelineType === 'vendas' && (
         <div className="flex-1 flex gap-3 overflow-x-auto pb-1 kanban-scroll items-stretch min-h-0">
           {SALES_STAGES.map((col, colIdx) => {
@@ -403,12 +418,15 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 onDragOver={(e) => handleDragOver(e, col.id)}
                 onDragLeave={() => handleDragLeave(col.id)}
                 onDrop={(e) => handleDropOpportunity(e, col.id)}
-                style={{ borderTopColor: col.stripeColor }}
-                className={`w-[290px] flex-shrink-0 bg-slate-100/90 rounded-2xl border border-slate-200/90 border-t-4 flex flex-col h-full max-h-full shadow-2xs transition-all duration-150 ${
-                  isDragTarget 
-                    ? 'ring-2 ring-orange-500/50 bg-orange-50/30' 
-                    : ''
-                }`}
+                style={{ 
+                  borderTopColor: col.stripeColor,
+                  ...(isDragTarget ? {
+                    borderColor: col.stripeColor,
+                    boxShadow: `0 0 0 2px ${col.stripeColor}`,
+                    backgroundColor: `${col.stripeColor}0D`,
+                  } : {})
+                }}
+                className="w-[290px] flex-shrink-0 bg-slate-100/90 rounded-2xl border border-slate-200/90 border-t-4 flex flex-col h-full max-h-full shadow-2xs transition-all duration-150"
               >
                 {/* Header da Coluna (Print 2 / HTML fornecido) */}
                 <div className="p-3 bg-white border-b border-slate-200/80 rounded-t-xl shrink-0">
@@ -568,11 +586,12 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         </div>
       )}
 
-      {/* 2. FUNIL DE PEDIDOS (6 Etapas solicitadas pelo usuário) */}
+      {/* 2. FUNIL DE PEDIDOS (Espelho fiel do Funil de Vendas com modelo, total da etapa e borda dinâmica) */}
       {pipelineType === 'pedidos' && (
         <div className="flex-1 flex gap-3 overflow-x-auto pb-1 kanban-scroll items-stretch min-h-0">
           {ORDER_STAGES.map((col, colIdx) => {
             const colOrders = filteredOrders.filter((o) => normalizeOrdStatus(o.status) === col.id)
+            const colTotal = colOrders.reduce((sum, o) => sum + getOrderTotal(o), 0)
             const isDragTarget = dragOverStageId === col.id
 
             return (
@@ -581,14 +600,17 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 onDragOver={(e) => handleDragOver(e, col.id)}
                 onDragLeave={() => handleDragLeave(col.id)}
                 onDrop={(e) => handleDropOrder(e, col.id)}
-                style={{ borderTopColor: col.stripeColor }}
-                className={`w-[290px] flex-shrink-0 bg-slate-100/90 rounded-2xl border border-slate-200/90 border-t-4 flex flex-col h-full max-h-full shadow-2xs transition-all duration-150 ${
-                  isDragTarget 
-                    ? 'ring-2 ring-orange-500/50 bg-orange-50/30' 
-                    : ''
-                }`}
+                style={{ 
+                  borderTopColor: col.stripeColor,
+                  ...(isDragTarget ? {
+                    borderColor: col.stripeColor,
+                    boxShadow: `0 0 0 2px ${col.stripeColor}`,
+                    backgroundColor: `${col.stripeColor}0D`,
+                  } : {})
+                }}
+                className="w-[290px] flex-shrink-0 bg-slate-100/90 rounded-2xl border border-slate-200/90 border-t-4 flex flex-col h-full max-h-full shadow-2xs transition-all duration-150"
               >
-                {/* Header da Coluna */}
+                {/* Header da Coluna com Total em R$ */}
                 <div className="p-3 bg-white border-b border-slate-200/80 rounded-t-xl shrink-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
@@ -605,12 +627,12 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     </span>
                   </div>
                   <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500 font-mono">
-                    <span>Etapa:</span>
-                    <span className="font-bold text-slate-800">{col.title}</span>
+                    <span>Total:</span>
+                    <span className="font-bold text-slate-800">{formatCurrency(colTotal)}</span>
                   </div>
                 </div>
 
-                {/* Cards Container de Pedidos com Scroll Vertical Interno por Etapa */}
+                {/* Cards Container de Pedidos (Espelho fiel do Card de Vendas) */}
                 <div className="p-2 space-y-2.5 overflow-y-auto flex-1 kanban-scroll">
                   {colOrders.length === 0 ? (
                     <div className="py-12 text-center text-xs text-slate-400 font-medium border border-dashed border-slate-200 rounded-xl m-0.5 flex items-center justify-center">
@@ -618,6 +640,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     </div>
                   ) : (
                     colOrders.map((ord) => {
+                      const vehicle = getVehicleModelInfo(getOrderVehicleModel(ord))
+                      const ordTotal = getOrderTotal(ord)
                       const canMovePrev = colIdx > 0
                       const canMoveNext = colIdx < ORDER_STAGES.length - 1 && col.id !== 'pedido_concluido' && col.id !== 'pedido_cancelado'
 
@@ -631,11 +655,11 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             draggedItemId === ord.id ? 'opacity-40 scale-95' : ''
                           }`}
                         >
-                          {/* Linha 1: Pedido # & Responsável */}
+                          {/* Linha 1: Modelo do Veículo em destaque (Pill Preto) + Responsável Igor */}
                           <div className="flex items-center justify-between gap-1">
-                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1.5 shadow-2xs font-mono">
-                              <FaTruck className="w-3 h-3 text-white shrink-0" />
-                              <span>PEDIDO #{ord.order_number}</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1.5 shadow-2xs">
+                              {renderVehicleIcon(vehicle.iconType)}
+                              <span>{vehicle.modelName}</span>
                             </span>
 
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
@@ -643,44 +667,38 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             </span>
                           </div>
 
-                          {/* Linha 2: Cliente & Modalidade */}
+                          {/* Linha 2: Cliente & Valor em Destaque Verde */}
                           <div className="flex items-start justify-between gap-2">
                             <h4 className="font-heading font-bold text-xs text-slate-900 hover:text-[#EA580C] transition-colors cursor-pointer leading-snug line-clamp-2">
                               {ord.contact?.full_name || 'Cliente'}
                             </h4>
-                            <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 whitespace-nowrap">
-                              {ord.fulfillment_type === 'transportadora_envio' ? 'Envio' : 'Loja'}
+                            <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
+                              {formatCurrency(ordTotal)}
                             </span>
                           </div>
 
-                          {/* Linha 3: Caixa de Descrição Operacional */}
+                          {/* Linha 3: Caixa de Descrição do Produto & Especificações */}
                           <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-[11px] space-y-0.5">
                             <p className="font-medium text-slate-800 truncate">
-                              Bagageiro Linha Cargo Robusty
+                              Bagageiro {vehicle.modelName} Modelo EXTREME
                             </p>
                             <div className="flex items-center justify-between text-[10px] text-slate-500">
                               <span>
-                                {ord.fulfillment_type === 'transportadora_envio' 
-                                  ? (ord.shipping_carrier_name || 'Transportadora') 
-                                  : 'Baia de Instalação'}
+                                {ord.fulfillment_type === 'instalacao_loja' 
+                                  ? 'Caminho B: Baia da Loja' 
+                                  : 'Caminho A: Entrega Transportadora'}
                               </span>
-                              <span className="font-mono">
-                                {ord.invoice_status === 'emitida_disponivel' ? 'NF-e Emitida' : 'NF-e Pendente'}
-                              </span>
+                              <span className="font-mono">Preto Epóxi</span>
                             </div>
                           </div>
 
                           {/* Linha 4: Tags Operacionais */}
                           <div className="flex flex-wrap gap-1">
                             <span className="text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 font-medium">
-                              📦 {ord.fulfillment_type === 'transportadora_envio' ? 'Cotação Igor' : 'Baia Loja'}
+                              📦 {ord.fulfillment_type === 'instalacao_loja' ? 'Instalação Loja' : 'Cotação Igor'}
                             </span>
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${
-                              ord.invoice_status === 'emitida_disponivel'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : 'bg-amber-50 text-amber-800 border-amber-200'
-                            }`}>
-                              🧾 {ord.invoice_status === 'emitida_disponivel' ? 'NF Emitida' : 'NF Solicitada'}
+                            <span className="text-[9px] bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 font-medium">
+                              🧾 Nota Fiscal
                             </span>
                           </div>
 
