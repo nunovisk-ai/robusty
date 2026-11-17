@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import type { 
   Vehicle, 
   Product, 
@@ -11,7 +11,7 @@ import type {
   AttachedDocument 
 } from '../types'
 import { fetchVehicles, fetchProducts, calculateBudget, getMaxDiscountForPaymentMethod } from '../services/catalogService'
-import { lookupCep, type CepResult } from '../services/cepService'
+import { lookupCep } from '../services/cepService'
 import { CustomDatePicker } from './CustomDatePicker'
 import { CustomAlertModal } from './CustomAlertModal'
 import { CommercialProposalModal } from './CommercialProposalModal'
@@ -28,6 +28,7 @@ import {
   Clock,
   Send,
   ArrowLeft,
+  ArrowRight,
   CheckCircle2,
   XCircle,
   Weight,
@@ -35,14 +36,13 @@ import {
   QrCode,
   ReceiptText,
   AlertTriangle,
-  Calculator,
   FileText,
   Paperclip,
   Upload,
   Eye,
-  Download,
-  ShieldCheck,
-  Printer
+  User,
+  Share2,
+  ExternalLink
 } from 'lucide-react'
 import { 
   FaWhatsapp, 
@@ -55,6 +55,8 @@ import {
   FaCarSide, 
   FaTruckPickup 
 } from 'react-icons/fa6'
+
+type BudgetFormTab = 'contact' | 'products' | 'fulfillment' | 'documents'
 
 interface BudgetBuilderViewProps {
   initialVehicleId?: string
@@ -114,13 +116,29 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     return initialOpportunity?.assigned_to || 'Norlando'
   })
 
-  // 1. Dados do Contato
+  // 1. Dados do Contato & Redes Sociais
   const [customerName, setCustomerName] = useState(() => initialOpportunity?.contact?.full_name || '')
   const [customerPhone, setCustomerPhone] = useState(() => {
     const raw = initialOpportunity?.contact?.phone_e164 || ''
     return formatBRPhone(raw.replace('+55', ''))
   })
   const [customerEmail, setCustomerEmail] = useState(() => initialOpportunity?.customer_email || initialOpportunity?.contact?.email || '')
+  const [instagramUrl, setInstagramUrl] = useState(() => 
+    initialOpportunity?.instagram_url || 
+    initialOpportunity?.contact?.instagram_url || 
+    initialOpportunity?.contact?.instagram_handle || 
+    ''
+  )
+  const [facebookUrl, setFacebookUrl] = useState(() => 
+    initialOpportunity?.facebook_url || 
+    initialOpportunity?.contact?.facebook_url || 
+    ''
+  )
+  const [websiteUrl, setWebsiteUrl] = useState(() => 
+    initialOpportunity?.website_url || 
+    initialOpportunity?.contact?.website_url || 
+    ''
+  )
   
   // Origem do Lead: whatsapp, instagram, facebook, manual, site
   const [leadOrigin, setLeadOrigin] = useState<string>(() => {
@@ -196,8 +214,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false)
   const [orderGeneratedSuccess, setOrderGeneratedSuccess] = useState(false)
 
-  // Tab selector: Orçamento & Produtos vs Documentos & NFs
-  const [activeFormTab, setActiveFormTab] = useState<'budget' | 'documents'>('budget')
+  // 4 Abas Limpas do Gerador de Orçamento:
+  // 1. Contato & Redes | 2. Veículo & Produtos | 3. Modalidade & Entrega/Coleta | 4. Documentos & NFs
+  const [activeFormTab, setActiveFormTab] = useState<BudgetFormTab>('contact')
 
   // Documentos Anexados (NFs e Proposta em PDF)
   const [attachments, setAttachments] = useState<AttachedDocument[]>(() => {
@@ -206,6 +225,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [nfeKeyInput, setNfeKeyInput] = useState('')
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false)
   const [attachmentToDelete, setAttachmentToDelete] = useState<AttachedDocument | null>(null)
+  const nfFileInputRef = useRef<HTMLInputElement | null>(null)
 
   // Modais Padronizados
   const [conflictModalOpen, setConflictModalOpen] = useState(false)
@@ -438,6 +458,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       customerName: customerName || 'Novo Cliente',
       customerPhone,
       customerEmail,
+      instagramUrl: instagramUrl.trim() || undefined,
+      facebookUrl: facebookUrl.trim() || undefined,
+      websiteUrl: websiteUrl.trim() || undefined,
       leadOrigin: mappedOrigin as LeadOrigin,
       vehicle: selectedVehicle,
       vehicleId: selectedVehicle?.id,
@@ -702,33 +725,69 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         </div>
       </div>
 
-      {/* Segmented Tab Navigation: Orçamento & Produtos vs Documentos & NFs */}
-      <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-nexo">
+      {/* Segmented 4-Tab Navigation: 1. Contato & Redes | 2. Veículo & Produtos | 3. Modalidade & Entrega/Coleta | 4. Documentos & NFs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-nexo">
         <button
           type="button"
-          onClick={() => setActiveFormTab('budget')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeFormTab === 'budget'
+          onClick={() => setActiveFormTab('contact')}
+          className={`flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeFormTab === 'contact'
               ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
-          <Calculator className="w-4 h-4" />
-          <span>Orçamento & Produtos</span>
+          <User className="w-4 h-4 shrink-0" />
+          <span className="truncate">1. Contato & Redes</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveFormTab('products')}
+          className={`flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeFormTab === 'products'
+              ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <Car className="w-4 h-4 shrink-0" />
+          <span className="truncate">2. Veículo & Produtos</span>
+          {items.length > 0 && (
+            <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${
+              activeFormTab === 'products' ? 'bg-white/20 text-white' : 'bg-orange-50 text-[#EA580C]'
+            }`}>
+              {items.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveFormTab('fulfillment')}
+          className={`flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeFormTab === 'fulfillment'
+              ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <Truck className="w-4 h-4 shrink-0" />
+          <span className="truncate">3. Modalidade & Entrega/Coleta</span>
+          {installationConflict && (
+            <span className="ml-auto w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Conflito de horário detectado" />
+          )}
         </button>
 
         <button
           type="button"
           onClick={() => setActiveFormTab('documents')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeFormTab === 'documents'
               ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
-          <FileText className="w-4 h-4" />
-          <span>Documentos & NFs</span>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+          <FileText className="w-4 h-4 shrink-0" />
+          <span className="truncate">4. Documentos & NFs</span>
+          <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${
             activeFormTab === 'documents' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
           }`}>
             {attachments.length}
@@ -736,566 +795,946 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         </button>
       </div>
 
-      {activeFormTab === 'budget' && (
+      {/* Main 2-Column Layout: Left = Active Tab Content | Right = Persistent Sticky Summary & Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Form & Item Picker */}
+        {/* Left Column: Active Tab Content */}
         <div className="lg:col-span-7 space-y-5">
-          {/* 1. Dados do Contato */}
-          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>1. Dados do Contato</span>
-              <span className="text-[11px] font-mono font-medium text-slate-400">#ROB-{orderNumber}</span>
-            </h3>
+          {/* =========================================================================
+              ABA 1: 1. CONTATO & REDES
+             ========================================================================= */}
+          {activeFormTab === 'contact' && (
+            <>
+              {/* Bloco 1.1: Dados do Contato */}
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-[#EA580C]" />
+                    <span>1. Dados do Contato</span>
+                  </span>
+                  <span className="text-[11px] font-mono font-medium text-slate-400">#ROB-{orderNumber}</span>
+                </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              {/* Nome do Cliente */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-600 block mb-1">Nome do Cliente:</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Carlos Eduardo"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
-                />
-              </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Nome do Cliente */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Nome do Cliente:</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Carlos Eduardo"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
+                    />
+                  </div>
 
-              {/* WhatsApp (com máscara brasileira DDD + número) */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-600 block mb-1">WhatsApp:</label>
-                <input
-                  type="text"
-                  placeholder="(11) 99999-9999"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(formatBRPhone(e.target.value))}
-                  className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
-                />
-              </div>
+                  {/* WhatsApp (com máscara brasileira DDD + número) */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">WhatsApp:</label>
+                    <input
+                      type="text"
+                      placeholder="(11) 99999-9999"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(formatBRPhone(e.target.value))}
+                      className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
+                    />
+                  </div>
 
-              {/* E-mail */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-600 block mb-1">E-mail:</label>
-                <input
-                  type="email"
-                  placeholder="cliente@empresa.com.br"
-                  value={customerEmail}
-                  onChange={(e) => setCustomerEmail(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
-                />
-              </div>
+                  {/* E-mail */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">E-mail:</label>
+                    <input
+                      type="email"
+                      placeholder="cliente@empresa.com.br"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
+                    />
+                  </div>
 
-              {/* Origem do Lead: WhatsApp, Instagram, Facebook, Manual, Site */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-600 block mb-1">Origem do Lead:</label>
-                <div className="grid grid-cols-5 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setLeadOrigin('whatsapp')}
-                    title="WhatsApp"
-                    className={`py-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
-                      leadOrigin === 'whatsapp'
-                        ? 'bg-emerald-50 border-emerald-500 text-[#25D366] shadow-xs'
-                        : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
-                    }`}
-                  >
-                    <FaWhatsapp className="w-4 h-4" />
-                  </button>
+                  {/* Origem do Lead: WhatsApp, Instagram, Facebook, Manual, Site */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Origem do Lead:</label>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setLeadOrigin('whatsapp')}
+                        title="WhatsApp"
+                        className={`py-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+                          leadOrigin === 'whatsapp'
+                            ? 'bg-emerald-50 border-emerald-500 text-[#25D366] shadow-xs'
+                            : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
+                        }`}
+                      >
+                        <FaWhatsapp className="w-4 h-4" />
+                      </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setLeadOrigin('instagram')}
-                    title="Instagram"
-                    className={`py-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
-                      leadOrigin === 'instagram'
-                        ? 'bg-pink-50 border-pink-500 text-[#E1306C] shadow-xs'
-                        : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
-                    }`}
-                  >
-                    <FaInstagram className="w-4 h-4" />
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => setLeadOrigin('instagram')}
+                        title="Instagram"
+                        className={`py-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+                          leadOrigin === 'instagram'
+                            ? 'bg-pink-50 border-pink-500 text-[#E1306C] shadow-xs'
+                            : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
+                        }`}
+                      >
+                        <FaInstagram className="w-4 h-4" />
+                      </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setLeadOrigin('facebook')}
-                    title="Facebook"
-                    className={`py-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
-                      leadOrigin === 'facebook'
-                        ? 'bg-blue-50 border-blue-500 text-[#1877F2] shadow-xs'
-                        : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
-                    }`}
-                  >
-                    <FaFacebook className="w-4 h-4" />
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => setLeadOrigin('facebook')}
+                        title="Facebook"
+                        className={`py-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+                          leadOrigin === 'facebook'
+                            ? 'bg-blue-50 border-blue-500 text-[#1877F2] shadow-xs'
+                            : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
+                        }`}
+                      >
+                        <FaFacebook className="w-4 h-4" />
+                      </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setLeadOrigin('site')}
-                    title="Site"
-                    className={`py-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
-                      leadOrigin === 'site'
-                        ? 'bg-orange-50 border-[#EA580C] text-[#EA580C] shadow-xs'
-                        : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
-                    }`}
-                  >
-                    <FaGlobe className="w-4 h-4" />
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => setLeadOrigin('site')}
+                        title="Site"
+                        className={`py-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+                          leadOrigin === 'site'
+                            ? 'bg-orange-50 border-[#EA580C] text-[#EA580C] shadow-xs'
+                            : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
+                        }`}
+                      >
+                        <FaGlobe className="w-4 h-4" />
+                      </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setLeadOrigin('manual')}
-                    title="Manual / Loja"
-                    className={`py-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
-                      leadOrigin === 'manual'
-                        ? 'bg-slate-900 border-slate-900 text-white shadow-xs'
-                        : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
-                    }`}
-                  >
-                    <FaStore className="w-4 h-4" />
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => setLeadOrigin('manual')}
+                        title="Manual / Loja"
+                        className={`py-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+                          leadOrigin === 'manual'
+                            ? 'bg-slate-900 border-slate-900 text-white shadow-xs'
+                            : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
+                        }`}
+                      >
+                        <FaStore className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* 2. Veículo do Cliente (Sem parenteses, sem badge laranja, sem rodapé de regras, sem marca, com ícone e rolagem horizontal em ordem alfabética) */}
-          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                <Car className="w-4 h-4 text-[#EA580C]" />
-                <span>2. Veículo do Cliente</span>
-              </h3>
-              <span className="text-[10px] text-slate-400 font-mono">
-                {sortedVehicles.length} modelos (A-Z)
-              </span>
-            </div>
+              {/* Bloco 1.2: Redes Sociais & Presença Digital (Instagram, Facebook e Website) */}
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                    <Share2 className="w-4 h-4 text-[#EA580C]" />
+                    <span>Redes Sociais & Website do Cliente</span>
+                  </h3>
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    Integra com a doca social no Kanban
+                  </span>
+                </div>
 
-            {/* Barra de rolagem horizontal em ordem alfabética */}
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-              {sortedVehicles.map((v) => {
-                const isSelected = selectedVehicleId === v.id
-                const cleanModel = getCleanVehicleModel(v.model)
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                  {/* Instagram */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 mb-1">
+                      <FaInstagram className="w-3.5 h-3.5 text-[#E1306C]" />
+                      <span>Instagram:</span>
+                    </label>
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        placeholder="@usuario ou link"
+                        value={instagramUrl}
+                        onChange={(e) => setInstagramUrl(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 pr-8 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#E1306C] focus:ring-2 focus:ring-[#E1306C]/10 transition-all font-medium"
+                      />
+                      {instagramUrl.trim() && (
+                        <a
+                          href={
+                            instagramUrl.trim().startsWith('http')
+                              ? instagramUrl.trim()
+                              : `https://instagram.com/${instagramUrl.trim().replace(/^@/, '')}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Abrir perfil no Instagram"
+                          className="absolute right-2.5 text-slate-400 hover:text-[#E1306C] transition-colors"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
 
-                return (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedVehicleId(v.id)
-                      setItems([]) // clear incompatible items
-                    }}
-                    className={`px-4 py-2.5 rounded-xl border flex items-center gap-2 shrink-0 transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-[#FFF3EA] border-[#EA580C] text-[#EA580C] font-bold shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200/80 text-slate-700 font-medium'
-                    }`}
-                  >
-                    <span className={isSelected ? 'text-[#EA580C]' : 'text-slate-400'}>
-                      {renderVehicleIcon(v.model)}
-                    </span>
-                    <span className="text-xs whitespace-nowrap">{cleanModel}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+                  {/* Facebook */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 mb-1">
+                      <FaFacebook className="w-3.5 h-3.5 text-[#1877F2]" />
+                      <span>Facebook:</span>
+                    </label>
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        placeholder="Página ou link do perfil"
+                        value={facebookUrl}
+                        onChange={(e) => setFacebookUrl(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 pr-8 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#1877F2] focus:ring-2 focus:ring-[#1877F2]/10 transition-all font-medium"
+                      />
+                      {facebookUrl.trim() && (
+                        <a
+                          href={
+                            facebookUrl.trim().startsWith('http')
+                              ? facebookUrl.trim()
+                              : `https://facebook.com/${facebookUrl.trim()}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Abrir página no Facebook"
+                          className="absolute right-2.5 text-slate-400 hover:text-[#1877F2] transition-colors"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
 
-          {/* 3. Bagageiros e Acessórios Compatíveis (com pesos, medidas, sem condições de pagamento) */}
-          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                3. Bagageiros e Acessórios Compatíveis
-              </h3>
-              <span className="text-xs text-slate-400 font-mono">
-                {filteredCompatibleProducts.length} de {compatibleProducts.length} itens
-              </span>
-            </div>
+                  {/* Website */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 mb-1">
+                      <FaGlobe className="w-3.5 h-3.5 text-sky-600" />
+                      <span>Website:</span>
+                    </label>
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        placeholder="www.empresa.com.br"
+                        value={websiteUrl}
+                        onChange={(e) => setWebsiteUrl(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 pr-8 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-600/10 transition-all font-medium"
+                      />
+                      {websiteUrl.trim() && (
+                        <a
+                          href={
+                            websiteUrl.trim().startsWith('http')
+                              ? websiteUrl.trim()
+                              : `https://${websiteUrl.trim()}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Abrir Website"
+                          className="absolute right-2.5 text-slate-400 hover:text-sky-600 transition-colors"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-            {/* Pílulas de Filtragem Rápida por Categoria */}
-            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
-              {[
-                { id: 'all', label: 'Todos' },
-                { id: 'bagageiro', label: 'Bagageiros' },
-                { id: 'escada', label: 'Escadas' },
-                { id: 'suporte', label: 'Suportes & Fixação' },
-                { id: 'outros', label: 'Outros' }
-              ].map((cat) => (
+              {/* Navegação Rápida para Aba 2 */}
+              <div className="flex justify-end">
                 <button
-                  key={cat.id}
                   type="button"
-                  onClick={() => setProductCategoryFilter(cat.id as any)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                    productCategoryFilter === cat.id
-                      ? 'bg-slate-900 text-white shadow-2xs'
-                      : 'bg-slate-100 hover:bg-slate-200/80 text-slate-600'
-                  }`}
+                  onClick={() => setActiveFormTab('products')}
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
                 >
-                  {cat.label}
+                  <span>Próximo: 2. Veículo & Produtos</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
-              ))}
-            </div>
+              </div>
+            </>
+          )}
 
-            <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-              {filteredCompatibleProducts.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400 font-medium border border-dashed border-slate-200 rounded-xl">
-                  Nenhum produto encontrado nesta categoria para este veículo.
+          {/* =========================================================================
+              ABA 2: 2. VEÍCULO & PRODUTOS
+             ========================================================================= */}
+          {activeFormTab === 'products' && (
+            <>
+              {/* 2.1 Veículo do Cliente (Sem parenteses, sem badge laranja, sem rodapé de regras, sem marca, com ícone e rolagem horizontal em ordem alfabética) */}
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                    <Car className="w-4 h-4 text-[#EA580C]" />
+                    <span>Veículo do Cliente</span>
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {sortedVehicles.length} modelos (A-Z)
+                  </span>
                 </div>
-              ) : (
-                filteredCompatibleProducts.map((p) => {
-                  const inBudget = items.find((i) => i.product.id === p.id)
-                  return (
-                    <div
-                      key={p.id}
-                      className="p-3 rounded-xl bg-slate-50/80 border border-slate-200/80 hover:border-slate-300 flex items-center justify-between gap-3 transition-colors"
-                    >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900 truncate">{p.name}</span>
-                      </div>
 
-                      {/* Dimensões, Peso e Valor do Produto (Sem condições de pagamento) */}
-                      <div className="flex items-center gap-3 text-xs mt-1 font-mono text-slate-500">
-                        {p.dimensions && (
-                          <span className="text-[11px] text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                            📏 {p.dimensions}
-                          </span>
-                        )}
-                        {p.weight_kg !== undefined && p.weight_kg > 0 && (
-                          <span className="text-[11px] text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                            ⚖️ {p.weight_kg} kg
-                          </span>
-                        )}
-                        <span className="text-slate-900 font-bold ml-auto font-sans">
-                          {formatCurrency(p.base_price_10x)}
+                {/* Barra de rolagem horizontal em ordem alfabética */}
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                  {sortedVehicles.map((v) => {
+                    const isSelected = selectedVehicleId === v.id
+                    const cleanModel = getCleanVehicleModel(v.model)
+
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedVehicleId(v.id)
+                          setItems([]) // clear incompatible items
+                        }}
+                        className={`px-4 py-2.5 rounded-xl border flex items-center gap-2 shrink-0 transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#FFF3EA] border-[#EA580C] text-[#EA580C] font-bold shadow-xs'
+                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200/80 text-slate-700 font-medium'
+                        }`}
+                      >
+                        <span className={isSelected ? 'text-[#EA580C]' : 'text-slate-400'}>
+                          {renderVehicleIcon(v.model)}
                         </span>
+                        <span className="text-xs whitespace-nowrap">{cleanModel}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* 2.2 Bagageiros e Acessórios Compatíveis (com pesos, medidas, sem condições de pagamento) */}
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Bagageiros e Acessórios Compatíveis
+                  </h3>
+                  <span className="text-xs text-slate-400 font-mono">
+                    {filteredCompatibleProducts.length} de {compatibleProducts.length} itens
+                  </span>
+                </div>
+
+                {/* Pílulas de Filtragem Rápida por Categoria */}
+                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+                  {[
+                    { id: 'all', label: 'Todos' },
+                    { id: 'bagageiro', label: 'Bagageiros' },
+                    { id: 'escada', label: 'Escadas' },
+                    { id: 'suporte', label: 'Suportes & Fixação' },
+                    { id: 'outros', label: 'Outros' }
+                  ].map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setProductCategoryFilter(cat.id as any)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                        productCategoryFilter === cat.id
+                          ? 'bg-slate-900 text-white shadow-2xs'
+                          : 'bg-slate-100 hover:bg-slate-200/80 text-slate-600'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                  {filteredCompatibleProducts.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-slate-400 font-medium border border-dashed border-slate-200 rounded-xl">
+                      Nenhum produto encontrado nesta categoria para este veículo.
+                    </div>
+                  ) : (
+                    filteredCompatibleProducts.map((p) => {
+                      const inBudget = items.find((i) => i.product.id === p.id)
+                      return (
+                        <div
+                          key={p.id}
+                          className="p-3 rounded-xl bg-slate-50/80 border border-slate-200/80 hover:border-slate-300 flex items-center justify-between gap-3 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-slate-900 truncate">{p.name}</span>
+                            </div>
+
+                            {/* Dimensões, Peso e Valor do Produto */}
+                            <div className="flex items-center gap-3 text-xs mt-1 font-mono text-slate-500">
+                              {p.dimensions && (
+                                <span className="text-[11px] text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                                  📏 {p.dimensions}
+                                </span>
+                              )}
+                              {p.weight_kg !== undefined && p.weight_kg > 0 && (
+                                <span className="text-[11px] text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                                  ⚖️ {p.weight_kg} kg
+                                </span>
+                              )}
+                              <span className="text-slate-900 font-bold ml-auto font-sans">
+                                {formatCurrency(p.base_price_10x)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleAddItem(p)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shrink-0 ${
+                              inBudget
+                                ? 'bg-[#EA580C] text-white shadow-xs'
+                                : 'bg-white hover:bg-orange-50 text-slate-700 hover:text-[#EA580C] border border-slate-200'
+                            }`}
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>{inBudget ? `Adicionado (${inBudget.quantity})` : 'Adicionar'}</span>
+                          </button>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Navegação entre Abas */}
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setActiveFormTab('contact')}
+                  className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>1. Contato & Redes</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveFormTab('fulfillment')}
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
+                >
+                  <span>Próximo: 3. Modalidade & Entrega/Coleta</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* =========================================================================
+              ABA 3: 3. MODALIDADE & ENTREGA/COLETA
+             ========================================================================= */}
+          {activeFormTab === 'fulfillment' && (
+            <>
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  3. Modalidade & Entrega / Coleta
+                </h3>
+
+                {/* Toggle de Modalidade */}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFulfillment('transportadora_envio')}
+                    className={`p-3.5 rounded-xl border flex items-center gap-3 transition-all cursor-pointer ${
+                      fulfillment === 'transportadora_envio'
+                        ? 'bg-[#FFF3EA] border-[#EA580C] text-slate-900 shadow-xs'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className={`p-2 rounded-lg ${fulfillment === 'transportadora_envio' ? 'bg-[#EA580C] text-white' : 'bg-slate-200 text-slate-600'}`}>
+                      <Truck className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-xs font-bold">Transportadora (Envio)</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFulfillment('instalacao_loja')}
+                    className={`p-3.5 rounded-xl border flex items-center gap-3 transition-all cursor-pointer ${
+                      fulfillment === 'instalacao_loja'
+                        ? 'bg-[#FFF3EA] border-[#EA580C] text-slate-900 shadow-xs'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className={`p-2 rounded-lg ${fulfillment === 'instalacao_loja' ? 'bg-[#EA580C] text-white' : 'bg-slate-200 text-slate-600'}`}>
+                      <Wrench className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-xs font-bold">Instalação na Loja</div>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Se for Transportadora */}
+                {fulfillment === 'transportadora_envio' && (
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3.5">
+                    {/* CEP do Cliente */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        CEP do Cliente:
+                      </label>
+                      <div className="flex gap-2 max-w-sm">
+                        <input
+                          type="text"
+                          placeholder="00000-000"
+                          value={cep}
+                          onChange={(e) => handleCepChange(e.target.value)}
+                          className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCepSearch}
+                          disabled={loadingCep}
+                          className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {loadingCep ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
+                          <span>Buscar</span>
+                        </button>
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleAddItem(p)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shrink-0 ${
-                        inBudget
-                          ? 'bg-[#EA580C] text-white shadow-xs'
-                          : 'bg-white hover:bg-orange-50 text-slate-700 hover:text-[#EA580C] border border-slate-200'
-                      }`}
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>{inBudget ? `Adicionado (${inBudget.quantity})` : 'Adicionar'}</span>
-                    </button>
-                  </div>
-                )
-              }))}
-            </div>
-          </div>
+                    {cepError && (
+                      <div className="text-xs text-red-600 bg-red-50 p-2 rounded-lg border border-red-200">
+                        {cepError}. Preencha os campos abaixo manualmente.
+                      </div>
+                    )}
 
-          {/* 4. Modalidade de Atendimento (Transportadora vs Instalação) */}
-          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              4. Modalidade de Atendimento
-            </h3>
+                    {/* Campos de endereço completos */}
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                      <div className="sm:col-span-8">
+                        <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Rua / Logradouro:</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Av. Amazonas"
+                          value={street}
+                          onChange={(e) => setStreet(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                        />
+                      </div>
+                      <div className="sm:col-span-4">
+                        <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Número:</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 1420"
+                          value={number}
+                          onChange={(e) => setNumber(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                        />
+                      </div>
+                    </div>
 
-            {/* Toggle de Modalidade */}
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setFulfillment('transportadora_envio')}
-                className={`p-3.5 rounded-xl border flex items-center gap-3 transition-all cursor-pointer ${
-                  fulfillment === 'transportadora_envio'
-                    ? 'bg-[#FFF3EA] border-[#EA580C] text-slate-900 shadow-xs'
-                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <div className={`p-2 rounded-lg ${fulfillment === 'transportadora_envio' ? 'bg-[#EA580C] text-white' : 'bg-slate-200 text-slate-600'}`}>
-                  <Truck className="w-4 h-4" />
-                </div>
-                <div className="text-left">
-                  <div className="text-xs font-bold">Transportadora (Envio)</div>
-                </div>
-              </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                      <div className="sm:col-span-4">
+                        <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Bairro:</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Centro"
+                          value={neighborhood}
+                          onChange={(e) => setNeighborhood(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                        />
+                      </div>
+                      <div className="sm:col-span-5">
+                        <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Cidade:</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Belo Horizonte"
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <label className="text-[10px] font-bold text-slate-500 block mb-0.5">UF:</label>
+                        <select
+                          value={state}
+                          onChange={(e) => setState(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-medium cursor-pointer"
+                        >
+                          <option value="">UF</option>
+                          {BRAZILIAN_STATES.map((uf) => (
+                            <option key={uf} value={uf}>
+                              {uf}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
 
-              <button
-                type="button"
-                onClick={() => setFulfillment('instalacao_loja')}
-                className={`p-3.5 rounded-xl border flex items-center gap-3 transition-all cursor-pointer ${
-                  fulfillment === 'instalacao_loja'
-                    ? 'bg-[#FFF3EA] border-[#EA580C] text-slate-900 shadow-xs'
-                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <div className={`p-2 rounded-lg ${fulfillment === 'instalacao_loja' ? 'bg-[#EA580C] text-white' : 'bg-slate-200 text-slate-600'}`}>
-                  <Wrench className="w-4 h-4" />
-                </div>
-                <div className="text-left">
-                  <div className="text-xs font-bold">Instalação na Loja</div>
-                </div>
-              </button>
-            </div>
+                    {/* Peso Total da Carga */}
+                    <div className="p-3 rounded-xl bg-orange-50/70 border border-orange-200 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 text-slate-800">
+                        <Weight className="w-4 h-4 text-[#EA580C]" />
+                        <span className="font-bold">Peso Total da Carga:</span>
+                      </div>
+                      <span className="font-mono font-bold text-[#EA580C] text-sm">
+                        {budget.totalWeightKg} kg
+                      </span>
+                    </div>
 
-            {/* Se for Transportadora */}
-            {fulfillment === 'transportadora_envio' && (
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3.5">
-                {/* CEP do Cliente */}
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                    CEP do Cliente:
-                  </label>
-                  <div className="flex gap-2 max-w-sm">
-                    <input
-                      type="text"
-                      placeholder="00000-000"
-                      value={cep}
-                      onChange={(e) => handleCepChange(e.target.value)}
-                      className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleCepSearch}
-                      disabled={loadingCep}
-                      className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    >
-                      {loadingCep ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
-                      <span>Buscar</span>
-                    </button>
-                  </div>
-                </div>
+                    {/* Valor do Frete */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        Valor do Frete (R$):
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="0.00"
+                        value={freightValue || ''}
+                        onChange={(e) => setFreightValue(parseFloat(e.target.value) || 0)}
+                        className="w-full sm:w-48 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
+                      />
+                    </div>
 
-                {cepError && (
-                  <div className="text-xs text-red-600 bg-red-50 p-2 rounded-lg border border-red-200">
-                    {cepError}. Preencha os campos abaixo manualmente.
+                    {/* Nome da Transportadora e Código de Rastreio */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200/80">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                          Nome da Transportadora:
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Braspress, Jadlog, Jamef..."
+                          value={shippingCarrierName}
+                          onChange={(e) => setShippingCarrierName(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                          Código de Rastreio:
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: BR123456789 ou NF-0045"
+                          value={shippingTrackingCode}
+                          onChange={(e) => setShippingTrackingCode(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Programação da Coleta */}
+                    <div className="pt-2 border-t border-slate-200/80">
+                      <div className="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-[#EA580C]" />
+                        <span>Programação da Coleta:</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <CustomDatePicker
+                          label="Data da Coleta:"
+                          value={pickupDate}
+                          onChange={setPickupDate}
+                          placeholder="Selecione data da coleta"
+                        />
+
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                            Horário da Coleta:
+                          </label>
+                          <select
+                            value={pickupTime}
+                            onChange={(e) => setPickupTime(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200/90 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono cursor-pointer"
+                          >
+                            {TIME_SLOTS.map((slot) => (
+                              <option key={slot} value={slot}>
+                                {slot}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                {/* Campos de endereço completos (livres para preenchimento manual) */}
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                  <div className="sm:col-span-8">
-                    <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Rua / Logradouro:</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Av. Amazonas"
-                      value={street}
-                      onChange={(e) => setStreet(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
-                    />
+                {/* Se for Instalação na Loja */}
+                {fulfillment === 'instalacao_loja' && (
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3.5">
+                    {/* Custo da Instalação (modificável) */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        Custo da Instalação (R$):
+                      </label>
+                      <input
+                        type="number"
+                        value={installationCost || ''}
+                        onChange={(e) => setInstallationCost(parseFloat(e.target.value) || 0)}
+                        className="w-full sm:w-48 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
+                        placeholder="200.00"
+                      />
+                      <span className="text-[10px] text-slate-400 block mt-1">
+                        Padrão do catálogo: {formatCurrency(selectedVehicle?.standard_installation_cost || 200)} (Totalmente modificável)
+                      </span>
+                    </div>
+
+                    {/* Data e Horário da Instalação */}
+                    <div className="pt-2 border-t border-slate-200/80">
+                      <div className="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-[#EA580C]" />
+                        <span>Agendamento da Instalação na Loja:</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <CustomDatePicker
+                          label="Data da Instalação:"
+                          value={installationDate}
+                          onChange={setInstallationDate}
+                          placeholder="Selecione data da instalação"
+                        />
+
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                            Horário da Instalação:
+                          </label>
+                          <select
+                            value={installationTime}
+                            onChange={(e) => setInstallationTime(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200/90 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono cursor-pointer"
+                          >
+                            {TIME_SLOTS.map((slot) => (
+                              <option key={slot} value={slot}>
+                                {slot}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {installationConflict && (
+                          <div className="sm:col-span-2 p-3.5 rounded-2xl bg-amber-50 border border-amber-300/80 text-amber-900 text-xs flex items-start gap-3 shadow-2xs">
+                            <AlertTriangle className="w-4 h-4 text-[#EA580C] shrink-0 mt-0.5" />
+                            <div className="space-y-1 leading-relaxed">
+                              <div className="font-bold text-amber-950 flex items-center gap-2">
+                                <span>Atenção: Já existe instalação agendada neste horário!</span>
+                                <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-amber-200/80 text-amber-900 font-bold">
+                                  {installationConflict.code}
+                                </span>
+                              </div>
+                              <div>
+                                Já existe uma instalação agendada para <strong>{installationConflict.date.split('-').reverse().join('/')} às {installationConflict.time}</strong> ({installationConflict.client} — {installationConflict.vehicle}).
+                              </div>
+                              <div className="text-[11px] text-amber-800">
+                                Recomendamos selecionar outro horário disponível para evitar espera na montagem do veículo.
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="sm:col-span-4">
-                    <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Número:</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: 1420"
-                      value={number}
-                      onChange={(e) => setNumber(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
-                    />
+                )}
+              </div>
+
+              {/* Navegação entre Abas */}
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setActiveFormTab('products')}
+                  className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>2. Veículo & Produtos</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveFormTab('documents')}
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
+                >
+                  <span>Próximo: 4. Documentos & NFs</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* =========================================================================
+              ABA 4: 4. DOCUMENTOS & NFs
+             ========================================================================= */}
+          {activeFormTab === 'documents' && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Card 1: Gerar Orçamento / Proposta em PDF */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-nexo space-y-4 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-200/60 text-[#EA580C] flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-bold text-slate-900">
+                          Proposta Comercial em PDF
+                        </h3>
+                        <p className="text-[11px] text-slate-500">
+                          Gere e anexe o orçamento oficial da Robusty.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs space-y-1 text-slate-600">
+                      <div className="flex justify-between font-medium">
+                        <span>Cliente:</span>
+                        <strong className="text-slate-800 truncate max-w-[140px]">{customerName || 'A definir'}</strong>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>Veículo:</span>
+                        <strong className="text-slate-800 truncate max-w-[140px]">{selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'A definir'}</strong>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>Total:</span>
+                        <strong className="text-[#EA580C] font-mono">{formatCurrency(budget.finalTotal)}</strong>
+                      </div>
+                    </div>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsProposalModalOpen(true)}
+                    className="w-full py-2.5 px-4 bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold rounded-xl text-xs transition-all shadow-sm shadow-orange-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Gerar & Visualizar PDF</span>
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                  <div className="sm:col-span-4">
-                    <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Bairro:</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Centro"
-                      value={neighborhood}
-                      onChange={(e) => setNeighborhood(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
-                    />
-                  </div>
-                  <div className="sm:col-span-5">
-                    <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Cidade:</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Belo Horizonte"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
-                    />
-                  </div>
-                  <div className="sm:col-span-3">
-                    <label className="text-[10px] font-bold text-slate-500 block mb-0.5">UF:</label>
-                    <select
-                      value={state}
-                      onChange={(e) => setState(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-medium cursor-pointer"
-                    >
-                      <option value="">UF</option>
-                      {BRAZILIAN_STATES.map((uf) => (
-                        <option key={uf} value={uf}>
-                          {uf}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Peso Total da Carga (Sem texto cálculo automático) */}
-                <div className="p-3 rounded-xl bg-orange-50/70 border border-orange-200 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2 text-slate-800">
-                    <Weight className="w-4 h-4 text-[#EA580C]" />
-                    <span className="font-bold">Peso Total da Carga:</span>
-                  </div>
-                  <span className="font-mono font-bold text-[#EA580C] text-sm">
-                    {budget.totalWeightKg} kg
-                  </span>
-                </div>
-
-                {/* Valor do Frete (Exibido após o peso da carga) */}
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                    Valor do Frete (R$):
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="0.00"
-                    value={freightValue || ''}
-                    onChange={(e) => setFreightValue(parseFloat(e.target.value) || 0)}
-                    className="w-full sm:w-48 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
-                  />
-                </div>
-
-                {/* Nome da Transportadora e Código de Rastreio */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200/80">
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                      Nome da Transportadora:
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Braspress, Jadlog, Jamef..."
-                      value={shippingCarrierName}
-                      onChange={(e) => setShippingCarrierName(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                      Código de Rastreio:
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ex: BR123456789 ou NF-0045"
-                      value={shippingTrackingCode}
-                      onChange={(e) => setShippingTrackingCode(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
-                    />
-                  </div>
-                </div>
-
-                {/* Campos: Data e Horário da Coleta (Sem texto 'para a loja se preparar' e sem 'hh:mm') */}
-                <div className="pt-2 border-t border-slate-200/80">
-                  <div className="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-[#EA580C]" />
-                    <span>Programação da Coleta:</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <CustomDatePicker
-                      label="Data da Coleta:"
-                      value={pickupDate}
-                      onChange={setPickupDate}
-                      placeholder="Selecione data da coleta"
-                    />
+                {/* Card 2: Anexar Nota Fiscal (NF-e) */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-nexo space-y-4 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-2xl bg-sky-50 border border-sky-200/60 text-sky-600 flex items-center justify-center shrink-0">
+                        <Paperclip className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-bold text-slate-900">
+                          Anexar Nota Fiscal (NF-e)
+                        </h3>
+                        <p className="text-[11px] text-slate-500">
+                          Anexe o Danfe em PDF ou arquivo XML.
+                        </p>
+                      </div>
+                    </div>
 
                     <div>
                       <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                        Horário da Coleta:
+                        Chave de Acesso NF-e (Opcional):
                       </label>
-                      <select
-                        value={pickupTime}
-                        onChange={(e) => setPickupTime(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200/90 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono cursor-pointer"
-                      >
-                        {TIME_SLOTS.map((slot) => (
-                          <option key={slot} value={slot}>
-                            {slot}
-                          </option>
-                        ))}
-                      </select>
+                      <input
+                        type="text"
+                        placeholder="44 dígitos da NF-e..."
+                        value={nfeKeyInput}
+                        onChange={(e) => setNfeKeyInput(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200/90 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C]"
+                      />
                     </div>
                   </div>
+
+                  <label className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 shadow-xs">
+                    <Upload className="w-4 h-4" />
+                    <span>Selecionar PDF / XML</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.xml"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
               </div>
-            )}
 
-            {/* Se for Instalação na Loja */}
-            {fulfillment === 'instalacao_loja' && (
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3.5">
-                {/* Custo da Instalação (modificável) */}
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                    Custo da Instalação (R$):
-                  </label>
-                  <input
-                    type="number"
-                    value={installationCost || ''}
-                    onChange={(e) => setInstallationCost(parseFloat(e.target.value) || 0)}
-                    className="w-full sm:w-48 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
-                    placeholder="200.00"
-                  />
-                  <span className="text-[10px] text-slate-400 block mt-1">
-                    Padrão do catálogo: {formatCurrency(selectedVehicle?.standard_installation_cost || 200)} (Totalmente modificável)
-                  </span>
+              {/* Lista de Documentos Anexados ao Lead / Pedido */}
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-nexo space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Documentos Anexados ao Pedido / Lead
+                    </h3>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                      {attachments.length} {attachments.length === 1 ? 'documento' : 'documentos'}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Campos: Data e Horário da Instalação (Sem 'baia única' e sem 'hh:mm') */}
-                <div className="pt-2 border-t border-slate-200/80">
-                  <div className="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-[#EA580C]" />
-                    <span>Agendamento da Instalação na Loja:</span>
+                {attachments.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400 italic space-y-1 border border-dashed border-slate-200 rounded-xl">
+                    <p>Nenhum documento ou nota fiscal anexada até o momento.</p>
+                    <p className="text-[11px] text-slate-400">Gere uma proposta em PDF ou anexe o Danfe/XML acima.</p>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <CustomDatePicker
-                      label="Data da Instalação:"
-                      value={installationDate}
-                      onChange={setInstallationDate}
-                      placeholder="Selecione data da instalação"
-                    />
-
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                        Horário da Instalação:
-                      </label>
-                      <select
-                        value={installationTime}
-                        onChange={(e) => setInstallationTime(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200/90 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono cursor-pointer"
+                ) : (
+                  <div className="grid grid-cols-1 gap-3">
+                    {attachments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="p-3.5 rounded-xl border border-slate-200/80 hover:border-slate-300 bg-slate-50/60 flex items-start justify-between gap-3 transition-all"
                       >
-                        {TIME_SLOTS.map((slot) => (
-                          <option key={slot} value={slot}>
-                            {slot}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {installationConflict && (
-                      <div className="sm:col-span-2 p-3.5 rounded-2xl bg-amber-50 border border-amber-300/80 text-amber-900 text-xs flex items-start gap-3 shadow-2xs">
-                        <AlertTriangle className="w-4 h-4 text-[#EA580C] shrink-0 mt-0.5" />
-                        <div className="space-y-1 leading-relaxed">
-                          <div className="font-bold text-amber-950 flex items-center gap-2">
-                            <span>Atenção: Já existe instalação agendada neste horário!</span>
-                            <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-amber-200/80 text-amber-900 font-bold">
-                              {installationConflict.code}
-                            </span>
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                            doc.type === 'orcamento_pdf' ? 'bg-orange-100 text-[#EA580C]' : 'bg-sky-100 text-sky-700'
+                          }`}>
+                            {doc.type === 'orcamento_pdf' ? <FileText className="w-4 h-4" /> : <Paperclip className="w-4 h-4" />}
                           </div>
-                          <div>
-                            Já existe uma instalação agendada para <strong>{installationConflict.date.split('-').reverse().join('/')} às {installationConflict.time}</strong> ({installationConflict.client} — {installationConflict.vehicle}).
-                          </div>
-                          <div className="text-[11px] text-amber-800">
-                            Recomendamos selecionar outro horário disponível para evitar espera na montagem do veículo.
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-slate-900 truncate">
+                              {doc.name}
+                            </div>
+                            <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
+                              <span>{doc.file_size || '120 KB'}</span>
+                              <span>•</span>
+                              <span>{new Date(doc.uploaded_at).toLocaleDateString('pt-BR')}</span>
+                            </div>
+                            {doc.nfe_access_key && (
+                              <div className="text-[10px] font-mono text-slate-400 truncate mt-1">
+                                Chave: {doc.nfe_access_key}
+                              </div>
+                            )}
                           </div>
                         </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          {doc.type === 'orcamento_pdf' && (
+                            <button
+                              type="button"
+                              onClick={() => setIsProposalModalOpen(true)}
+                              title="Visualizar Proposta"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setAttachmentToDelete(doc)}
+                            title="Remover documento"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
-                    )}
+                    ))}
                   </div>
-                </div>
+                )}
               </div>
-            )}
-          </div>
+
+              {/* Navegação de Retorno */}
+              <div className="flex items-center justify-start">
+                <button
+                  type="button"
+                  onClick={() => setActiveFormTab('fulfillment')}
+                  className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>3. Modalidade & Entrega/Coleta</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Right Column: Helena/Kommo Style Official Quotation Sheet */}
+        {/* Right Column: Persistent Sticky Official Quotation Sheet & Quick Actions */}
         <div className="lg:col-span-5 space-y-4">
           <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm sticky top-20">
+            {/* Hidden file input for Quick Action "Anexar NF" */}
+            <input
+              ref={nfFileInputRef}
+              type="file"
+              accept=".pdf,.xml"
+              onChange={(e) => {
+                handleFileUpload(e)
+                setActiveFormTab('documents')
+              }}
+              className="hidden"
+            />
+
             {/* Sheet Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
               <div className="flex items-center gap-2">
@@ -1307,7 +1746,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               </div>
               <div className="text-right">
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                  PROPOSTA OFICIAL
+                  RESUMO & AÇÕES RÁPIDAS
                 </span>
                 <div className="text-[10px] font-mono text-slate-400 mt-0.5">
                   #ROB-{orderNumber}
@@ -1317,28 +1756,38 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
             {/* Customer & Vehicle Header */}
             <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-100 space-y-1.5 text-xs mb-4">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center gap-2">
                 <span className="text-slate-500">Cliente:</span>
-                <span className="font-bold text-slate-900">{customerName || 'Cliente não informado'}</span>
+                <span className="font-bold text-slate-900 truncate">{customerName || 'Cliente não informado'}</span>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center gap-2">
                 <span className="text-slate-500">Veículo:</span>
-                <span className="font-semibold text-slate-800">
+                <span className="font-semibold text-slate-800 truncate">
                   {selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Não selecionado'}
                 </span>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center gap-2">
                 <span className="text-slate-500">Modalidade:</span>
                 <span className="text-slate-800 font-medium">
                   {fulfillment === 'transportadora_envio' ? 'Envio por Transportadora' : 'Instalação na Loja'}
                 </span>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center gap-2">
                 <span className="text-slate-500">Responsável:</span>
                 <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-[10px]">
                   {assignedTo}
                 </span>
               </div>
+              {(instagramUrl.trim() || facebookUrl.trim() || websiteUrl.trim()) && (
+                <div className="flex justify-between items-center gap-2 pt-1 border-t border-slate-200/60">
+                  <span className="text-slate-500">Redes Conectadas:</span>
+                  <div className="flex items-center gap-1.5">
+                    {instagramUrl.trim() && <FaInstagram className="w-3.5 h-3.5 text-[#E1306C]" title={`Instagram: ${instagramUrl}`} />}
+                    {facebookUrl.trim() && <FaFacebook className="w-3.5 h-3.5 text-[#1877F2]" title={`Facebook: ${facebookUrl}`} />}
+                    {websiteUrl.trim() && <FaGlobe className="w-3.5 h-3.5 text-sky-600" title={`Website: ${websiteUrl}`} />}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Items List */}
@@ -1351,7 +1800,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               </div>
 
               {items.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                <div className="py-5 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
                   Nenhum produto adicionado ao orçamento
                 </div>
               ) : (
@@ -1602,28 +2051,34 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               )}
             </div>
 
-            {/* Ações do Orçamento */}
+            {/* Botões de Ação Rápida na Barra Lateral Fixa */}
             <div className="space-y-2.5">
-              {/* Botões da Proposta Comercial Oficial */}
+              {/* Linha 1 de Ações Rápidas: Gerar Orçamento PDF + Anexar NF */}
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setIsProposalModalOpen(true)}
-                  disabled={items.length === 0}
-                  className="py-2.5 px-2 rounded-xl text-xs font-bold border border-slate-200 hover:border-[#EA580C] hover:text-[#EA580C] text-slate-700 bg-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-98 disabled:opacity-50"
+                  className="py-2.5 px-2.5 rounded-xl text-xs font-bold border border-orange-200 hover:border-[#EA580C] text-[#EA580C] hover:bg-orange-50 bg-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-98"
                 >
-                  <FileText className="w-3.5 h-3.5 text-[#EA580C]" />
-                  <span>Visualizar PDF</span>
+                  <FileText className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Gerar Orçamento PDF</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setIsProposalModalOpen(true)}
-                  disabled={items.length === 0}
-                  className="py-2.5 px-2 rounded-xl text-xs font-bold border border-orange-200 hover:border-[#EA580C] text-[#EA580C] hover:bg-orange-50 bg-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-98 disabled:opacity-50"
+                  onClick={() => {
+                    setActiveFormTab('documents')
+                    nfFileInputRef.current?.click()
+                  }}
+                  className="py-2.5 px-2.5 rounded-xl text-xs font-bold border border-slate-200 hover:border-sky-600 text-slate-700 hover:text-sky-700 hover:bg-sky-50/60 bg-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-98"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Baixar Proposta</span>
+                  <Paperclip className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                  <span className="truncate">Anexar NF</span>
+                  {attachments.length > 0 && (
+                    <span className="text-[10px] font-mono bg-sky-100 text-sky-800 px-1.5 py-0.2 rounded-full">
+                      {attachments.length}
+                    </span>
+                  )}
                 </button>
               </div>
 
@@ -1642,7 +2097,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 <span>{copied ? 'Copiado para o WhatsApp!' : 'Copiar Texto para o WhatsApp'}</span>
               </button>
 
-              {/* Botões Principais: Salvar ou Gerar Pedido */}
+              {/* Botões Principais: Salvar no Funil + Criar Pedido */}
               <div className="grid grid-cols-2 gap-2">
                 {/* Botão Salvar (Cria/atualiza o card no Funil de Vendas) */}
                 <button
@@ -1651,19 +2106,19 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   disabled={items.length === 0}
                   className="py-3 px-3 rounded-xl text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] text-white shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-98"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Salvar</span>
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>Salvar Orçamento</span>
                 </button>
 
-                {/* Botão Gerar Pedido (Integra diretamente com o Funil de Pedidos) */}
+                {/* Botão Criar Pedido (Integra diretamente com o Funil de Pedidos) */}
                 <button
                   type="button"
                   onClick={handleGenerateOrderAction}
                   disabled={items.length === 0}
                   className="py-3 px-3 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-98"
                 >
-                  <Truck className="w-4 h-4" />
-                  <span>Gerar Pedido</span>
+                  <Truck className="w-4 h-4 shrink-0" />
+                  <span>Criar Pedido</span>
                 </button>
               </div>
 
@@ -1675,7 +2130,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
               {orderGeneratedSuccess && (
                 <div className="text-center text-xs text-blue-700 py-1 font-bold animate-fade-in bg-blue-50 rounded-lg p-2 border border-blue-200">
-                  ✓ Pedido gerado e integrado ao Funil de Pedidos (#ROB-{orderNumber})!
+                  ✓ Pedido criado e integrado ao Funil de Pedidos (#ROB-{orderNumber})!
                 </div>
               )}
 
@@ -1705,177 +2160,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           </div>
         </div>
       </div>
-      )}
-
-      {/* ABA 2: DOCUMENTOS & ANEXOS (NFs e Proposta em PDF) */}
-      {activeFormTab === 'documents' && (
-        <div className="space-y-6">
-          {/* Top Actions: Gerar PDF e Anexar NF-e */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Card 1: Gerar Orçamento / Proposta em PDF */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-nexo space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-200/60 text-[#EA580C] flex items-center justify-center shrink-0">
-                  <FileText className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Proposta Comercial em PDF
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Gere e visualize o orçamento oficial da Robusty para envio ao cliente.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 border border-slate-200/60 rounded-2xl text-xs space-y-1.5 text-slate-600">
-                <div className="flex justify-between font-medium">
-                  <span>Cliente:</span>
-                  <strong className="text-slate-800">{customerName || 'A definir'}</strong>
-                </div>
-                <div className="flex justify-between font-medium">
-                  <span>Veículo:</span>
-                  <strong className="text-slate-800">{selectedVehicle?.model || 'A definir'}</strong>
-                </div>
-                <div className="flex justify-between font-medium">
-                  <span>Total da Proposta:</span>
-                  <strong className="text-[#EA580C] font-mono">{formatCurrency(budget.finalTotal)}</strong>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setIsProposalModalOpen(true)}
-                  className="w-full py-2.5 px-4 bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold rounded-full text-xs transition-all shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                >
-                  <FileText className="w-4 h-4" />
-                  <span>Gerar & Visualizar Proposta em PDF</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Card 2: Anexar Nota Fiscal (NF-e) */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-nexo space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-200/60 text-sky-600 flex items-center justify-center shrink-0">
-                  <Paperclip className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Anexar Nota Fiscal (NF-e)
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Anexe o Danfe em PDF ou arquivo XML emitido pelo Igor para a expedição.
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                    Chave de Acesso da NF-e (Opcional - 44 dígitos):
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: 3526 0200 0000 0000 0000 5500 1000 0010 4010 0000 0000"
-                    value={nfeKeyInput}
-                    onChange={(e) => setNfeKeyInput(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200/90 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C]"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <label className="flex-1 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-full text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-sm">
-                    <Upload className="w-4 h-4" />
-                    <span>Selecionar Arquivo PDF / XML</span>
-                    <input
-                      type="file"
-                      accept=".pdf,.xml"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Lista de Documentos Anexados ao Lead / Pedido */}
-          <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-nexo space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-900">
-                  Documentos Anexados ao Pedido / Lead
-                </h3>
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                  {attachments.length} {attachments.length === 1 ? 'documento' : 'documentos'}
-                </span>
-              </div>
-            </div>
-
-            {attachments.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-400 italic space-y-1">
-                <p>Nenhum documento ou nota fiscal anexada a esta oportunidade até o momento.</p>
-                <p className="text-[11px] text-slate-400">Gere uma proposta em PDF ou selecione o Danfe/XML acima para anexar.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {attachments.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="p-4 rounded-2xl border border-slate-200/80 hover:border-slate-300 bg-slate-50/60 flex items-start justify-between gap-3 transition-all"
-                  >
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        doc.type === 'orcamento_pdf' ? 'bg-orange-100 text-[#EA580C]' : 'bg-sky-100 text-sky-700'
-                      }`}>
-                        {doc.type === 'orcamento_pdf' ? <FileText className="w-5 h-5" /> : <Paperclip className="w-5 h-5" />}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-slate-900 truncate">
-                          {doc.name}
-                        </div>
-                        <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
-                          <span>{doc.file_size || '120 KB'}</span>
-                          <span>•</span>
-                          <span>{new Date(doc.uploaded_at).toLocaleDateString('pt-BR')}</span>
-                        </div>
-                        {doc.nfe_access_key && (
-                          <div className="text-[10px] font-mono text-slate-400 truncate mt-1">
-                            Chave: {doc.nfe_access_key}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                      {doc.type === 'orcamento_pdf' && (
-                        <button
-                          type="button"
-                          onClick={() => setIsProposalModalOpen(true)}
-                          title="Visualizar Proposta"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setAttachmentToDelete(doc)}
-                        title="Remover documento"
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* MODAL 1: PROPOSTA COMERCIAL EM PDF */}
       <CommercialProposalModal
@@ -1938,7 +2222,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         onPrimaryAction={() => {
           setConflictModalOpen(false)
           setPendingAction(null)
-          setActiveFormTab('budget')
+          setActiveFormTab('fulfillment')
         }}
         secondaryButtonText="Salvar Mesmo Assim (Encaixe)"
         onSecondaryAction={executePendingAction}

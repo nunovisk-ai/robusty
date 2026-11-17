@@ -1009,6 +1009,9 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                               assigned_to: ord.assigned_to || 'Igor',
                               contact_id: ord.contact_id,
                               contact: ord.contact,
+                              instagram_url: ord.instagram_url || ord.contact?.instagram_url,
+                              facebook_url: ord.facebook_url || ord.contact?.facebook_url,
+                              website_url: ord.website_url || ord.contact?.website_url,
                               vehicle_model_year: vehicle.modelName,
                               stage: 'venda_ganha',
                               fulfillment_type: ord.fulfillment_type,
@@ -1023,6 +1026,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                               pickup_time: ord.pickup_time,
                               installation_date: ord.installation_date,
                               installation_time: ord.installation_time,
+                              attachments: ord.attachments,
                               created_at: ord.created_at,
                               updated_at: ord.created_at,
                             })
