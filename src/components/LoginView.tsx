@@ -140,27 +140,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
       {/* Main Container */}
       <div className="w-full max-w-md relative z-10 space-y-6">
-        {/* Brand Header */}
-        <div className="text-center space-y-3">
-          <div className="inline-flex items-center justify-center p-4 rounded-2xl bg-white shadow-nexo border border-slate-100">
-            <img
-              src={`${import.meta.env.BASE_URL}robusty-logo.png`}
-              alt="Robusty"
-              className="h-12 w-auto object-contain"
-            />
-          </div>
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF3EA] border border-[#FFEDD5] text-[11px] font-semibold text-[#EA580C] mb-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#EA580C] animate-pulse" />
-              <span>CRM Comercial & Operacional</span>
-            </div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-              Acesso ao Sistema
-            </h1>
-            <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
-              Entre com suas credenciais para gerenciar leads, orçamentos, pedidos e operações.
-            </p>
-          </div>
+        {/* Brand Logo (Clean & Transparent) */}
+        <div className="flex justify-center pb-1">
+          <img
+            src={`${import.meta.env.BASE_URL}robusty-logo.png`}
+            alt="Robusty"
+            className="h-16 w-auto object-contain"
+          />
         </div>
 
         {/* Login Card */}
@@ -185,7 +171,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             {/* Email Field */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                <span>E-mail Corporativo</span>
+                <span>E-mail</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
@@ -206,7 +192,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-700">
-                  Senha de Acesso
+                  Senha
                 </label>
                 <button
                   type="button"
