@@ -25,7 +25,19 @@ body {
   letter-spacing: -0.015em;
 }
 
-/* Custom smooth scrollbars for Nexo Kanban */
+/* Reset default browser button outline stroke */
+button, 
+button:focus, 
+button:focus-visible, 
+button:active,
+a, 
+a:focus, 
+a:focus-visible {
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Custom smooth discreet scrollbars for Kanban */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -39,6 +51,27 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #CBD5E1;
+}
+
+/* Kanban discreet horizontal scrollbar pinned at bottom */
+.kanban-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 #F1F5F9;
+}
+.kanban-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.kanban-scroll::-webkit-scrollbar-track {
+  background: #F1F5F9;
+  border-radius: 9999px;
+}
+.kanban-scroll::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+.kanban-scroll::-webkit-scrollbar-thumb:hover {
+  background: #EA580C;
 }
 
 /* Nexo pill animations & shadows */

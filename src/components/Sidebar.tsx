@@ -39,13 +39,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems = [
     {
       id: 'kanban' as ActiveTab,
-      label: 'Pipeline / Funil',
+      label: 'Pipeline',
       icon: <SlidersHorizontal className="w-5 h-5" />,
-    },
-    {
-      id: 'budget' as ActiveTab,
-      label: 'Novo Orçamento',
-      icon: <Calculator className="w-5 h-5" />,
     },
     {
       id: 'catalog' as ActiveTab,
@@ -82,7 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
         <button
           onClick={() => setIsMobileOpen(false)}
-          className="md:hidden p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+          className="md:hidden p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer outline-none focus:outline-none"
         >
           <X className="w-5 h-5" />
         </button>
@@ -99,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 setActiveTab(item.id)
                 setIsMobileOpen(false)
               }}
-              className={`w-full flex items-center px-3.5 py-3 rounded-2xl text-left transition-all cursor-pointer font-medium ${
+              className={`w-full flex items-center px-3.5 py-3 rounded-2xl text-left transition-all cursor-pointer font-medium outline-none focus:outline-none focus:ring-0 focus-visible:outline-none ${
                 isActive
                   ? 'bg-[#EA580C] text-white shadow-sm font-semibold shadow-orange-500/20'
                   : 'text-slate-600 hover:text-[#EA580C] hover:bg-[#FFF3EA]'

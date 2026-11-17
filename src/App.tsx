@@ -91,6 +91,52 @@ const defaultOpportunities: Opportunity[] = [
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
+  {
+    id: 'opp-4',
+    contact_id: 'c-4',
+    contact: {
+      id: 'c-4',
+      full_name: 'Rogério Logística (Nova Kangoo)',
+      phone_e164: '+5511955554433',
+      origin: 'meta_lead_ads',
+      created_at: new Date().toISOString(),
+    },
+    vehicle_model_year: 'Renault Nova Kangoo 2024+',
+    stage: 'em_qualificacao',
+    fulfillment_type: 'transportadora_envio',
+    subtotal_products: 2280.0,
+    freight_value: 150.0,
+    installation_value: 0,
+    discount_value: 0,
+    discount_percent: 0,
+    final_total: 2430.0,
+    payment_method: 'cartao_link_igor',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'opp-5',
+    contact_id: 'c-5',
+    contact: {
+      id: 'c-5',
+      full_name: 'Oficina do Beto (Doblo Cargo)',
+      phone_e164: '+5511944443322',
+      origin: 'loja_presencial',
+      created_at: new Date().toISOString(),
+    },
+    vehicle_model_year: 'Fiat Doblo Cargo',
+    stage: 'em_negociacao',
+    fulfillment_type: 'instalacao_loja',
+    subtotal_products: 2100.0,
+    freight_value: 0,
+    installation_value: 200.0,
+    discount_value: 210.0,
+    discount_percent: 10,
+    final_total: 2090.0,
+    payment_method: 'pix',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
 ]
 
 const defaultOrders: Order[] = [
@@ -366,11 +412,18 @@ export function App() {
           onLogout={handleLogout}
         />
 
-        <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto">
+        <main className={`flex-1 p-4 sm:p-6 sm:py-8 w-full mx-auto ${activeTab === 'kanban' ? 'max-w-[1700px]' : 'max-w-7xl'}`}>
           {activeTab === 'kanban' && (
             <KanbanView
               opportunities={opportunities}
+              orders={orders}
               onMoveStage={handleMoveStage}
+              onUpdateOrderStatus={async (ordId, nextSt) => {
+                setOrders((prev) =>
+                  prev.map((o) => (o.id === ordId ? { ...o, status: nextSt } : o))
+                )
+                await updateOrderStatusInSupabase(ordId, nextSt)
+              }}
               onConvertToOrder={handleConvertToOrder}
               onOpenNewBudget={() => setActiveTab('budget')}
             />

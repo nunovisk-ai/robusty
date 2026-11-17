@@ -20,7 +20,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 }) => {
   const getTabTitle = (tab: ActiveTab) => {
     switch (tab) {
-      case 'kanban': return 'Pipeline / Funil de Leads'
+      case 'kanban': return 'Pipeline'
       case 'budget': return 'Montador de Orçamento'
       case 'catalog': return 'Catálogo Oficial Fev/2026'
       case 'orders': return 'Funil Operacional de Pedidos'
@@ -37,7 +37,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       <div className="flex items-center gap-4">
         <button
           onClick={onToggleMobile}
-          className="md:hidden p-2.5 rounded-2xl text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
+          className="md:hidden p-2.5 rounded-2xl text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer outline-none focus:outline-none"
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -54,10 +54,10 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Primary Action Button */}
         <button
           onClick={onNewLeadClick}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#EA580C] hover:bg-[#C2410C] text-white rounded-full text-xs font-semibold transition-all shadow-md shadow-orange-500/25 hover:shadow-orange-500/35 active:scale-98 cursor-pointer"
+          className="flex items-center gap-2 px-5 py-2.5 bg-[#EA580C] hover:bg-[#C2410C] text-white rounded-full text-xs font-semibold transition-all shadow-md shadow-orange-500/25 hover:shadow-orange-500/35 active:scale-98 cursor-pointer outline-none focus:outline-none"
         >
           <Plus className="w-4 h-4 stroke-[2.5]" />
-          <span>Novo Lead</span>
+          <span>Novo Orçamento</span>
         </button>
       </div>
     </header>
