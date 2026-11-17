@@ -21,9 +21,7 @@ import {
   List,
   AlertCircle,
   ExternalLink,
-  ShieldAlert,
-  Copy,
-  Check
+  ShieldAlert
 } from 'lucide-react'
 import {
   FaWhatsapp,
@@ -141,36 +139,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   // Selected date for day view and reference for month/week navigation
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date())
   const [selectedEventModal, setSelectedEventModal] = useState<CalendarEvent | null>(null)
-  const [copiedFieldKey, setCopiedFieldKey] = useState<string | null>(null)
-
-  const handleCopyField = (key: string, value?: string) => {
-    if (!value) return
-    navigator.clipboard.writeText(value)
-    setCopiedFieldKey(key)
-    setTimeout(() => {
-      setCopiedFieldKey((curr) => (curr === key ? null : curr))
-    }, 2000)
-  }
-
-  const renderCopyButton = (fieldKey: string, valueToCopy?: string, label: string = 'Copiar') => {
-    if (!valueToCopy) return null
-    const isCopied = copiedFieldKey === fieldKey
-    return (
-      <button
-        type="button"
-        onClick={() => handleCopyField(fieldKey, valueToCopy)}
-        title={isCopied ? 'Copiado para área de transferência!' : `Copiar ${label}`}
-        className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0 border ${
-          isCopied
-            ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-            : 'bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 border-slate-200 shadow-2xs'
-        }`}
-      >
-        {isCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-slate-400" />}
-        <span>{isCopied ? 'Copiado!' : 'Copiar'}</span>
-      </button>
-    )
-  }
 
   // Unify and integrate all events from Orders, Opportunities, and Appointments
   const allEvents = useMemo(() => {
@@ -1150,11 +1118,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             <div className="space-y-3.5 text-xs">
               {/* Programação: Data e Hora */}
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                    Horário Agendado
-                  </div>
-                  {renderCopyButton('dateTime', `${selectedEventModal.date.split('-').reverse().join('/')} às ${selectedEventModal.time}`, 'Data/Hora')}
+                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">
+                  Horário Agendado
                 </div>
                 <div className="text-sm font-bold text-slate-900 font-mono flex items-center gap-2">
                   <Clock className="w-4 h-4 text-[#EA580C]" />
@@ -1164,11 +1129,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
               {/* Cliente */}
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                    Contato do Cliente
-                  </div>
-                  {renderCopyButton('clientName', selectedEventModal.clientName, 'Nome')}
+                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  Contato do Cliente
                 </div>
                 <div className="text-sm font-bold text-slate-900">
                   {selectedEventModal.clientName}
@@ -1179,35 +1141,28 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       <Phone className="w-3.5 h-3.5 text-slate-400" />
                       <span>{selectedEventModal.clientPhone}</span>
                     </span>
-                    <div className="flex items-center gap-2">
-                      {renderCopyButton('clientPhone', selectedEventModal.clientPhone, 'Telefone')}
-                      <a
-                        href={`https://wa.me/${selectedEventModal.clientPhone.replace(/\D/g, '')}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[#25D366] hover:underline font-bold flex items-center gap-1 text-[11px]"
-                      >
-                        <FaWhatsapp className="w-3.5 h-3.5" />
-                        <span>WhatsApp</span>
-                      </a>
-                    </div>
+                    <a
+                      href={`https://wa.me/${selectedEventModal.clientPhone.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[#25D366] hover:underline font-bold flex items-center gap-1 text-[11px]"
+                    >
+                      <FaWhatsapp className="w-3.5 h-3.5" />
+                      <span>WhatsApp</span>
+                    </a>
                   </div>
                 )}
                 {selectedEventModal.clientEmail && (
-                  <div className="flex items-center justify-between text-xs text-slate-500 pt-0.5">
+                  <div className="text-xs text-slate-500 pt-0.5">
                     <span className="truncate">E-mail: {selectedEventModal.clientEmail}</span>
-                    {renderCopyButton('clientEmail', selectedEventModal.clientEmail, 'E-mail')}
                   </div>
                 )}
               </div>
 
               {/* Veículo & Carga */}
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                    Veículo & Carga
-                  </div>
-                  {renderCopyButton('vehicleModel', selectedEventModal.vehicleModel, 'Veículo')}
+                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  Veículo & Carga
                 </div>
                 <div className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span className="text-[#EA580C]">
@@ -1216,19 +1171,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   <span>{selectedEventModal.vehicleModel}</span>
                 </div>
                 <div className="text-xs text-slate-700 bg-white p-2.5 rounded-xl border border-slate-200/60 leading-relaxed space-y-1">
-                  <div className="flex items-center justify-between">
-                    <strong className="text-slate-900 font-semibold">Peças / Bagageiros:</strong>
-                    {renderCopyButton('itemsSummary', selectedEventModal.itemsSummary, 'Peças')}
-                  </div>
+                  <strong className="text-slate-900 font-semibold block">Peças / Bagageiros:</strong>
                   <div>{selectedEventModal.itemsSummary}</div>
                 </div>
                 {selectedEventModal.totalWeightKg && (
-                  <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-700 pt-1">
-                    <span className="flex items-center gap-1.5">
-                      <Weight className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Peso Total da Carga: {selectedEventModal.totalWeightKg} kg</span>
-                    </span>
-                    {renderCopyButton('totalWeight', `${selectedEventModal.totalWeightKg} kg`, 'Peso')}
+                  <div className="text-xs font-mono font-bold text-slate-700 pt-1 flex items-center gap-1.5">
+                    <Weight className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Peso Total da Carga: {selectedEventModal.totalWeightKg} kg</span>
                   </div>
                 )}
               </div>
@@ -1236,34 +1185,25 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               {/* Logística de Envio ou Instalação */}
               {selectedEventModal.type === 'coleta' ? (
                 <div className="p-3.5 rounded-2xl bg-sky-50/80 border border-sky-200/80 space-y-2">
-                  <div className="text-[10px] uppercase font-bold text-sky-700 tracking-wider flex items-center justify-between">
-                    <div className="flex items-center gap-1">
-                      <Truck className="w-3.5 h-3.5 text-sky-600" />
-                      <span>Dados para Expedição / Transportadora</span>
-                    </div>
+                  <div className="text-[10px] uppercase font-bold text-sky-700 tracking-wider flex items-center gap-1">
+                    <Truck className="w-3.5 h-3.5 text-sky-600" />
+                    <span>Dados para Expedição / Transportadora</span>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-sky-950 font-semibold">
+                  <div className="text-xs text-sky-950 font-semibold">
                     <span>Transportadora: {selectedEventModal.shippingCarrierName || 'Aguardando definição'}</span>
-                    {selectedEventModal.shippingCarrierName && renderCopyButton('carrier', selectedEventModal.shippingCarrierName, 'Transportadora')}
                   </div>
 
                   {selectedEventModal.shippingTrackingCode && (
-                    <div className="flex items-center justify-between text-xs font-mono bg-white/80 p-2 rounded-xl border border-sky-200 text-sky-900">
+                    <div className="text-xs font-mono bg-white/80 p-2 rounded-xl border border-sky-200 text-sky-900">
                       <span>Rastreio: <strong>{selectedEventModal.shippingTrackingCode}</strong></span>
-                      {renderCopyButton('trackingCode', selectedEventModal.shippingTrackingCode, 'Rastreio')}
                     </div>
                   )}
 
                   {selectedEventModal.shippingAddress?.street && (
                     <div className="bg-white/80 p-2.5 rounded-xl border border-sky-200 text-xs text-sky-900 space-y-1">
-                      <div className="flex items-center justify-between font-bold text-sky-950">
+                      <div className="font-bold text-sky-950">
                         <span>Endereço de Entrega:</span>
-                        {renderCopyButton(
-                          'fullAddress',
-                          `${selectedEventModal.shippingAddress.street}, ${selectedEventModal.shippingAddress.number}${selectedEventModal.shippingAddress.neighborhood ? ` - ${selectedEventModal.shippingAddress.neighborhood}` : ''}${selectedEventModal.shippingAddress.city ? `, ${selectedEventModal.shippingAddress.city}/${selectedEventModal.shippingAddress.state}` : ''}${selectedEventModal.shippingAddress.cep ? ` - CEP ${selectedEventModal.shippingAddress.cep}` : ''}`,
-                          'Endereço'
-                        )}
                       </div>
                       <div className="leading-snug">
                         {selectedEventModal.shippingAddress.street}, {selectedEventModal.shippingAddress.number}
@@ -1271,9 +1211,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         {selectedEventModal.shippingAddress.city && ` - ${selectedEventModal.shippingAddress.city}/${selectedEventModal.shippingAddress.state}`}
                       </div>
                       {selectedEventModal.shippingAddress.cep && (
-                        <div className="flex items-center justify-between pt-1 border-t border-sky-100 font-mono text-[11px]">
+                        <div className="pt-1 border-t border-sky-100 font-mono text-[11px]">
                           <span>CEP: {selectedEventModal.shippingAddress.cep}</span>
-                          {renderCopyButton('cep', selectedEventModal.shippingAddress.cep, 'CEP')}
                         </div>
                       )}
                     </div>
@@ -1281,12 +1220,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 </div>
               ) : (
                 <div className="p-3.5 rounded-2xl bg-purple-50/80 border border-purple-200/80 space-y-1">
-                  <div className="text-[10px] uppercase font-bold text-purple-700 tracking-wider flex items-center justify-between">
-                    <div className="flex items-center gap-1">
-                      <Wrench className="w-3.5 h-3.5 text-purple-600" />
-                      <span>Oficina & Montagem na Loja</span>
-                    </div>
-                    {renderCopyButton('shopLocation', 'Oficina Matriz Robusty', 'Local')}
+                  <div className="text-[10px] uppercase font-bold text-purple-700 tracking-wider flex items-center gap-1">
+                    <Wrench className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Oficina & Montagem na Loja</span>
                   </div>
                   <div className="text-xs text-purple-950 font-medium">
                     Local: Oficina Matriz Robusty
