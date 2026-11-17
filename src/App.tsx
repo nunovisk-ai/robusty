@@ -8,7 +8,18 @@ import { OrdersView } from './components/OrdersView'
 import { CalendarView } from './components/CalendarView'
 import { SettingsView } from './components/SettingsView'
 import { LoginView, type CurrentUser } from './components/LoginView'
-import type { Opportunity, OpportunityStage, Order, OrderStatus, Appointment, Product, Vehicle } from './types'
+import type { 
+  Opportunity, 
+  OpportunityStage, 
+  Order, 
+  OrderStatus, 
+  Appointment, 
+  Product, 
+  Vehicle,
+  OpportunityComment,
+  OpportunityHistoryEvent,
+  OpportunityTask
+} from './types'
 import {
   fetchOpportunities,
   saveOpportunityToSupabase,
@@ -61,6 +72,39 @@ const defaultOpportunities: Opportunity[] = [
     shipping_carrier_name: 'Braspress Cargas',
     shipping_tracking_code: 'BP-98234-MG',
     payment_method: 'pix',
+    tasks: [
+      {
+        id: 'task-1',
+        opportunity_id: 'opp-1',
+        order_number: 1040,
+        client_name: 'Mercado Central de Minas',
+        title: 'Cotar frete com a Braspress',
+        due_date: getRelDateStr(0),
+        due_time: '15:00',
+        assigned_to: 'Norlando',
+        completed: false,
+        created_at: new Date().toISOString()
+      }
+    ],
+    comments: [
+      {
+        id: 'comm-1',
+        opportunity_id: 'opp-1',
+        author: 'Norlando',
+        text: 'Cliente solicitou bagageiro reforçado para transporte diário de caixas de alimentos. Verificar disponibilidade do modelo EXTREME.',
+        created_at: new Date(Date.now() - 3600000 * 4).toISOString()
+      }
+    ],
+    history: [
+      {
+        id: 'hist-1',
+        opportunity_id: 'opp-1',
+        type: 'created',
+        description: 'Orçamento #ROB-1040 criado no CRM via WhatsApp Inbound',
+        user: 'Norlando',
+        created_at: new Date(Date.now() - 3600000 * 5).toISOString()
+      }
+    ],
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -90,6 +134,39 @@ const defaultOpportunities: Opportunity[] = [
     installation_date: getRelDateStr(1),
     installation_time: '14:00',
     payment_method: 'boleto',
+    tasks: [
+      {
+        id: 'task-2',
+        opportunity_id: 'opp-2',
+        order_number: 1041,
+        client_name: 'Roberto Frotas (Fiorino)',
+        title: 'Follow-up do orçamento enviado',
+        due_date: getRelDateStr(0),
+        due_time: '16:30',
+        assigned_to: 'Igor',
+        completed: false,
+        created_at: new Date().toISOString()
+      }
+    ],
+    comments: [
+      {
+        id: 'comm-2',
+        opportunity_id: 'opp-2',
+        author: 'Igor',
+        text: 'Roberto tem interesse em fechar para 3 Fiorinos da frota se o desconto for mantido.',
+        created_at: new Date(Date.now() - 3600000 * 2).toISOString()
+      }
+    ],
+    history: [
+      {
+        id: 'hist-2',
+        opportunity_id: 'opp-2',
+        type: 'stage_change',
+        description: 'Movimentação de etapa: de "Lead Recebido" para "Orçamento Enviado"',
+        user: 'Igor',
+        created_at: new Date(Date.now() - 3600000 * 3).toISOString()
+      }
+    ],
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -362,10 +439,41 @@ export function App() {
     setActiveTab('budget')
   }
 
-  // Move stage inside Funil de Vendas with bidirectional sync
+  // Move stage inside Funil de Vendas with bidirectional sync and automatic audit trail
   const handleMoveStage = async (oppId: string, newStage: OpportunityStage) => {
+    const stageLabels: Record<string, string> = {
+      lead_recebido: 'Lead Recebido',
+      contato_iniciado: 'Contato Iniciado',
+      aguardando_cotacao: 'Aguardando Cotação',
+      em_qualificacao: 'Em Qualificação',
+      orcamento_enviado: 'Orçamento Enviado',
+      em_negociacao: 'Em Negociação',
+      venda_ganha: 'Venda Ganha',
+      venda_perdida: 'Venda Perdida'
+    }
+
     setOpportunities((prev) =>
-      prev.map((o) => (o.id === oppId ? { ...o, stage: newStage, updated_at: new Date().toISOString() } : o))
+      prev.map((o) => {
+        if (o.id === oppId) {
+          const oldLabel = stageLabels[o.stage] || o.stage
+          const newLabel = stageLabels[newStage] || newStage
+          const historyEvent: OpportunityHistoryEvent = {
+            id: `hist-stage-${Date.now()}`,
+            opportunity_id: oppId,
+            type: 'stage_change',
+            description: `Movimentação de etapa: de "${oldLabel}" para "${newLabel}"`,
+            user: o.assigned_to || 'Equipe',
+            created_at: new Date().toISOString()
+          }
+          return {
+            ...o,
+            stage: newStage,
+            history: [historyEvent, ...(o.history || [])],
+            updated_at: new Date().toISOString()
+          }
+        }
+        return o
+      })
     )
 
     // Mirror to orders if moving to venda_perdida
@@ -376,6 +484,29 @@ export function App() {
     }
 
     await updateOpportunityStage(oppId, newStage)
+  }
+
+  // 1-Click task toggle for TopBar & Kanban
+  const handleToggleTask = (oppId: string, taskId: string) => {
+    setOpportunities((prev) =>
+      prev.map((opp) => {
+        if (opp.id === oppId && opp.tasks) {
+          const updatedTasks = opp.tasks.map((t) => {
+            if (t.id === taskId) {
+              const nextCompleted = !t.completed
+              return {
+                ...t,
+                completed: nextCompleted,
+                completed_at: nextCompleted ? new Date().toISOString() : undefined
+              }
+            }
+            return t
+          })
+          return { ...opp, tasks: updatedTasks, updated_at: new Date().toISOString() }
+        }
+        return opp
+      })
+    )
   }
 
   // Move status inside Funil de Pedidos with bidirectional sync
@@ -515,6 +646,9 @@ export function App() {
         total_price: i.product.base_price_10x * i.quantity,
       })),
       attachments: data.attachments || existingOpp?.attachments || [],
+      comments: data.comments || existingOpp?.comments || [],
+      history: data.history || existingOpp?.history || [],
+      tasks: data.tasks || existingOpp?.tasks || [],
       created_at: existingOpp?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
@@ -548,6 +682,9 @@ export function App() {
             shipping_tracking_code: data.shippingTrackingCode || ord.shipping_tracking_code,
             total_weight_kg: data.totalWeightKg,
             attachments: data.attachments || existingOpp?.attachments || [],
+            comments: data.comments || existingOpp?.comments || [],
+            history: data.history || existingOpp?.history || [],
+            tasks: data.tasks || existingOpp?.tasks || [],
           }
         }
         return ord
@@ -644,6 +781,9 @@ export function App() {
         total_price: i.product.base_price_10x * i.quantity,
       })),
       attachments: data.attachments || existingOpp?.attachments || [],
+      comments: data.comments || existingOpp?.comments || [],
+      history: data.history || existingOpp?.history || [],
+      tasks: data.tasks || existingOpp?.tasks || [],
       created_at: existingOpp?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
@@ -684,6 +824,9 @@ export function App() {
               shipping_tracking_code: data.shippingTrackingCode || ord.shipping_tracking_code,
               total_weight_kg: data.totalWeightKg,
               attachments: data.attachments || existingOpp?.attachments || [],
+              comments: data.comments || existingOpp?.comments || [],
+              history: data.history || existingOpp?.history || [],
+              tasks: data.tasks || existingOpp?.tasks || [],
             }
           }
           return ord
@@ -716,6 +859,9 @@ export function App() {
         installation_time: data.installationTime,
         total_weight_kg: data.totalWeightKg,
         attachments: data.attachments || existingOpp?.attachments || [],
+        comments: data.comments || existingOpp?.comments || [],
+        history: data.history || existingOpp?.history || [],
+        tasks: data.tasks || existingOpp?.tasks || [],
         created_at: new Date().toISOString(),
       }
       setOrders((prev) => [newOrder, ...prev])
@@ -798,6 +944,9 @@ export function App() {
           onNewLeadClick={handleOpenNewOpportunity}
           currentUser={currentUser}
           onLogout={handleLogout}
+          opportunities={opportunities}
+          onSelectOpportunity={handleSelectOpportunityToEdit}
+          onToggleTask={handleToggleTask}
         />
 
         <main className={`flex-1 w-full ${activeTab === 'kanban' ? 'p-3 sm:px-6 sm:py-3 flex flex-col min-h-0 overflow-hidden max-w-full' : 'p-4 sm:p-6 sm:py-8 max-w-7xl mx-auto'}`}>

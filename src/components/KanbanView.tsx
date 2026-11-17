@@ -10,7 +10,10 @@ import {
   CheckCircle2,
   X,
   LayoutGrid,
-  List
+  List,
+  Clock,
+  Calendar,
+  MessageSquare
 } from 'lucide-react'
 import { 
   FaWhatsapp, 
@@ -734,6 +737,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       const canMoveNext = colIdx < SALES_STAGES.length - 1 && !isWonStage && col.id !== 'venda_perdida'
                       const originBadge = getOriginBadge(opp.contact?.origin)
                       const OriginIcon = originBadge.Icon
+                      const pendingTasks = (opp.tasks || []).filter((t) => !t.completed)
+                      const hasComments = (opp.comments || []).length > 0
 
                       return (
                         <div
@@ -783,6 +788,48 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                               >
                                 {opp.contact?.full_name || 'Cliente'}
                               </h4>
+
+                              {/* Lembretes e Comentários Compactos */}
+                              {(pendingTasks.length > 0 || hasComments) && (
+                                <div className="flex items-center justify-between gap-1 text-[9px]">
+                                  {pendingTasks.length > 0 ? (() => {
+                                    const today = new Date().toISOString().split('T')[0]
+                                    const overdue = pendingTasks.find((t) => t.due_date < today)
+                                    const todayTask = pendingTasks.find((t) => t.due_date === today)
+                                    const targetTask = overdue || todayTask || pendingTasks[0]
+
+                                    if (overdue) {
+                                      return (
+                                        <span className="font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded flex items-center gap-1 truncate max-w-[150px]">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping shrink-0" />
+                                          <span className="truncate">⚠️ {targetTask.title}</span>
+                                        </span>
+                                      )
+                                    }
+                                    if (todayTask) {
+                                      return (
+                                        <span className="font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded flex items-center gap-1 truncate max-w-[150px]">
+                                          <Clock className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                          <span className="truncate">Hoje {targetTask.due_time}</span>
+                                        </span>
+                                      )
+                                    }
+                                    return (
+                                      <span className="font-medium text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded flex items-center gap-1 truncate max-w-[150px]">
+                                        <Calendar className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                                        <span className="truncate">{targetTask.due_date}</span>
+                                      </span>
+                                    )
+                                  })() : <div />}
+
+                                  {hasComments && (
+                                    <span className="text-[9px] font-medium text-slate-500 bg-slate-100 px-1 py-0.2 rounded flex items-center gap-0.5 shrink-0" title={`${opp.comments?.length} observação(ões)`}>
+                                      <MessageSquare className="w-2.5 h-2.5 text-slate-400" />
+                                      <span>{opp.comments?.length}</span>
+                                    </span>
+                                  )}
+                                </div>
+                              )}
 
                               {/* Linha 4: Doca Social Compacta + Ações */}
                               <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">
@@ -895,6 +942,48 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                   {formatCurrency(opp.final_total)}
                                 </span>
                               </div>
+
+                              {/* Linha de Lembretes / Tarefas e Observações */}
+                              {(pendingTasks.length > 0 || hasComments) && (
+                                <div className="flex items-center justify-between gap-1 text-[10px] pt-1 border-t border-slate-100/70">
+                                  {pendingTasks.length > 0 ? (() => {
+                                    const today = new Date().toISOString().split('T')[0]
+                                    const overdue = pendingTasks.find((t) => t.due_date < today)
+                                    const todayTask = pendingTasks.find((t) => t.due_date === today)
+                                    const targetTask = overdue || todayTask || pendingTasks[0]
+
+                                    if (overdue) {
+                                      return (
+                                        <span className="font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md flex items-center gap-1.5 truncate max-w-[200px]" title={`Tarefa atrasada: ${targetTask.title}`}>
+                                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping shrink-0" />
+                                          <span className="truncate">⚠️ {targetTask.title}</span>
+                                        </span>
+                                      )
+                                    }
+                                    if (todayTask) {
+                                      return (
+                                        <span className="font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md flex items-center gap-1.5 truncate max-w-[200px]" title={`Lembrete para hoje às ${targetTask.due_time}: ${targetTask.title}`}>
+                                          <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                                          <span className="truncate">Hoje {targetTask.due_time}: {targetTask.title}</span>
+                                        </span>
+                                      )
+                                    }
+                                    return (
+                                      <span className="font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1.5 truncate max-w-[200px]" title={`Lembrete para ${targetTask.due_date}: ${targetTask.title}`}>
+                                        <Calendar className="w-3 h-3 text-slate-500 shrink-0" />
+                                        <span className="truncate">{targetTask.due_date}: {targetTask.title}</span>
+                                      </span>
+                                    )
+                                  })() : <div />}
+
+                                  {hasComments && (
+                                    <span className="text-[10px] font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0" title={`${opp.comments?.length} observação(ões) registrada(s)`}>
+                                      <MessageSquare className="w-3 h-3 text-slate-400" />
+                                      <span>{opp.comments?.length}</span>
+                                    </span>
+                                  )}
+                                </div>
+                              )}
 
                               {/* Linha 6: Rodapé com Doca de Redes Sociais + Ações de Avanço de Etapa (Sem botão Detalhes) */}
                               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
