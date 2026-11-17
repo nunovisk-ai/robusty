@@ -54,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'calendar' as ActiveTab,
-      label: 'Agenda de Instalação',
+      label: 'Agenda',
       icon: <Calendar className="w-5 h-5" />,
     },
     {

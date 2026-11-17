@@ -20,6 +20,13 @@ import {
   createAppointmentInSupabase,
 } from './services/crmService'
 
+// Helper para gerar datas relativas para mock inicial dinâmico
+const getRelDateStr = (days: number) => {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  return d.toISOString().split('T')[0]
+}
+
 // Default fallback mock data with unique order numbers and assigned responsible
 const defaultOpportunities: Opportunity[] = [
   {
@@ -45,7 +52,7 @@ const defaultOpportunities: Opportunity[] = [
     discount_percent: 0,
     final_total: 4579.0,
     total_weight_kg: 45,
-    pickup_date: '2026-02-24',
+    pickup_date: getRelDateStr(0),
     pickup_time: '10:00',
     payment_method: 'pix',
     created_at: new Date().toISOString(),
@@ -74,7 +81,7 @@ const defaultOpportunities: Opportunity[] = [
     discount_percent: 5,
     final_total: 2290.0,
     total_weight_kg: 22,
-    installation_date: '2026-02-25',
+    installation_date: getRelDateStr(1),
     installation_time: '14:00',
     payment_method: 'boleto',
     created_at: new Date().toISOString(),
@@ -103,7 +110,7 @@ const defaultOpportunities: Opportunity[] = [
     discount_percent: 10,
     final_total: 3652.0,
     total_weight_kg: 48,
-    pickup_date: '2026-02-26',
+    pickup_date: getRelDateStr(2),
     pickup_time: '11:30',
     payment_method: 'pix',
     created_at: new Date().toISOString(),
@@ -159,7 +166,7 @@ const defaultOpportunities: Opportunity[] = [
     discount_percent: 10,
     final_total: 2090.0,
     total_weight_kg: 24,
-    installation_date: '2026-02-27',
+    installation_date: getRelDateStr(3),
     installation_time: '09:00',
     payment_method: 'pix',
     created_at: new Date().toISOString(),
@@ -189,7 +196,7 @@ const defaultOrders: Order[] = [
     invoice_status: 'solicitada_ao_igor',
     shipping_carrier_name: 'Braspress Cargas (Cotação Igor)',
     total_weight_kg: 45,
-    pickup_date: '2026-02-24',
+    pickup_date: getRelDateStr(0),
     pickup_time: '10:00',
     created_at: new Date().toISOString(),
   },
@@ -213,7 +220,7 @@ const defaultOrders: Order[] = [
     invoice_required: false,
     invoice_status: 'nao_solicitada',
     total_weight_kg: 22,
-    installation_date: '2026-02-25',
+    installation_date: getRelDateStr(1),
     installation_time: '14:00',
     created_at: new Date().toISOString(),
   },
@@ -238,7 +245,7 @@ const defaultOrders: Order[] = [
     invoice_status: 'solicitada_ao_igor',
     shipping_carrier_name: 'Jadlog Express',
     total_weight_kg: 48,
-    pickup_date: '2026-02-26',
+    pickup_date: getRelDateStr(2),
     pickup_time: '11:30',
     created_at: new Date().toISOString(),
   },
@@ -258,8 +265,8 @@ const defaultAppointments: Appointment[] = [
     },
     vehicle_description: 'Fiat Fiorino — Bagageiro FX 100',
     products_summary: 'Bagageiro FX 100 com fixação padrão',
-    scheduled_start: `${new Date().toISOString().split('T')[0]}T14:00:00`,
-    scheduled_end: `${new Date().toISOString().split('T')[0]}T15:30:00`,
+    scheduled_start: `${getRelDateStr(1)}T14:00:00`,
+    scheduled_end: `${getRelDateStr(1)}T15:30:00`,
     status: 'agendado',
   },
 ]
@@ -788,6 +795,8 @@ export function App() {
 
           {activeTab === 'calendar' && (
             <CalendarView
+              orders={orders}
+              opportunities={opportunities}
               appointments={appointments}
               onAddAppointment={handleAddAppointment}
             />
