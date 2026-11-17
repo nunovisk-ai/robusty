@@ -31,34 +31,45 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
   const getStatusBadge = (status: OrderStatus) => {
     switch (status) {
+      case 'pedido_gerado':
       case 'pedido_recebido':
-        return <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60 text-xs font-bold">Pedido Recebido</span>
+        return <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60 text-xs font-bold">Pedido Gerado</span>
+      case 'em_preparacao':
       case 'em_preparacao_loja':
-        return <span className="px-3 py-1 rounded-full bg-yellow-50 text-yellow-800 border border-yellow-200/60 text-xs font-bold">Em Preparação (Loja)</span>
+        return <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200/60 text-xs font-bold">Em Preparação</span>
+      case 'aguardando_coleta_instalacao':
       case 'aguardando_coleta_transportadora':
-        return <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200/60 text-xs font-bold">Aguardando Coleta</span>
       case 'aguardando_instalacao_agendada':
-        return <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200/60 text-xs font-bold">Instalação Agendada</span>
+        return <span className="px-3 py-1 rounded-full bg-sky-50 text-sky-800 border border-sky-200/60 text-xs font-bold">Aguardando Coleta/Instalação</span>
+      case 'em_entrega_instalacao':
       case 'em_transporte_ou_instalacao':
-        return <span className="px-3 py-1 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200/60 text-xs font-bold">Em Rota / Execução</span>
+        return <span className="px-3 py-1 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200/60 text-xs font-bold">Em Entrega/Instalação</span>
       case 'pedido_concluido':
         return <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-xs font-bold">Pedido Concluído</span>
+      case 'pedido_cancelado':
+        return <span className="px-3 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200/60 text-xs font-bold">Pedido Cancelado</span>
       default:
         return <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">{status}</span>
     }
   }
 
-  const getNextStatus = (current: OrderStatus, type: string): OrderStatus => {
-    if (type === 'transportadora_envio') {
-      if (current === 'pedido_recebido') return 'em_preparacao_loja'
-      if (current === 'em_preparacao_loja') return 'aguardando_coleta_transportadora'
-      if (current === 'aguardando_coleta_transportadora') return 'em_transporte_ou_instalacao'
-      if (current === 'em_transporte_ou_instalacao') return 'pedido_concluido'
-    } else {
-      if (current === 'pedido_recebido') return 'em_preparacao_loja'
-      if (current === 'em_preparacao_loja') return 'aguardando_instalacao_agendada'
-      if (current === 'aguardando_instalacao_agendada') return 'em_transporte_ou_instalacao'
-      if (current === 'em_transporte_ou_instalacao') return 'pedido_concluido'
+  const getNextStatus = (current: OrderStatus): OrderStatus => {
+    const sequence: OrderStatus[] = [
+      'pedido_gerado',
+      'em_preparacao',
+      'aguardando_coleta_instalacao',
+      'em_entrega_instalacao',
+      'pedido_concluido'
+    ]
+    let normalized = current
+    if (current === 'pedido_recebido') normalized = 'pedido_gerado'
+    if (current === 'em_preparacao_loja') normalized = 'em_preparacao'
+    if (current === 'aguardando_coleta_transportadora' || current === 'aguardando_instalacao_agendada') normalized = 'aguardando_coleta_instalacao'
+    if (current === 'em_transporte_ou_instalacao' || current === 'aguardando_emissao_nf') normalized = 'em_entrega_instalacao'
+
+    const idx = sequence.indexOf(normalized)
+    if (idx !== -1 && idx < sequence.length - 1) {
+      return sequence[idx + 1]
     }
     return current
   }
@@ -204,7 +215,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
                   {order.status !== 'pedido_concluido' && (
                     <button
-                      onClick={() => onUpdateOrderStatus(order.id, getNextStatus(order.status, order.fulfillment_type))}
+                      onClick={() => onUpdateOrderStatus(order.id, getNextStatus(order.status))}
                       className="px-5 py-2 rounded-full text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] text-white transition-all flex items-center gap-1.5 shadow-md shadow-orange-500/20 cursor-pointer active:scale-95"
                     >
                       <CheckCircle className="w-3.5 h-3.5" />

@@ -20,14 +20,15 @@ export type LeadOrigin =
 export type OpportunityStage = 
   | 'novo_lead'
   | 'em_qualificacao'
-  | 'aguardando_atendimento'
-  | 'aguardando_cotacao_frete'
-  | 'preparacao_orcamento'
+  | 'aguardando_cotacao'
   | 'orcamento_enviado'
   | 'em_negociacao'
   | 'aguardando_pagamento'
   | 'venda_ganha'
   | 'venda_perdida'
+  | 'aguardando_atendimento'
+  | 'aguardando_cotacao_frete'
+  | 'preparacao_orcamento'
 
 export type FulfillmentType = 'transportadora_envio' | 'instalacao_loja'
 
@@ -39,14 +40,18 @@ export type PaymentMethod =
   | 'pagamento_na_instalacao'
 
 export type OrderStatus = 
+  | 'pedido_gerado'
+  | 'em_preparacao'
+  | 'aguardando_coleta_instalacao'
+  | 'em_entrega_instalacao'
+  | 'pedido_concluido'
+  | 'pedido_cancelado'
   | 'pedido_recebido'
   | 'em_preparacao_loja'
   | 'aguardando_coleta_transportadora'
   | 'aguardando_instalacao_agendada'
   | 'em_transporte_ou_instalacao'
   | 'aguardando_emissao_nf'
-  | 'pedido_concluido'
-  | 'pedido_cancelado'
 
 export interface Vehicle {
   id: string

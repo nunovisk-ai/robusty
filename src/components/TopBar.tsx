@@ -49,16 +49,15 @@ export const TopBar: React.FC<TopBarProps> = ({
         </div>
       </div>
 
-      {/* Right: Actions */}
-      <div className="flex items-center gap-3 sm:gap-4">
-        {/* Primary Action Button */}
-        <button
-          onClick={onNewLeadClick}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#EA580C] hover:bg-[#C2410C] text-white rounded-full text-xs font-semibold transition-all shadow-md shadow-orange-500/25 hover:shadow-orange-500/35 active:scale-98 cursor-pointer outline-none focus:outline-none"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-          <span>Novo Orçamento</span>
-        </button>
+      {/* Right: User / Status Info */}
+      <div className="flex items-center gap-3">
+        {currentUser && (
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200/60 text-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+            <span className="text-slate-500">Acessando como</span>
+            <span className="font-semibold text-slate-800">{currentUser.name}</span>
+          </div>
+        )}
       </div>
     </header>
   )
