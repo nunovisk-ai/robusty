@@ -135,6 +135,39 @@ export interface AttachedDocument {
   nfe_access_key?: string
 }
 
+export interface OpportunityComment {
+  id: string
+  opportunity_id?: string
+  author: 'Igor' | 'Norlando' | 'Loja' | string
+  text: string
+  created_at: string
+}
+
+export interface OpportunityHistoryEvent {
+  id: string
+  opportunity_id?: string
+  type: 'stage_change' | 'created' | 'order_generated' | 'note' | 'status_change'
+  description: string
+  from_stage?: OpportunityStage | string
+  to_stage?: OpportunityStage | string
+  user?: 'Igor' | 'Norlando' | 'Loja' | string
+  created_at: string
+}
+
+export interface OpportunityTask {
+  id: string
+  opportunity_id?: string
+  order_number?: number
+  client_name?: string
+  title: string
+  due_date: string // YYYY-MM-DD
+  due_time?: string // HH:mm
+  assigned_to?: 'Igor' | 'Norlando' | 'Loja' | string
+  completed: boolean
+  completed_at?: string
+  created_at: string
+}
+
 export interface Opportunity {
   id: string
   order_number?: number
@@ -173,6 +206,9 @@ export interface Opportunity {
   notes?: string
   items?: OpportunityItem[]
   attachments?: AttachedDocument[]
+  comments?: OpportunityComment[]
+  history?: OpportunityHistoryEvent[]
+  tasks?: OpportunityTask[]
   created_at: string
   updated_at: string
 }
@@ -205,6 +241,9 @@ export interface Order {
   total_weight_kg?: number
   internal_notes?: string
   attachments?: AttachedDocument[]
+  comments?: OpportunityComment[]
+  history?: OpportunityHistoryEvent[]
+  tasks?: OpportunityTask[]
   created_at: string
 }
 
