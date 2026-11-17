@@ -1,8 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import type { Vehicle, Product, PaymentMethod, FulfillmentType, Opportunity, LeadOrigin } from '../types'
+import type { 
+  Vehicle, 
+  Product, 
+  PaymentMethod, 
+  FulfillmentType, 
+  Opportunity, 
+  LeadOrigin, 
+  Order, 
+  Appointment, 
+  AttachedDocument 
+} from '../types'
 import { fetchVehicles, fetchProducts, calculateBudget, getMaxDiscountForPaymentMethod } from '../services/catalogService'
 import { lookupCep, type CepResult } from '../services/cepService'
 import { CustomDatePicker } from './CustomDatePicker'
+import { CustomAlertModal } from './CustomAlertModal'
+import { CommercialProposalModal } from './CommercialProposalModal'
 import { formatBRPhone, formatBRCep, formatCurrency, getCleanVehicleModel } from '../utils/formatters'
 import { 
   Truck, 
@@ -22,7 +34,15 @@ import {
   CreditCard,
   QrCode,
   ReceiptText,
-  AlertTriangle
+  AlertTriangle,
+  Calculator,
+  FileText,
+  Paperclip,
+  Upload,
+  Eye,
+  Download,
+  ShieldCheck,
+  Printer
 } from 'lucide-react'
 import { 
   FaWhatsapp, 
@@ -40,6 +60,9 @@ interface BudgetBuilderViewProps {
   initialVehicleId?: string
   initialOpportunity?: Opportunity | null
   existingOrderNumber?: number
+  existingOrders?: Order[]
+  existingOpportunities?: Opportunity[]
+  existingAppointments?: Appointment[]
   onSaveToKanban?: (opportunityData: any) => void
   onGenerateOrder?: (opportunityData: any) => void
   onDeleteOpportunity?: (oppId: string) => void
@@ -64,6 +87,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   initialVehicleId,
   initialOpportunity,
   existingOrderNumber,
+  existingOrders = [],
+  existingOpportunities = [],
+  existingAppointments = [],
   onSaveToKanban,
   onGenerateOrder,
   onDeleteOpportunity,
@@ -164,8 +190,23 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [copied, setCopied] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
   const [orderGeneratedSuccess, setOrderGeneratedSuccess] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [confirmLost, setConfirmLost] = useState(false)
+
+  // Tab selector: Orçamento & Produtos vs Documentos & NFs
+  const [activeFormTab, setActiveFormTab] = useState<'budget' | 'documents'>('budget')
+
+  // Documentos Anexados (NFs e Proposta em PDF)
+  const [attachments, setAttachments] = useState<AttachedDocument[]>(() => {
+    return initialOpportunity?.attachments || []
+  })
+  const [nfeKeyInput, setNfeKeyInput] = useState('')
+  const [isProposalModalOpen, setIsProposalModalOpen] = useState(false)
+  const [attachmentToDelete, setAttachmentToDelete] = useState<AttachedDocument | null>(null)
+
+  // Modais Padronizados
+  const [conflictModalOpen, setConflictModalOpen] = useState(false)
+  const [pendingAction, setPendingAction] = useState<'save' | 'order' | null>(null)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [lostModalOpen, setLostModalOpen] = useState(false)
 
   // Load Vehicles & Products
   useEffect(() => {
@@ -402,11 +443,136 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       paymentMethod: (paymentMethod as PaymentMethod) || 'pix',
       discountPercent: budget.discountPercent,
       cardInstallments,
+      attachments,
     }
   }
 
-  // 1. Salvar: cria/atualiza o card no Funil de Vendas
-  const handleSave = () => {
+  // Detecção de Conflito de Instalação (Requisito 4)
+  const installationConflict = useMemo(() => {
+    if (fulfillment !== 'instalacao_loja' || !installationDate || !installationTime) return null
+
+    // 1. Procurar em existingOrders
+    const orderConflict = existingOrders.find((ord) => {
+      if (initialOpportunity && (ord.id === initialOpportunity.id || ord.opportunity_id === initialOpportunity.id || ord.order_number === orderNumber)) {
+        return false
+      }
+      return (
+        ord.fulfillment_type === 'instalacao_loja' &&
+        ord.installation_date === installationDate &&
+        ord.installation_time === installationTime &&
+        ord.status !== 'pedido_cancelado'
+      )
+    })
+
+    if (orderConflict) {
+      return {
+        type: 'order',
+        code: orderConflict.order_code || `#ROB-${orderConflict.order_number}`,
+        client: orderConflict.contact?.full_name || 'Cliente com pedido ativo',
+        vehicle: orderConflict.opportunity?.vehicle_model_year || 'Veículo utilitário',
+        date: installationDate,
+        time: installationTime
+      }
+    }
+
+    // 2. Procurar em existingOpportunities
+    const oppConflict = existingOpportunities.find((opp) => {
+      if (initialOpportunity && (opp.id === initialOpportunity.id || opp.order_number === orderNumber)) {
+        return false
+      }
+      return (
+        opp.fulfillment_type === 'instalacao_loja' &&
+        opp.installation_date === installationDate &&
+        opp.installation_time === installationTime &&
+        opp.stage !== 'venda_perdida'
+      )
+    })
+
+    if (oppConflict) {
+      return {
+        type: 'opportunity',
+        code: oppConflict.order_code || (oppConflict.order_number ? `#ROB-${oppConflict.order_number}` : '#ORÇ-ROB'),
+        client: oppConflict.contact?.full_name || 'Lead em negociação',
+        vehicle: oppConflict.vehicle_model_year || 'Veículo utilitário',
+        date: installationDate,
+        time: installationTime
+      }
+    }
+
+    // 3. Procurar em existingAppointments
+    const aptConflict = existingAppointments.find((apt) => {
+      const start = apt.scheduled_start
+      return (
+        start.startsWith(installationDate) &&
+        start.includes(installationTime) &&
+        apt.status !== 'cancelado'
+      )
+    })
+
+    if (aptConflict) {
+      return {
+        type: 'appointment',
+        code: 'Agendamento Loja',
+        client: aptConflict.contact?.full_name || 'Cliente agendado',
+        vehicle: aptConflict.vehicle_description || 'Veículo utilitário',
+        date: installationDate,
+        time: installationTime
+      }
+    }
+
+    return null
+  }, [
+    fulfillment,
+    installationDate,
+    installationTime,
+    existingOrders,
+    existingOpportunities,
+    existingAppointments,
+    initialOpportunity,
+    orderNumber
+  ])
+
+  const handleAttachProposal = (doc: AttachedDocument) => {
+    setAttachments((prev) => [doc, ...prev])
+  }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const isXml = file.name.toLowerCase().endsWith('.xml')
+    const newDoc: AttachedDocument = {
+      id: `doc-nfe-${Date.now()}`,
+      name: file.name,
+      type: isXml ? 'nfe_xml' : 'nfe_pdf',
+      file_size: `${Math.max(1, Math.round(file.size / 1024))} KB`,
+      uploaded_at: new Date().toISOString(),
+      nfe_access_key: nfeKeyInput.trim() || undefined
+    }
+
+    setAttachments((prev) => [newDoc, ...prev])
+    setNfeKeyInput('')
+    e.target.value = ''
+  }
+
+  const handleConfirmDeleteAttachment = () => {
+    if (attachmentToDelete) {
+      setAttachments((prev) => prev.filter((a) => a.id !== attachmentToDelete.id))
+      setAttachmentToDelete(null)
+    }
+  }
+
+  const executePendingAction = () => {
+    if (pendingAction === 'save') {
+      executeSave()
+    } else if (pendingAction === 'order') {
+      executeGenerateOrder()
+    }
+    setPendingAction(null)
+    setConflictModalOpen(false)
+  }
+
+  const executeSave = () => {
     const data = buildOpportunityData()
     if (onSaveToKanban) {
       onSaveToKanban(data)
@@ -415,8 +581,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     setTimeout(() => setSavedSuccess(false), 3000)
   }
 
-  // 2. Gerar Pedido: integra o card diretamente com o Funil de Pedidos
-  const handleGenerateOrderAction = () => {
+  const executeGenerateOrder = () => {
     const data = buildOpportunityData()
     if (onGenerateOrder) {
       onGenerateOrder(data)
@@ -427,12 +592,32 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     setTimeout(() => setOrderGeneratedSuccess(false), 3000)
   }
 
+  // 1. Salvar: cria/atualiza o card no Funil de Vendas com checagem de conflito
+  const handleSave = () => {
+    if (installationConflict) {
+      setPendingAction('save')
+      setConflictModalOpen(true)
+      return
+    }
+    executeSave()
+  }
+
+  // 2. Gerar Pedido: integra o card diretamente com o Funil de Pedidos com checagem de conflito
+  const handleGenerateOrderAction = () => {
+    if (installationConflict) {
+      setPendingAction('order')
+      setConflictModalOpen(true)
+      return
+    }
+    executeGenerateOrder()
+  }
+
   // 3. Apagar Orçamento
   const handleDelete = () => {
     if (initialOpportunity && onDeleteOpportunity) {
       onDeleteOpportunity(initialOpportunity.id)
     }
-    setConfirmDelete(false)
+    setDeleteModalOpen(false)
   }
 
   // 4. Marcar Oportunidade Perdida / Venda Não Concluída
@@ -440,7 +625,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     if (initialOpportunity && onMarkLost) {
       onMarkLost(initialOpportunity.id)
     }
-    setConfirmLost(false)
+    setLostModalOpen(false)
   }
 
   const maxAllowedDiscount = getMaxDiscountForPaymentMethod(paymentMethod)
@@ -494,6 +679,41 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         </div>
       </div>
 
+      {/* Segmented Tab Navigation: Orçamento & Produtos vs Documentos & NFs */}
+      <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-nexo">
+        <button
+          type="button"
+          onClick={() => setActiveFormTab('budget')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeFormTab === 'budget'
+              ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <Calculator className="w-4 h-4" />
+          <span>Orçamento & Produtos</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveFormTab('documents')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeFormTab === 'documents'
+              ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>Documentos & NFs</span>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+            activeFormTab === 'documents' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+          }`}>
+            {attachments.length}
+          </span>
+        </button>
+      </div>
+
+      {activeFormTab === 'budget' && (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Form & Item Picker */}
         <div className="lg:col-span-7 space-y-5">
@@ -965,6 +1185,26 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                         ))}
                       </select>
                     </div>
+
+                    {installationConflict && (
+                      <div className="sm:col-span-2 p-3.5 rounded-2xl bg-amber-50 border border-amber-300/80 text-amber-900 text-xs flex items-start gap-3 shadow-2xs">
+                        <AlertTriangle className="w-4 h-4 text-[#EA580C] shrink-0 mt-0.5" />
+                        <div className="space-y-1 leading-relaxed">
+                          <div className="font-bold text-amber-950 flex items-center gap-2">
+                            <span>Atenção: Já existe instalação agendada neste horário!</span>
+                            <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-amber-200/80 text-amber-900 font-bold">
+                              {installationConflict.code}
+                            </span>
+                          </div>
+                          <div>
+                            Já existe uma instalação agendada para <strong>{installationConflict.date.split('-').reverse().join('/')} às {installationConflict.time}</strong> ({installationConflict.client} — {installationConflict.vehicle}).
+                          </div>
+                          <div className="text-[11px] text-amber-800">
+                            Recomendamos selecionar outro horário disponível para evitar espera na montagem do veículo.
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1283,6 +1523,17 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
             {/* Ações do Orçamento */}
             <div className="space-y-2.5">
+              {/* Botão Gerar Orçamento em PDF */}
+              <button
+                type="button"
+                onClick={() => setIsProposalModalOpen(true)}
+                disabled={items.length === 0}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold border border-slate-200 hover:border-[#EA580C] hover:text-[#EA580C] text-slate-700 bg-white transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs active:scale-98 disabled:opacity-50"
+              >
+                <FileText className="w-4 h-4 text-[#EA580C]" />
+                <span>Gerar Orçamento em PDF</span>
+              </button>
+
               {/* Botão Copiar WhatsApp */}
               <button
                 type="button"
@@ -1335,74 +1586,310 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 </div>
               )}
 
-              {/* Ações Secundárias: Encerrar Negociação (Venda Perdida) e Apagar Orçamento */}
+              {/* Ações Secundárias com Modal Padronizado */}
               {initialOpportunity && (
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                  {/* Opção Marcar como Venda Perdida / Encerrar Negociação */}
-                  {confirmLost ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-amber-700 font-bold">Encerrar negociação?</span>
-                      <button
-                        type="button"
-                        onClick={handleMarkLost}
-                        className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[11px] font-bold cursor-pointer"
-                      >
-                        Sim
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmLost(false)}
-                        className="px-2 py-1 bg-slate-200 text-slate-700 rounded text-[11px] cursor-pointer"
-                      >
-                        Não
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setConfirmLost(true)}
-                      className="text-slate-500 hover:text-amber-600 transition-colors cursor-pointer flex items-center gap-1 font-medium"
-                    >
-                      <XCircle className="w-3.5 h-3.5" />
-                      <span>Encerrar Negociação</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setLostModalOpen(true)}
+                    className="text-slate-500 hover:text-amber-600 transition-colors cursor-pointer flex items-center gap-1 font-medium"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>Encerrar Negociação</span>
+                  </button>
 
-                  {/* Opção Apagar Orçamento */}
-                  {confirmDelete ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-red-600 font-bold">Excluir?</span>
-                      <button
-                        type="button"
-                        onClick={handleDelete}
-                        className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-bold cursor-pointer"
-                      >
-                        Confirmar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDelete(false)}
-                        className="px-2 py-1 bg-slate-200 text-slate-700 rounded text-[11px] cursor-pointer"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDelete(true)}
-                      className="text-slate-400 hover:text-red-600 transition-colors cursor-pointer flex items-center gap-1 font-medium"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Apagar Orçamento</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setDeleteModalOpen(true)}
+                    className="text-slate-400 hover:text-red-600 transition-colors cursor-pointer flex items-center gap-1 font-medium"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Apagar Orçamento</span>
+                  </button>
                 </div>
               )}
             </div>
           </div>
         </div>
       </div>
+      )}
+
+      {/* ABA 2: DOCUMENTOS & ANEXOS (NFs e Proposta em PDF) */}
+      {activeFormTab === 'documents' && (
+        <div className="space-y-6">
+          {/* Top Actions: Gerar PDF e Anexar NF-e */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Card 1: Gerar Orçamento / Proposta em PDF */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-nexo space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-200/60 text-[#EA580C] flex items-center justify-center shrink-0">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Proposta Comercial em PDF
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Gere e visualize o orçamento oficial da Robusty para envio ao cliente.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 border border-slate-200/60 rounded-2xl text-xs space-y-1.5 text-slate-600">
+                <div className="flex justify-between font-medium">
+                  <span>Cliente:</span>
+                  <strong className="text-slate-800">{customerName || 'A definir'}</strong>
+                </div>
+                <div className="flex justify-between font-medium">
+                  <span>Veículo:</span>
+                  <strong className="text-slate-800">{selectedVehicle?.model || 'A definir'}</strong>
+                </div>
+                <div className="flex justify-between font-medium">
+                  <span>Total da Proposta:</span>
+                  <strong className="text-[#EA580C] font-mono">{formatCurrency(budget.finalTotal)}</strong>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsProposalModalOpen(true)}
+                  className="w-full py-2.5 px-4 bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold rounded-full text-xs transition-all shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Gerar & Visualizar Proposta em PDF</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Card 2: Anexar Nota Fiscal (NF-e) */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-nexo space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-200/60 text-sky-600 flex items-center justify-center shrink-0">
+                  <Paperclip className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Anexar Nota Fiscal (NF-e)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Anexe o Danfe em PDF ou arquivo XML emitido pelo Igor para a expedição.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                    Chave de Acesso da NF-e (Opcional - 44 dígitos):
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 3526 0200 0000 0000 0000 5500 1000 0010 4010 0000 0000"
+                    value={nfeKeyInput}
+                    onChange={(e) => setNfeKeyInput(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200/90 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C]"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="flex-1 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-full text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-sm">
+                    <Upload className="w-4 h-4" />
+                    <span>Selecionar Arquivo PDF / XML</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.xml"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Lista de Documentos Anexados ao Lead / Pedido */}
+          <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-nexo space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900">
+                  Documentos Anexados ao Pedido / Lead
+                </h3>
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                  {attachments.length} {attachments.length === 1 ? 'documento' : 'documentos'}
+                </span>
+              </div>
+            </div>
+
+            {attachments.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400 italic space-y-1">
+                <p>Nenhum documento ou nota fiscal anexada a esta oportunidade até o momento.</p>
+                <p className="text-[11px] text-slate-400">Gere uma proposta em PDF ou selecione o Danfe/XML acima para anexar.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {attachments.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="p-4 rounded-2xl border border-slate-200/80 hover:border-slate-300 bg-slate-50/60 flex items-start justify-between gap-3 transition-all"
+                  >
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        doc.type === 'orcamento_pdf' ? 'bg-orange-100 text-[#EA580C]' : 'bg-sky-100 text-sky-700'
+                      }`}>
+                        {doc.type === 'orcamento_pdf' ? <FileText className="w-5 h-5" /> : <Paperclip className="w-5 h-5" />}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-slate-900 truncate">
+                          {doc.name}
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
+                          <span>{doc.file_size || '120 KB'}</span>
+                          <span>•</span>
+                          <span>{new Date(doc.uploaded_at).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                        {doc.nfe_access_key && (
+                          <div className="text-[10px] font-mono text-slate-400 truncate mt-1">
+                            Chave: {doc.nfe_access_key}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {doc.type === 'orcamento_pdf' && (
+                        <button
+                          type="button"
+                          onClick={() => setIsProposalModalOpen(true)}
+                          title="Visualizar Proposta"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setAttachmentToDelete(doc)}
+                        title="Remover documento"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 1: PROPOSTA COMERCIAL EM PDF */}
+      <CommercialProposalModal
+        isOpen={isProposalModalOpen}
+        onClose={() => setIsProposalModalOpen(false)}
+        onAttachProposal={handleAttachProposal}
+        data={{
+          orderNumber,
+          customerName,
+          customerPhone,
+          customerEmail,
+          vehicleModel: selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Utilitário',
+          items,
+          budget,
+          fulfillment,
+          address: {
+            street,
+            number,
+            neighborhood,
+            city,
+            state,
+            cep,
+          },
+          pickupDate,
+          pickupTime,
+          installationDate,
+          installationTime,
+          paymentMethod: (paymentMethod as PaymentMethod) || 'pix',
+          totalWeightKg: budget.totalWeightKg,
+        }}
+      />
+
+      {/* MODAL 2: ALERTA PADRONIZADO DE CONFLITO DE INSTALAÇÃO */}
+      <CustomAlertModal
+        isOpen={conflictModalOpen}
+        onClose={() => {
+          setConflictModalOpen(false)
+          setPendingAction(null)
+        }}
+        type="warning"
+        title="Conflito de Horário de Instalação"
+        message={
+          installationConflict ? (
+            <div className="space-y-2">
+              <p>
+                Já existe uma instalação agendada na oficina para <strong>{installationConflict.date.split('-').reverse().join('/')} às {installationConflict.time}</strong>.
+              </p>
+              <p className="text-slate-500">
+                Cliente: <strong>{installationConflict.client}</strong> ({installationConflict.vehicle}) — Pedido <strong>{installationConflict.code}</strong>.
+              </p>
+              <p className="text-amber-800 font-medium">
+                Recomendamos escolher outro horário disponível para garantir um atendimento ágil e sem filas para o cliente.
+              </p>
+            </div>
+          ) : (
+            'Existe um compromisso agendado para este horário.'
+          )
+        }
+        primaryButtonText="Alterar Horário"
+        onPrimaryAction={() => {
+          setConflictModalOpen(false)
+          setPendingAction(null)
+          setActiveFormTab('budget')
+        }}
+        secondaryButtonText="Salvar Mesmo Assim (Encaixe)"
+        onSecondaryAction={executePendingAction}
+        tertiaryButtonText="Cancelar"
+      />
+
+      {/* MODAL 3: CONFIRMAÇÃO PADRONIZADA DE EXCLUSÃO DE ORÇAMENTO */}
+      <CustomAlertModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        type="danger"
+        title="Apagar Orçamento"
+        message="Tem certeza que deseja apagar permanentemente este orçamento? Esta ação removerá os dados do Pipeline e do Funil de Pedidos."
+        details={`Orçamento: #ROB-${orderNumber} — Cliente: ${customerName || 'Cliente'}`}
+        primaryButtonText="Sim, Apagar Orçamento"
+        onPrimaryAction={handleDelete}
+        secondaryButtonText="Cancelar"
+        isDangerAction={true}
+      />
+
+      {/* MODAL 4: CONFIRMAÇÃO PADRONIZADA DE VENDA PERDIDA */}
+      <CustomAlertModal
+        isOpen={lostModalOpen}
+        onClose={() => setLostModalOpen(false)}
+        type="warning"
+        title="Encerrar Negociação (Venda Perdida)"
+        message="Deseja mover esta oportunidade para a etapa de Venda Perdida no Funil Comercial? O lead permanecerá no histórico para futuras abordagens."
+        primaryButtonText="Confirmar Venda Perdida"
+        onPrimaryAction={handleMarkLost}
+        secondaryButtonText="Voltar"
+      />
+
+      {/* MODAL 5: CONFIRMAÇÃO PADRONIZADA DE REMOÇÃO DE ANEXO */}
+      <CustomAlertModal
+        isOpen={!!attachmentToDelete}
+        onClose={() => setAttachmentToDelete(null)}
+        type="danger"
+        title="Remover Documento"
+        message={`Deseja realmente remover o documento "${attachmentToDelete?.name}" deste pedido?`}
+        primaryButtonText="Sim, Remover"
+        onPrimaryAction={handleConfirmDeleteAttachment}
+        secondaryButtonText="Cancelar"
+        isDangerAction={true}
+      />
     </div>
   )
 }

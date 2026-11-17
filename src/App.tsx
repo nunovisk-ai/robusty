@@ -493,6 +493,7 @@ export function App() {
         discount_applied: 0,
         total_price: i.product.base_price_10x * i.quantity,
       })),
+      attachments: data.attachments || existingOpp?.attachments || [],
       created_at: existingOpp?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
@@ -520,6 +521,7 @@ export function App() {
             installation_date: data.installationDate,
             installation_time: data.installationTime,
             total_weight_kg: data.totalWeightKg,
+            attachments: data.attachments || existingOpp?.attachments || [],
           }
         }
         return ord
@@ -597,6 +599,7 @@ export function App() {
       total_weight_kg: data.totalWeightKg,
       customer_email: data.customerEmail,
       address: data.address,
+      attachments: data.attachments || existingOpp?.attachments || [],
       created_at: existingOpp?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
@@ -631,6 +634,7 @@ export function App() {
               installation_date: data.installationDate,
               installation_time: data.installationTime,
               total_weight_kg: data.totalWeightKg,
+              attachments: data.attachments || existingOpp?.attachments || [],
             }
           }
           return ord
@@ -658,6 +662,7 @@ export function App() {
         installation_date: data.installationDate,
         installation_time: data.installationTime,
         total_weight_kg: data.totalWeightKg,
+        attachments: data.attachments || existingOpp?.attachments || [],
         created_at: new Date().toISOString(),
       }
       setOrders((prev) => [newOrder, ...prev])
@@ -760,6 +765,9 @@ export function App() {
               initialVehicleId={selectedVehicleForBudget}
               initialOpportunity={editingOpportunity}
               existingOrderNumber={orders.length > 0 ? Math.max(...orders.map((o) => o.order_number)) + 1 : 1045}
+              existingOrders={orders}
+              existingOpportunities={opportunities}
+              existingAppointments={appointments}
               onSaveToKanban={handleSaveOpportunity}
               onGenerateOrder={handleGenerateOrderFromBudget}
               onDeleteOpportunity={handleDeleteOpportunity}

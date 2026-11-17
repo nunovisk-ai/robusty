@@ -517,7 +517,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             <div className="flex items-center justify-between text-[10px] text-slate-500">
                               <span>
                                 {opp.fulfillment_type === 'instalacao_loja' 
-                                  ? 'Caminho B: Baia da Loja' 
+                                  ? 'Caminho B: Instalação na Loja' 
                                   : 'Caminho A: Entrega Transportadora'}
                               </span>
                               <span className="font-mono">Preto Epóxi</span>
@@ -747,7 +747,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             <div className="flex items-center justify-between text-[10px] text-slate-500">
                               <span>
                                 {ord.fulfillment_type === 'instalacao_loja' 
-                                  ? 'Caminho B: Baia da Loja' 
+                                  ? 'Caminho B: Instalação na Loja' 
                                   : 'Caminho A: Entrega Transportadora'}
                               </span>
                               <span className="font-mono">Preto Epóxi</span>

@@ -494,7 +494,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-500 font-medium max-w-2xl leading-relaxed">
-            Painel unificado para acompanhamento de horários de coleta com transportadoras e agendamentos de montagem na baia única da loja física.
+            Painel unificado para acompanhamento de horários de coleta com transportadoras e agendamentos de instalação na loja física.
           </p>
         </div>
 
@@ -908,7 +908,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                               <div className="flex items-center justify-between mb-2">
                                 <span className="font-mono text-xs font-bold flex items-center gap-1.5">
                                   {isColeta ? <Truck className="w-3.5 h-3.5 text-sky-600" /> : <Wrench className="w-3.5 h-3.5 text-purple-600" />}
-                                  <span>{isColeta ? 'Coleta Transportadora' : 'Instalação (Baia Única)'}</span>
+                                  <span>{isColeta ? 'Coleta Transportadora' : 'Instalação na Loja'}</span>
                                 </span>
                                 {ev.orderCode && (
                                   <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-white/80 border border-slate-200 text-slate-700">
@@ -1037,7 +1037,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       {!isColeta && (
                         <span className="flex items-center gap-1 text-purple-700 font-medium">
                           <Store className="w-3 h-3" />
-                          Baia Única — Galpão Matriz
+                          Instalação — Loja Física
                         </span>
                       )}
                     </div>
@@ -1204,7 +1204,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     <span>Oficina & Montagem na Loja</span>
                   </div>
                   <div className="text-xs text-purple-950 font-medium">
-                    Local: Baia Única de Instalação (Galpão Matriz Robusty)
+                    Local: Oficina Matriz Robusty
                   </div>
                   <div className="text-[11px] text-purple-800">
                     A equipe deve separar com antecedência o bagageiro, as garras de fixação e a guia de rolete correspondente ao veículo.

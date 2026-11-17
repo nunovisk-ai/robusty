@@ -122,6 +122,16 @@ export interface OpportunityItem {
   total_price: number
 }
 
+export interface AttachedDocument {
+  id: string
+  name: string
+  type: 'nfe_pdf' | 'nfe_xml' | 'orcamento_pdf' | 'comprovante' | 'outro'
+  file_url?: string
+  file_size?: string
+  uploaded_at: string
+  nfe_access_key?: string
+}
+
 export interface Opportunity {
   id: string
   order_number?: number
@@ -154,6 +164,7 @@ export interface Opportunity {
   lost_reason?: string
   notes?: string
   items?: OpportunityItem[]
+  attachments?: AttachedDocument[]
   created_at: string
   updated_at: string
 }
@@ -182,6 +193,7 @@ export interface Order {
   installation_time?: string
   total_weight_kg?: number
   internal_notes?: string
+  attachments?: AttachedDocument[]
   created_at: string
 }
 

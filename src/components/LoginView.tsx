@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import type { UserRole } from '../types'
 import { supabase } from '../lib/supabase'
+import { CustomAlertModal } from './CustomAlertModal'
 
 export interface CurrentUser {
   id: string
@@ -64,6 +65,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [showResetModal, setShowResetModal] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -196,7 +198,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 </label>
                 <button
                   type="button"
-                  onClick={() => alert('Para redefinir sua senha, solicite ao administrador do sistema.')}
+                  onClick={() => setShowResetModal(true)}
                   className="text-[11px] text-[#EA580C] hover:text-[#FF5C00] font-semibold cursor-pointer"
                 >
                   Esqueceu a senha?
@@ -268,6 +270,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           </span>
         </div>
       </div>
+
+      {/* Modal Padronizado de Recuperação de Senha */}
+      <CustomAlertModal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
+        type="info"
+        title="Redefinição de Senha"
+        message="Por motivos de segurança e controle corporativo, a alteração e redefinição de senhas de acesso aos operadores deve ser solicitada diretamente ao administrador ou diretoria do sistema."
+        details="Administração: João Ricardo (joaoricardo@grupomixfer.com.br) ou Igor (Gestão Operacional)"
+        primaryButtonText="Entendido"
+      />
     </div>
   )
 }

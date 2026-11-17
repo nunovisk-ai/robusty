@@ -143,7 +143,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           </div>
           <ol className="text-xs text-slate-600 space-y-1 list-decimal list-inside font-medium">
             <li>Norlando comunica a loja com dados do veículo e agendamento</li>
-            <li>Loja separa o produto e reserva a baia de montagem</li>
+            <li>Loja separa o produto e organiza a montagem</li>
             <li>Equipe executa a instalação física no veículo</li>
             <li>Se o cliente necessitar de NF-e: Norlando solicita ao Igor</li>
             <li>Igor providencia e envia a nota fiscal de serviço/venda</li>
