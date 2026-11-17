@@ -104,11 +104,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   <title>Proposta Comercial ROB-${data.orderNumber} - Robusty Bagageiros</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #ffffff; color: #1e293b; }
-    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    body { font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #ffffff; color: #1e293b; }
+    .font-mono { font-family: 'Geist Mono', monospace; }
     @media print {
       @page { margin: 12mm; size: A4; }
       body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
