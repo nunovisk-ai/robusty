@@ -200,14 +200,6 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handleCopyWhatsApp}
-              className="px-3.5 py-1.5 rounded-full text-xs font-bold border border-slate-200 hover:border-[#25D366] text-slate-700 hover:text-[#25D366] bg-white transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              {copied ? <Check className="w-3.5 h-3.5 text-[#25D366]" /> : <FaWhatsapp className="w-3.5 h-3.5 text-[#25D366]" />}
-              <span>{copied ? 'Copiado!' : 'Copiar p/ WhatsApp'}</span>
-            </button>
-
-            <button
               onClick={handleAttachToOrder}
               disabled={attached}
               className="px-3.5 py-1.5 rounded-full text-xs font-bold border border-slate-200 hover:border-slate-400 text-slate-700 bg-white transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-60"

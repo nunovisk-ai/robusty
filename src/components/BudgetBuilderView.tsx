@@ -2089,21 +2089,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 </button>
               </div>
 
-              {/* Botão Copiar WhatsApp */}
-              <button
-                type="button"
-                onClick={handleCopyProposal}
-                disabled={items.length === 0}
-                className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  copied
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20 disabled:opacity-50 active:scale-98'
-                }`}
-              >
-                {copied ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-                <span>{copied ? 'Copiado para o WhatsApp!' : 'Copiar Texto para o WhatsApp'}</span>
-              </button>
-
               {/* Botões Principais: Salvar no Funil + Criar Pedido */}
               <div className="grid grid-cols-2 gap-2">
                 {/* Botão Salvar (Cria/atualiza o card no Funil de Vendas) */}
