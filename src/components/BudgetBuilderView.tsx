@@ -54,6 +54,12 @@ const TIME_SLOTS = [
   '17:00', '17:30', '18:00'
 ]
 
+const BRAZILIAN_STATES = [
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 
+  'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 
+  'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+]
+
 export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({ 
   initialVehicleId,
   initialOpportunity,
@@ -462,9 +468,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 #ROB-{orderNumber}
               </span>
             </div>
-            <p className="text-xs text-slate-500">
-              {initialOpportunity ? 'Editando oportunidade existente' : 'Criando nova oportunidade comercial & operacional'}
-            </p>
           </div>
         </div>
 
@@ -735,7 +738,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 </div>
                 <div className="text-left">
                   <div className="text-xs font-bold">Transportadora (Envio)</div>
-                  <div className="text-[10px] text-slate-500">Entrega em endereço / Coleta</div>
                 </div>
               </button>
 
@@ -753,7 +755,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 </div>
                 <div className="text-left">
                   <div className="text-xs font-bold">Instalação na Loja</div>
-                  <div className="text-[10px] text-slate-500">Agendamento físico baia única</div>
                 </div>
               </button>
             </div>
@@ -761,43 +762,28 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
             {/* Se for Transportadora */}
             {fulfillment === 'transportadora_envio' && (
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3.5">
-                {/* Linha 1: CEP e Valor do Frete */}
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                  <div className="sm:col-span-6">
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                      CEP do Cliente:
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="00000-000"
-                        value={cep}
-                        onChange={(e) => handleCepChange(e.target.value)}
-                        className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleCepSearch}
-                        disabled={loadingCep}
-                        className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      >
-                        {loadingCep ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
-                        <span>Buscar</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="sm:col-span-6">
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                      Valor do Frete (R$):
-                    </label>
+                {/* CEP do Cliente */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                    CEP do Cliente:
+                  </label>
+                  <div className="flex gap-2 max-w-sm">
                     <input
-                      type="number"
-                      placeholder="0.00"
-                      value={freightValue || ''}
-                      onChange={(e) => setFreightValue(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
+                      type="text"
+                      placeholder="00000-000"
+                      value={cep}
+                      onChange={(e) => handleCepChange(e.target.value)}
+                      className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
                     />
+                    <button
+                      type="button"
+                      onClick={handleCepSearch}
+                      disabled={loadingCep}
+                      className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {loadingCep ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
+                      <span>Buscar</span>
+                    </button>
                   </div>
                 </div>
 
@@ -807,7 +793,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   </div>
                 )}
 
-                {/* Linha 2: Campos de endereço completos (livres para preenchimento manual) */}
+                {/* Campos de endereço completos (livres para preenchimento manual) */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
                   <div className="sm:col-span-8">
                     <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Rua / Logradouro:</label>
@@ -854,33 +840,51 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   </div>
                   <div className="sm:col-span-3">
                     <label className="text-[10px] font-bold text-slate-500 block mb-0.5">UF:</label>
-                    <input
-                      type="text"
-                      placeholder="MG"
-                      maxLength={2}
+                    <select
                       value={state}
-                      onChange={(e) => setState(e.target.value.toUpperCase())}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] uppercase"
-                    />
+                      onChange={(e) => setState(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-medium cursor-pointer"
+                    >
+                      <option value="">UF</option>
+                      {BRAZILIAN_STATES.map((uf) => (
+                        <option key={uf} value={uf}>
+                          {uf}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
-                {/* Peso Total da Carga Automático */}
+                {/* Peso Total da Carga (Sem texto cálculo automático) */}
                 <div className="p-3 rounded-xl bg-orange-50/70 border border-orange-200 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2 text-slate-800">
                     <Weight className="w-4 h-4 text-[#EA580C]" />
-                    <span className="font-bold">Peso Total da Carga (Cálculo Automático):</span>
+                    <span className="font-bold">Peso Total da Carga:</span>
                   </div>
                   <span className="font-mono font-bold text-[#EA580C] text-sm">
                     {budget.totalWeightKg} kg
                   </span>
                 </div>
 
-                {/* Novos Campos: Data e Horário da Coleta */}
+                {/* Valor do Frete (Exibido após o peso da carga) */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                    Valor do Frete (R$):
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="0.00"
+                    value={freightValue || ''}
+                    onChange={(e) => setFreightValue(parseFloat(e.target.value) || 0)}
+                    className="w-full sm:w-48 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
+                  />
+                </div>
+
+                {/* Campos: Data e Horário da Coleta (Sem texto 'para a loja se preparar' e sem 'hh:mm') */}
                 <div className="pt-2 border-t border-slate-200/80">
                   <div className="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-[#EA580C]" />
-                    <span>Programação da Coleta (Para a Loja se Preparar):</span>
+                    <span>Programação da Coleta:</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <CustomDatePicker
@@ -892,7 +896,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                     <div>
                       <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                        Horário da Coleta (hh:mm):
+                        Horário da Coleta:
                       </label>
                       <select
                         value={pickupTime}
@@ -931,11 +935,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   </span>
                 </div>
 
-                {/* Novos Campos: Data e Horário da Instalação */}
+                {/* Campos: Data e Horário da Instalação (Sem 'baia única' e sem 'hh:mm') */}
                 <div className="pt-2 border-t border-slate-200/80">
                   <div className="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-[#EA580C]" />
-                    <span>Agendamento da Instalação na Loja (Baia Única):</span>
+                    <span>Agendamento da Instalação na Loja:</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <CustomDatePicker
@@ -947,7 +951,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                     <div>
                       <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                        Horário da Instalação (hh:mm):
+                        Horário da Instalação:
                       </label>
                       <select
                         value={installationTime}
