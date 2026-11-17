@@ -419,17 +419,20 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 onDragLeave={() => handleDragLeave(col.id)}
                 onDrop={(e) => handleDropOpportunity(e, col.id)}
                 style={{ 
-                  borderTopColor: col.stripeColor,
-                  ...(isDragTarget ? {
-                    borderColor: col.stripeColor,
-                    boxShadow: `0 0 0 2px ${col.stripeColor}`,
-                    backgroundColor: `${col.stripeColor}0D`,
-                  } : {})
+                  boxShadow: isDragTarget ? `0 0 0 2.5px ${col.stripeColor}` : undefined,
                 }}
-                className="w-[290px] flex-shrink-0 bg-slate-100/90 rounded-2xl border border-slate-200/90 border-t-4 flex flex-col h-full max-h-full shadow-2xs transition-all duration-150"
+                className={`w-[290px] flex-shrink-0 bg-slate-100/90 rounded-2xl border border-slate-200/90 flex flex-col h-full max-h-full shadow-2xs transition-all duration-200 overflow-hidden ${
+                  isDragTarget ? 'bg-slate-200/60' : ''
+                }`}
               >
+                {/* Faixa superior colorida da etapa (Elemento dedicado - NUNCA apaga) */}
+                <div 
+                  className="h-1.5 w-full shrink-0" 
+                  style={{ backgroundColor: col.stripeColor }} 
+                />
+
                 {/* Header da Coluna (Print 2 / HTML fornecido) */}
-                <div className="p-3 bg-white border-b border-slate-200/80 rounded-t-xl shrink-0">
+                <div className="p-3 bg-white border-b border-slate-200/80 shrink-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
                       <span 
@@ -601,17 +604,20 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 onDragLeave={() => handleDragLeave(col.id)}
                 onDrop={(e) => handleDropOrder(e, col.id)}
                 style={{ 
-                  borderTopColor: col.stripeColor,
-                  ...(isDragTarget ? {
-                    borderColor: col.stripeColor,
-                    boxShadow: `0 0 0 2px ${col.stripeColor}`,
-                    backgroundColor: `${col.stripeColor}0D`,
-                  } : {})
+                  boxShadow: isDragTarget ? `0 0 0 2.5px ${col.stripeColor}` : undefined,
                 }}
-                className="w-[290px] flex-shrink-0 bg-slate-100/90 rounded-2xl border border-slate-200/90 border-t-4 flex flex-col h-full max-h-full shadow-2xs transition-all duration-150"
+                className={`w-[290px] flex-shrink-0 bg-slate-100/90 rounded-2xl border border-slate-200/90 flex flex-col h-full max-h-full shadow-2xs transition-all duration-200 overflow-hidden ${
+                  isDragTarget ? 'bg-slate-200/60' : ''
+                }`}
               >
+                {/* Faixa superior colorida da etapa (Elemento dedicado - NUNCA apaga) */}
+                <div 
+                  className="h-1.5 w-full shrink-0" 
+                  style={{ backgroundColor: col.stripeColor }} 
+                />
+
                 {/* Header da Coluna com Total em R$ */}
-                <div className="p-3 bg-white border-b border-slate-200/80 rounded-t-xl shrink-0">
+                <div className="p-3 bg-white border-b border-slate-200/80 shrink-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
                       <span 
