@@ -970,6 +970,7 @@ export function App() {
               existingOrders={orders}
               existingOpportunities={opportunities}
               existingAppointments={appointments}
+              currentUser={currentUser}
               onSaveToKanban={handleSaveOpportunity}
               onGenerateOrder={handleGenerateOrderFromBudget}
               onDeleteOpportunity={handleDeleteOpportunity}

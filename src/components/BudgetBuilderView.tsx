@@ -18,6 +18,7 @@ import { lookupCep } from '../services/cepService'
 import { CustomDatePicker } from './CustomDatePicker'
 import { CustomAlertModal } from './CustomAlertModal'
 import { CommercialProposalModal } from './CommercialProposalModal'
+import type { CurrentUser } from './LoginView'
 import { formatBRPhone, formatBRCep, formatCurrency, getCleanVehicleModel } from '../utils/formatters'
 import { 
   Truck, 
@@ -72,6 +73,7 @@ interface BudgetBuilderViewProps {
   existingOrders?: Order[]
   existingOpportunities?: Opportunity[]
   existingAppointments?: Appointment[]
+  currentUser?: CurrentUser | null
   onSaveToKanban?: (opportunityData: any) => void
   onGenerateOrder?: (opportunityData: any) => void
   onDeleteOpportunity?: (oppId: string) => void
@@ -99,6 +101,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   existingOrders = [],
   existingOpportunities = [],
   existingAppointments = [],
+  currentUser,
   onSaveToKanban,
   onGenerateOrder,
   onDeleteOpportunity,
@@ -239,7 +242,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     return initialOpportunity?.comments || []
   })
   const [newCommentText, setNewCommentText] = useState('')
-  const [commentAuthor, setCommentAuthor] = useState<'Norlando' | 'Igor' | 'Loja'>(assignedTo)
 
   const [history, setHistory] = useState<OpportunityHistoryEvent[]>(() => {
     if (initialOpportunity?.history && initialOpportunity.history.length > 0) {
@@ -690,10 +692,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
   const handleAddComment = () => {
     if (!newCommentText.trim()) return
+    const authorName = currentUser?.name || assignedTo || 'Usuário'
     const comment: OpportunityComment = {
       id: `comm-${Date.now()}`,
       opportunity_id: initialOpportunity?.id,
-      author: commentAuthor,
+      author: authorName,
       text: newCommentText.trim(),
       created_at: new Date().toISOString()
     }
@@ -2094,26 +2097,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                 {/* Caixa de Entrada de Comentário */}
                 <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200 space-y-3">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-slate-700">Registrar como:</span>
-                    <div className="flex items-center gap-1.5">
-                      {(['Norlando', 'Igor', 'Loja'] as const).map((author) => (
-                        <button
-                          key={author}
-                          type="button"
-                          onClick={() => setCommentAuthor(author)}
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                            commentAuthor === author
-                              ? 'bg-[#EA580C] text-white shadow-2xs'
-                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          {author === 'Loja' ? <FaStore className="w-2.5 h-2.5" /> : <FaUser className="w-2.5 h-2.5" />}
-                          <span>{author}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                   <textarea
                     value={newCommentText}
                     onChange={(e) => setNewCommentText(e.target.value)}
@@ -2121,7 +2104,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     rows={3}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EA580C]/20 focus:border-[#EA580C] transition-all resize-none"
                   />
-                  <div className="flex justify-end">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                      <FaUser className="w-2.5 h-2.5 text-slate-400" />
+                      <span>Registrando automaticamente como: <strong className="text-slate-800">{currentUser?.name || assignedTo}</strong></span>
+                    </span>
                     <button
                       type="button"
                       onClick={handleAddComment}
