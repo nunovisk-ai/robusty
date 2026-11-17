@@ -1,58 +1,167 @@
-import React, { useState, useEffect } from 'react'
-import type { Vehicle, Product, PaymentMethod, FulfillmentType } from '../types'
-import { fetchVehicles, fetchProducts, calculateBudget } from '../services/catalogService'
+import React, { useState, useEffect, useMemo } from 'react'
+import type { Vehicle, Product, PaymentMethod, FulfillmentType, Opportunity, LeadOrigin } from '../types'
+import { fetchVehicles, fetchProducts, calculateBudget, getMaxDiscountForPaymentMethod } from '../services/catalogService'
 import { lookupCep, type CepResult } from '../services/cepService'
+import { CustomDatePicker } from './CustomDatePicker'
+import { formatBRPhone, formatBRCep, formatCurrency, getCleanVehicleModel } from '../utils/formatters'
 import { 
-  Calculator, 
   Truck, 
   Wrench, 
   Plus, 
   Trash2, 
-  Copy, 
   Check, 
   MapPin, 
   Loader2, 
-  AlertCircle,
   Car,
-  FileCheck,
-  Send
+  Clock,
+  Send,
+  ArrowLeft,
+  CheckCircle2,
+  XCircle,
+  Weight,
+  CreditCard,
+  QrCode,
+  ReceiptText,
+  AlertTriangle
 } from 'lucide-react'
+import { 
+  FaWhatsapp, 
+  FaInstagram, 
+  FaFacebook, 
+  FaStore, 
+  FaGlobe, 
+  FaVanShuttle, 
+  FaTruck, 
+  FaCarSide, 
+  FaTruckPickup 
+} from 'react-icons/fa6'
 
 interface BudgetBuilderViewProps {
   initialVehicleId?: string
+  initialOpportunity?: Opportunity | null
+  existingOrderNumber?: number
   onSaveToKanban?: (opportunityData: any) => void
+  onGenerateOrder?: (opportunityData: any) => void
+  onDeleteOpportunity?: (oppId: string) => void
+  onMarkLost?: (oppId: string) => void
+  onClose?: () => void
 }
+
+const TIME_SLOTS = [
+  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', 
+  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', 
+  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', 
+  '17:00', '17:30', '18:00'
+]
 
 export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({ 
   initialVehicleId,
-  onSaveToKanban 
+  initialOpportunity,
+  existingOrderNumber,
+  onSaveToKanban,
+  onGenerateOrder,
+  onDeleteOpportunity,
+  onMarkLost,
+  onClose
 }) => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [allProducts, setAllProducts] = useState<Product[]>([])
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string>(initialVehicleId || '')
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>(
+    initialOpportunity?.vehicle_id || initialVehicleId || ''
+  )
   
-  const [items, setItems] = useState<{ product: Product; quantity: number }[]>([])
-  const [fulfillment, setFulfillment] = useState<FulfillmentType>('transportadora_envio')
-  const [cep, setCep] = useState('')
-  const [loadingCep, setLoadingCep] = useState(false)
-  const [address, setAddress] = useState<CepResult>({
-    cep: '',
-    street: '',
-    neighborhood: '',
-    city: '',
-    state: '',
+  // Número do Pedido / Identificador Único
+  const [orderNumber] = useState<number>(() => {
+    if (initialOpportunity?.order_number) return initialOpportunity.order_number
+    if (existingOrderNumber) return existingOrderNumber
+    return Math.floor(1040 + Math.random() * 80)
   })
+
+  // Responsável: Igor, Norlando ou Loja
+  const [assignedTo, setAssignedTo] = useState<'Igor' | 'Norlando' | 'Loja'>(() => {
+    return initialOpportunity?.assigned_to || 'Norlando'
+  })
+
+  // 1. Dados do Contato
+  const [customerName, setCustomerName] = useState(() => initialOpportunity?.contact?.full_name || '')
+  const [customerPhone, setCustomerPhone] = useState(() => {
+    const raw = initialOpportunity?.contact?.phone_e164 || ''
+    return formatBRPhone(raw.replace('+55', ''))
+  })
+  const [customerEmail, setCustomerEmail] = useState(() => initialOpportunity?.customer_email || initialOpportunity?.contact?.email || '')
   
-  const [freightValue, setFreightValue] = useState<number>(0)
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix')
-  const [discountPercent, setDiscountPercent] = useState<number>(0)
-  
-  const [customerName, setCustomerName] = useState('')
-  const [customerPhone, setCustomerPhone] = useState('')
-  
+  // Origem do Lead: whatsapp, instagram, facebook, manual, site
+  const [leadOrigin, setLeadOrigin] = useState<string>(() => {
+    const orig = initialOpportunity?.contact?.origin
+    if (orig === 'instagram_direct') return 'instagram'
+    if (orig === 'meta_lead_ads') return 'facebook'
+    if (orig === 'site_form' || orig === 'site') return 'site'
+    if (orig === 'loja_presencial' || orig === 'manual') return 'manual'
+    return 'whatsapp'
+  })
+
+  // 2. Produtos Selecionados
+  const [items, setItems] = useState<{ product: Product; quantity: number }[]>(() => {
+    if (initialOpportunity?.items && initialOpportunity.items.length > 0) {
+      return initialOpportunity.items
+        .filter((item) => item.product)
+        .map((item) => ({ product: item.product!, quantity: item.quantity }))
+    }
+    return []
+  })
+
+  // 3. Modalidade de Atendimento
+  const [fulfillment, setFulfillment] = useState<FulfillmentType>(() => {
+    return initialOpportunity?.fulfillment_type || 'transportadora_envio'
+  })
+
+  // Endereço e CEP
+  const [cep, setCep] = useState(() => {
+    return formatBRCep(initialOpportunity?.address?.cep || '')
+  })
+  const [street, setStreet] = useState(() => initialOpportunity?.address?.street || '')
+  const [number, setNumber] = useState(() => initialOpportunity?.address?.number || '')
+  const [complement, setComplement] = useState(() => initialOpportunity?.address?.complement || '')
+  const [neighborhood, setNeighborhood] = useState(() => initialOpportunity?.address?.neighborhood || '')
+  const [city, setCity] = useState(() => initialOpportunity?.address?.city || '')
+  const [state, setState] = useState(() => initialOpportunity?.address?.state || '')
+  const [loadingCep, setLoadingCep] = useState(false)
+  const [cepError, setCepError] = useState<string | null>(null)
+
+  // Transportadora
+  const [freightValue, setFreightValue] = useState<number>(() => initialOpportunity?.freight_value || 0)
+  const [pickupDate, setPickupDate] = useState<string>(() => initialOpportunity?.pickup_date || '')
+  const [pickupTime, setPickupTime] = useState<string>(() => initialOpportunity?.pickup_time || '10:00')
+
+  // Instalação na Loja
+  const [installationDate, setInstallationDate] = useState<string>(() => initialOpportunity?.installation_date || '')
+  const [installationTime, setInstallationTime] = useState<string>(() => initialOpportunity?.installation_time || '14:00')
+  const [installationCost, setInstallationCost] = useState<number>(() => {
+    if (initialOpportunity?.installation_value !== undefined) return initialOpportunity.installation_value
+    return 200
+  })
+
+  // 4. Condições de Pagamento e Desconto
+  // "o sistema deve pedir primeiro a forma de pagamento antes de exibir as opções de desconto"
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>(() => {
+    return initialOpportunity?.payment_method || ''
+  })
+  const [cardInstallments, setCardInstallments] = useState<number>(() => {
+    return initialOpportunity?.card_installments || 10
+  })
+  const [discountPercent, setDiscountPercent] = useState<number>(() => {
+    if (initialOpportunity?.discount_percent !== undefined) return initialOpportunity.discount_percent
+    return 0
+  })
+
+  // UI state
   const [copied, setCopied] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
+  const [orderGeneratedSuccess, setOrderGeneratedSuccess] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmLost, setConfirmLost] = useState(false)
 
+  // Load Vehicles & Products
   useEffect(() => {
     async function load() {
       const [vList, pList] = await Promise.all([fetchVehicles(), fetchProducts()])
@@ -65,23 +174,104 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     load()
   }, [])
 
+  // Order vehicles alphabetically by model
+  const sortedVehicles = useMemo(() => {
+    return [...vehicles].sort((a, b) => a.model.localeCompare(b.model, 'pt-BR'))
+  }, [vehicles])
+
   const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId)
 
-  const compatibleProducts = allProducts.filter(
-    (p) => !p.compatible_vehicle_id || p.compatible_vehicle_id === selectedVehicleId
-  )
+  // Compatible products for vehicle
+  const compatibleProducts = useMemo(() => {
+    return allProducts.filter(
+      (p) => !p.compatible_vehicle_id || p.compatible_vehicle_id === selectedVehicleId
+    )
+  }, [allProducts, selectedVehicleId])
 
-  const baseInstallationCost = (selectedVehicle && fulfillment === 'instalacao_loja')
-    ? selectedVehicle.standard_installation_cost
-    : 0
+  // Recalculate installation cost default when vehicle changes if not custom edited
+  useEffect(() => {
+    if (selectedVehicle && fulfillment === 'instalacao_loja' && !initialOpportunity) {
+      setInstallationCost(selectedVehicle.standard_installation_cost || 200)
+    }
+  }, [selectedVehicleId, fulfillment])
 
+  // Automatically enforce discount limits when payment method changes
+  const handlePaymentMethodSelect = (method: PaymentMethod) => {
+    setPaymentMethod(method)
+    const maxDiscount = getMaxDiscountForPaymentMethod(method)
+    // Preset defaults
+    if (method === 'pix') {
+      setDiscountPercent(10)
+    } else if (method === 'boleto') {
+      setDiscountPercent(5)
+    } else {
+      setDiscountPercent(0)
+    }
+  }
+
+  // Financial calculations
   const budget = calculateBudget(
     items,
-    paymentMethod,
-    discountPercent,
+    (paymentMethod as PaymentMethod) || 'pix',
+    paymentMethod ? discountPercent : 0,
     fulfillment === 'transportadora_envio' ? freightValue : 0,
-    baseInstallationCost
+    fulfillment === 'instalacao_loja' ? installationCost : 0
   )
+
+  // Vehicle silhouette icon mapper
+  const renderVehicleIcon = (modelStr?: string) => {
+    const s = (modelStr || '').toLowerCase()
+    if (s.includes('kombi') || s.includes('jumpy') || s.includes('expert') || s.includes('scudo')) {
+      return <FaVanShuttle className="w-4 h-4 shrink-0" />
+    }
+    if (s.includes('ducato') || s.includes('master') || s.includes('sprinter') || s.includes('daily') || s.includes('jumper') || s.includes('boxer')) {
+      return <FaTruck className="w-4 h-4 shrink-0" />
+    }
+    if (s.includes('hr') || s.includes('bongo') || s.includes('saveiro')) {
+      return <FaTruckPickup className="w-4 h-4 shrink-0" />
+    }
+    return <FaCarSide className="w-4 h-4 shrink-0" />
+  }
+
+  // CEP Lookup
+  const handleCepSearch = async () => {
+    const clean = cep.replace(/\D/g, '')
+    if (clean.length !== 8) return
+    setLoadingCep(true)
+    setCepError(null)
+    const res = await lookupCep(clean)
+    setLoadingCep(false)
+    if (res.error) {
+      setCepError(res.error)
+    } else {
+      if (res.street) setStreet(res.street)
+      if (res.neighborhood) setNeighborhood(res.neighborhood)
+      if (res.city) setCity(res.city)
+      if (res.state) setState(res.state)
+    }
+  }
+
+  // Auto search on 8 digits
+  const handleCepChange = (raw: string) => {
+    const formatted = formatBRCep(raw)
+    setCep(formatted)
+    const clean = formatted.replace(/\D/g, '')
+    if (clean.length === 8) {
+      setLoadingCep(true)
+      setCepError(null)
+      lookupCep(clean).then((res) => {
+        setLoadingCep(false)
+        if (res.error) {
+          setCepError(res.error)
+        } else {
+          if (res.street) setStreet(res.street)
+          if (res.neighborhood) setNeighborhood(res.neighborhood)
+          if (res.city) setCity(res.city)
+          if (res.state) setState(res.state)
+        }
+      })
+    }
+  }
 
   const handleAddItem = (prod: Product) => {
     setItems((prev) => {
@@ -113,52 +303,39 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     )
   }
 
-  const handleCepSearch = async () => {
-    if (!cep || cep.replace(/\D/g, '').length !== 8) return
-    setLoadingCep(true)
-    const res = await lookupCep(cep)
-    setAddress(res)
-    setLoadingCep(false)
-  }
-
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
-  }
-
+  // WhatsApp Message Generation
   const generateWhatsAppMessage = () => {
     const lines = [
       `*PROPOSTA COMERCIAL ROBUSTY — BAGAGEIROS AUTOMOTIVOS*`,
-      `Olá ${customerName ? customerName : 'Cliente'}! Segue seu orçamento oficial:`,
+      `*Identificador Único:* #ROB-${orderNumber}`,
+      `*Responsável:* ${assignedTo}`,
+      `Olá ${customerName ? customerName : 'Cliente'}! Segue sua proposta oficial:`,
       ``,
-      `*Veículo:* ${selectedVehicle ? selectedVehicle.model : 'Não especificado'}`,
+      `*Veículo:* ${selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Utilitário'}`,
       `*Modalidade:* ${fulfillment === 'instalacao_loja' ? 'Instalação na Loja Robusty' : 'Envio por Transportadora'}`,
-      ...(fulfillment === 'transportadora_envio' && address.city ? [`*Destino:* ${address.city} - ${address.state} (CEP: ${address.cep})`] : []),
+      ...(fulfillment === 'transportadora_envio' && city ? [`*Destino:* ${city}/${state} (CEP: ${cep})`] : []),
+      ...(fulfillment === 'transportadora_envio' && pickupDate ? [`*Previsão de Coleta:* ${pickupDate} às ${pickupTime}`] : []),
+      ...(fulfillment === 'instalacao_loja' && installationDate ? [`*Agendamento Instalação:* ${installationDate} às ${installationTime}`] : []),
       ``,
       `*ITENS DO ORÇAMENTO:*`,
       ...items.map(
         (i, idx) =>
-          `${idx + 1}. ${i.product.name} (x${i.quantity}) — ${formatCurrency(
-            paymentMethod === 'pix'
-              ? i.product.max_discount_price_10pct
-              : paymentMethod === 'boleto'
-              ? i.product.cash_price_5pct
-              : i.product.base_price_10x
-          )}`
+          `${idx + 1}. ${i.product.name} (x${i.quantity}) — ${formatCurrency(i.product.base_price_10x * i.quantity)} ${i.product.dimensions ? `(${i.product.dimensions})` : ''} ${i.product.weight_kg ? `[${i.product.weight_kg * i.quantity} kg]` : ''}`
       ),
       ``,
       `*RESUMO FINANCEIRO:*`,
       `• Subtotal Produtos: ${formatCurrency(budget.subtotal)}`,
-      ...(discountPercent > 0 ? [`• Desconto Comercial (${discountPercent}%): -${formatCurrency(budget.discountValue)}`] : []),
-      ...(fulfillment === 'transportadora_envio' ? [`• Frete Transportadora: ${formatCurrency(budget.freightValue)}`] : []),
-      ...(fulfillment === 'instalacao_loja' && budget.installationValue > 0 ? [`• Taxa de Instalação: ${formatCurrency(budget.installationValue)}`] : []),
+      ...(budget.discountValue > 0 ? [`• Desconto Comercial (${budget.discountPercent}%): -${formatCurrency(budget.discountValue)}`] : []),
+      ...(fulfillment === 'transportadora_envio' && budget.freightValue > 0 ? [`• Frete Transportadora: ${formatCurrency(budget.freightValue)} (Peso Total: ${budget.totalWeightKg} kg)`] : []),
+      ...(fulfillment === 'instalacao_loja' && budget.installationValue > 0 ? [`• Custo de Instalação: ${formatCurrency(budget.installationValue)}`] : []),
       ``,
       `*VALOR TOTAL:* *${formatCurrency(budget.finalTotal)}*`,
       `*Condição:* ${
         paymentMethod === 'pix'
-          ? 'À vista no PIX (10% de desconto)'
+          ? 'À vista no PIX (com desconto)'
           : paymentMethod === 'boleto'
-          ? 'À vista no Boleto (5% de desconto)'
-          : 'Cartão de Crédito em até 10x sem juros'
+          ? 'À vista no Boleto Bancário'
+          : `Cartão de Crédito em até ${cardInstallments}x de ${formatCurrency(budget.finalTotal / cardInstallments)}`
       }`,
       ``,
       `Qualquer dúvida estamos à disposição para confirmar seu pedido!`,
@@ -173,34 +350,159 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     setTimeout(() => setCopied(false), 2500)
   }
 
-  const handleSaveToCrm = () => {
-    if (onSaveToKanban) {
-      onSaveToKanban({
-        customerName: customerName || 'Novo Cliente',
-        customerPhone,
-        vehicle: selectedVehicle,
-        items,
-        fulfillment,
-        address: fulfillment === 'transportadora_envio' ? address : null,
-        budget,
-        paymentMethod,
-      })
-      setSavedSuccess(true)
-      setTimeout(() => setSavedSuccess(false), 3000)
+  // Build payload
+  const buildOpportunityData = () => {
+    const mappedOrigin = (() => {
+      switch (leadOrigin) {
+        case 'instagram': return 'instagram_direct'
+        case 'facebook': return 'meta_lead_ads'
+        case 'site': return 'site_form'
+        case 'manual': return 'loja_presencial'
+        default: return 'whatsapp_inbound'
+      }
+    })()
+
+    return {
+      id: initialOpportunity?.id || `opp-${Date.now()}`,
+      orderNumber,
+      orderCode: `#ROB-${orderNumber}`,
+      assignedTo,
+      customerName: customerName || 'Novo Cliente',
+      customerPhone,
+      customerEmail,
+      leadOrigin: mappedOrigin as LeadOrigin,
+      vehicle: selectedVehicle,
+      vehicleId: selectedVehicle?.id,
+      vehicleModel: selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Utilitário',
+      items,
+      fulfillment,
+      address: {
+        cep,
+        street,
+        number,
+        complement,
+        neighborhood,
+        city,
+        state,
+      },
+      freightValue,
+      pickupDate,
+      pickupTime,
+      installationDate,
+      installationTime,
+      installationCost,
+      totalWeightKg: budget.totalWeightKg,
+      budget,
+      paymentMethod: (paymentMethod as PaymentMethod) || 'pix',
+      discountPercent: budget.discountPercent,
+      cardInstallments,
     }
   }
 
+  // 1. Salvar: cria/atualiza o card no Funil de Vendas
+  const handleSave = () => {
+    const data = buildOpportunityData()
+    if (onSaveToKanban) {
+      onSaveToKanban(data)
+    }
+    setSavedSuccess(true)
+    setTimeout(() => setSavedSuccess(false), 3000)
+  }
+
+  // 2. Gerar Pedido: integra o card diretamente com o Funil de Pedidos
+  const handleGenerateOrderAction = () => {
+    const data = buildOpportunityData()
+    if (onGenerateOrder) {
+      onGenerateOrder(data)
+    } else if (onSaveToKanban) {
+      onSaveToKanban({ ...data, autoGenerateOrder: true })
+    }
+    setOrderGeneratedSuccess(true)
+    setTimeout(() => setOrderGeneratedSuccess(false), 3000)
+  }
+
+  // 3. Apagar Orçamento
+  const handleDelete = () => {
+    if (initialOpportunity && onDeleteOpportunity) {
+      onDeleteOpportunity(initialOpportunity.id)
+    }
+    setConfirmDelete(false)
+  }
+
+  // 4. Marcar Oportunidade Perdida / Venda Não Concluída
+  const handleMarkLost = () => {
+    if (initialOpportunity && onMarkLost) {
+      onMarkLost(initialOpportunity.id)
+    }
+    setConfirmLost(false)
+  }
+
+  const maxAllowedDiscount = getMaxDiscountForPaymentMethod(paymentMethod)
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* Top Header with Back Button & Unique Identifier */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 sm:px-6 rounded-2xl border border-slate-100 shadow-nexo">
+        <div className="flex items-center gap-3">
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Voltar ao Pipeline"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          )}
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-lg sm:text-xl font-bold text-slate-900">
+                Gerador de Orçamento
+              </h2>
+              <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-full bg-[#FFF3EA] text-[#EA580C] border border-[#EA580C]/20 shadow-2xs">
+                #ROB-{orderNumber}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">
+              {initialOpportunity ? 'Editando oportunidade existente' : 'Criando nova oportunidade comercial & operacional'}
+            </p>
+          </div>
+        </div>
+
+        {/* Responsável Pill Selector: Igor, Norlando ou Loja */}
+        <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-full border border-slate-200">
+          <span className="text-[11px] font-bold text-slate-500 pl-2 pr-1">Responsável:</span>
+          {(['Norlando', 'Igor', 'Loja'] as const).map((resp) => {
+            const isSelected = assignedTo === resp
+            return (
+              <button
+                type="button"
+                key={resp}
+                onClick={() => setAssignedTo(resp)}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-[#EA580C] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+              >
+                {resp}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Form & Item Picker */}
         <div className="lg:col-span-7 space-y-5">
-          {/* Step 1: Customer Contact Info */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              1. Dados do Contato
+          {/* 1. Dados do Contato */}
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+              <span>1. Dados do Contato</span>
+              <span className="text-[11px] font-mono font-medium text-slate-400">#ROB-{orderNumber}</span>
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {/* Nome do Cliente */}
               <div>
                 <label className="text-[11px] font-bold text-slate-600 block mb-1">Nome do Cliente:</label>
                 <input
@@ -208,68 +510,153 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   placeholder="Ex: Carlos Eduardo"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200/80 rounded-full px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
+                  className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
                 />
               </div>
+
+              {/* WhatsApp (com máscara brasileira DDD + número) */}
               <div>
-                <label className="text-[11px] font-bold text-slate-600 block mb-1">WhatsApp / Telefone:</label>
+                <label className="text-[11px] font-bold text-slate-600 block mb-1">WhatsApp:</label>
                 <input
                   type="text"
                   placeholder="(11) 99999-9999"
                   value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200/80 rounded-full px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
+                  onChange={(e) => setCustomerPhone(formatBRPhone(e.target.value))}
+                  className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
                 />
+              </div>
+
+              {/* E-mail */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 block mb-1">E-mail:</label>
+                <input
+                  type="email"
+                  placeholder="cliente@empresa.com.br"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
+                />
+              </div>
+
+              {/* Origem do Lead: WhatsApp, Instagram, Facebook, Manual, Site */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 block mb-1">Origem do Lead:</label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setLeadOrigin('whatsapp')}
+                    title="WhatsApp"
+                    className={`py-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+                      leadOrigin === 'whatsapp'
+                        ? 'bg-emerald-50 border-emerald-500 text-[#25D366] shadow-xs'
+                        : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    <FaWhatsapp className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLeadOrigin('instagram')}
+                    title="Instagram"
+                    className={`py-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+                      leadOrigin === 'instagram'
+                        ? 'bg-pink-50 border-pink-500 text-[#E1306C] shadow-xs'
+                        : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    <FaInstagram className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLeadOrigin('facebook')}
+                    title="Facebook"
+                    className={`py-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+                      leadOrigin === 'facebook'
+                        ? 'bg-blue-50 border-blue-500 text-[#1877F2] shadow-xs'
+                        : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    <FaFacebook className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLeadOrigin('site')}
+                    title="Site"
+                    className={`py-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+                      leadOrigin === 'site'
+                        ? 'bg-orange-50 border-[#EA580C] text-[#EA580C] shadow-xs'
+                        : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    <FaGlobe className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLeadOrigin('manual')}
+                    title="Manual / Loja"
+                    className={`py-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+                      leadOrigin === 'manual'
+                        ? 'bg-slate-900 border-slate-900 text-white shadow-xs'
+                        : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    <FaStore className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Step 2: Select Vehicle */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
+          {/* 2. Veículo do Cliente (Sem parenteses, sem badge laranja, sem rodapé de regras, sem marca, com ícone e rolagem horizontal em ordem alfabética) */}
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
                 <Car className="w-4 h-4 text-[#EA580C]" />
-                <span>2. Veículo do Cliente (Regra de Dependência)</span>
+                <span>2. Veículo do Cliente</span>
               </h3>
-              {selectedVehicle && (
-                <span className="text-xs font-semibold text-[#EA580C] bg-[#FFF3EA] px-3 py-1 rounded-full">
-                  {selectedVehicle.model}
-                </span>
-              )}
+              <span className="text-[10px] text-slate-400 font-mono">
+                {sortedVehicles.length} modelos (A-Z)
+              </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              {vehicles.map((v) => (
-                <button
-                  key={v.id}
-                  onClick={() => {
-                    setSelectedVehicleId(v.id)
-                    setItems([]) // clear incompatible items
-                  }}
-                  className={`p-3.5 rounded-2xl text-left border transition-all cursor-pointer ${
-                    selectedVehicleId === v.id
-                      ? 'bg-[#FFF3EA] border-[#EA580C] text-[#EA580C] font-semibold shadow-xs'
-                      : 'bg-slate-50/70 border-slate-200/70 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="text-xs font-bold leading-tight">{v.model}</div>
-                  <div className="text-[10px] text-slate-400 font-normal mt-0.5">{v.make}</div>
-                </button>
-              ))}
-            </div>
+            {/* Barra de rolagem horizontal em ordem alfabética */}
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+              {sortedVehicles.map((v) => {
+                const isSelected = selectedVehicleId === v.id
+                const cleanModel = getCleanVehicleModel(v.model)
 
-            {selectedVehicle?.notes && (
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <span>{selectedVehicle.notes}</span>
-              </div>
-            )}
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedVehicleId(v.id)
+                      setItems([]) // clear incompatible items
+                    }}
+                    className={`px-4 py-2.5 rounded-xl border flex items-center gap-2 shrink-0 transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#FFF3EA] border-[#EA580C] text-[#EA580C] font-bold shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200/80 text-slate-700 font-medium'
+                    }`}
+                  >
+                    <span className={isSelected ? 'text-[#EA580C]' : 'text-slate-400'}>
+                      {renderVehicleIcon(v.model)}
+                    </span>
+                    <span className="text-xs whitespace-nowrap">{cleanModel}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
-          {/* Step 3: Compatible Products for Selected Vehicle */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
+          {/* 3. Bagageiros e Acessórios Compatíveis (com pesos, medidas, sem condições de pagamento) */}
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
                 3. Bagageiros e Acessórios Compatíveis
               </h3>
               <span className="text-xs text-slate-400 font-mono">
@@ -277,7 +664,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               </span>
             </div>
 
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
               {compatibleProducts.map((p) => {
                 const inBudget = items.find((i) => i.product.id === p.id)
                 return (
@@ -288,24 +675,33 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-slate-900 truncate">{p.name}</span>
+                      </div>
+
+                      {/* Dimensões, Peso e Valor do Produto (Sem condições de pagamento) */}
+                      <div className="flex items-center gap-3 text-xs mt-1 font-mono text-slate-500">
                         {p.dimensions && (
-                          <span className="text-[10px] text-slate-500 font-mono whitespace-nowrap">
-                            ({p.dimensions})
+                          <span className="text-[11px] text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                            📏 {p.dimensions}
                           </span>
                         )}
-                      </div>
-                      <div className="flex items-center gap-3 text-xs mt-0.5 font-mono">
-                        <span className="text-slate-500">10x: {formatCurrency(p.base_price_10x)}</span>
-                        <span className="text-emerald-700 font-semibold">PIX: {formatCurrency(p.max_discount_price_10pct)}</span>
+                        {p.weight_kg !== undefined && p.weight_kg > 0 && (
+                          <span className="text-[11px] text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                            ⚖️ {p.weight_kg} kg
+                          </span>
+                        )}
+                        <span className="text-slate-900 font-bold ml-auto font-sans">
+                          {formatCurrency(p.base_price_10x)}
+                        </span>
                       </div>
                     </div>
 
                     <button
+                      type="button"
                       onClick={() => handleAddItem(p)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shrink-0 ${
                         inBudget
-                          ? 'bg-orange-600 text-white shadow-xs'
-                          : 'bg-white hover:bg-orange-50 text-slate-700 hover:text-orange-600 border border-slate-200'
+                          ? 'bg-[#EA580C] text-white shadow-xs'
+                          : 'bg-white hover:bg-orange-50 text-slate-700 hover:text-[#EA580C] border border-slate-200'
                       }`}
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -317,68 +713,73 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
             </div>
           </div>
 
-          {/* Step 4: Fulfillment (Transportadora vs Instalação) */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          {/* 4. Modalidade de Atendimento (Transportadora vs Instalação) */}
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
               4. Modalidade de Atendimento
             </h3>
 
+            {/* Toggle de Modalidade */}
             <div className="grid grid-cols-2 gap-3">
               <button
+                type="button"
                 onClick={() => setFulfillment('transportadora_envio')}
                 className={`p-3.5 rounded-xl border flex items-center gap-3 transition-all cursor-pointer ${
                   fulfillment === 'transportadora_envio'
-                    ? 'bg-orange-50 border-orange-500 text-slate-900 shadow-xs'
+                    ? 'bg-[#FFF3EA] border-[#EA580C] text-slate-900 shadow-xs'
                     : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                 }`}
               >
-                <div className={`p-2 rounded-lg ${fulfillment === 'transportadora_envio' ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                <div className={`p-2 rounded-lg ${fulfillment === 'transportadora_envio' ? 'bg-[#EA580C] text-white' : 'bg-slate-200 text-slate-600'}`}>
                   <Truck className="w-4 h-4" />
                 </div>
                 <div className="text-left">
-                  <div className="text-xs font-bold">Transportadora</div>
-                  <div className="text-[10px] text-slate-500">Requer CEP e Frete</div>
+                  <div className="text-xs font-bold">Transportadora (Envio)</div>
+                  <div className="text-[10px] text-slate-500">Entrega em endereço / Coleta</div>
                 </div>
               </button>
 
               <button
+                type="button"
                 onClick={() => setFulfillment('instalacao_loja')}
                 className={`p-3.5 rounded-xl border flex items-center gap-3 transition-all cursor-pointer ${
                   fulfillment === 'instalacao_loja'
-                    ? 'bg-orange-50 border-orange-500 text-slate-900 shadow-xs'
+                    ? 'bg-[#FFF3EA] border-[#EA580C] text-slate-900 shadow-xs'
                     : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                 }`}
               >
-                <div className={`p-2 rounded-lg ${fulfillment === 'instalacao_loja' ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                <div className={`p-2 rounded-lg ${fulfillment === 'instalacao_loja' ? 'bg-[#EA580C] text-white' : 'bg-slate-200 text-slate-600'}`}>
                   <Wrench className="w-4 h-4" />
                 </div>
                 <div className="text-left">
                   <div className="text-xs font-bold">Instalação na Loja</div>
-                  <div className="text-[10px] text-slate-500">Agenda interna física</div>
+                  <div className="text-[10px] text-slate-500">Agendamento físico baia única</div>
                 </div>
               </button>
             </div>
 
-            {/* If Transportadora: CEP & Freight Fields */}
+            {/* Se for Transportadora */}
             {fulfillment === 'transportadora_envio' && (
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <div className="flex-1">
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                      CEP do Cliente (Obrigatório):
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3.5">
+                {/* Linha 1: CEP e Valor do Frete */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                  <div className="sm:col-span-6">
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                      CEP do Cliente:
                     </label>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         placeholder="00000-000"
                         value={cep}
-                        onChange={(e) => setCep(e.target.value)}
-                        className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-orange-500 font-mono"
+                        onChange={(e) => handleCepChange(e.target.value)}
+                        className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
                       />
                       <button
+                        type="button"
                         onClick={handleCepSearch}
                         disabled={loadingCep}
-                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                       >
                         {loadingCep ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
                         <span>Buscar</span>
@@ -386,8 +787,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="w-full sm:w-44">
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                  <div className="sm:col-span-6">
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
                       Valor do Frete (R$):
                     </label>
                     <input
@@ -395,77 +796,238 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       placeholder="0.00"
                       value={freightValue || ''}
                       onChange={(e) => setFreightValue(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-orange-500 font-mono"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
                     />
                   </div>
                 </div>
 
-                {address.city && (
-                  <div className="text-xs text-slate-700 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 flex items-start gap-2">
-                    <MapPin className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-bold text-slate-900">{address.street || 'Logradouro'}</span>, {address.neighborhood} — {address.city}/{address.state}
-                    </div>
+                {cepError && (
+                  <div className="text-xs text-red-600 bg-red-50 p-2 rounded-lg border border-red-200">
+                    {cepError}. Preencha os campos abaixo manualmente.
                   </div>
                 )}
-                {address.error && (
-                  <div className="text-xs text-red-600">{address.error}</div>
-                )}
+
+                {/* Linha 2: Campos de endereço completos (livres para preenchimento manual) */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                  <div className="sm:col-span-8">
+                    <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Rua / Logradouro:</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Av. Amazonas"
+                      value={street}
+                      onChange={(e) => setStreet(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                    />
+                  </div>
+                  <div className="sm:col-span-4">
+                    <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Número:</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: 1420"
+                      value={number}
+                      onChange={(e) => setNumber(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                  <div className="sm:col-span-4">
+                    <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Bairro:</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Centro"
+                      value={neighborhood}
+                      onChange={(e) => setNeighborhood(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                    />
+                  </div>
+                  <div className="sm:col-span-5">
+                    <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Cidade:</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Belo Horizonte"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                    />
+                  </div>
+                  <div className="sm:col-span-3">
+                    <label className="text-[10px] font-bold text-slate-500 block mb-0.5">UF:</label>
+                    <input
+                      type="text"
+                      placeholder="MG"
+                      maxLength={2}
+                      value={state}
+                      onChange={(e) => setState(e.target.value.toUpperCase())}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] uppercase"
+                    />
+                  </div>
+                </div>
+
+                {/* Peso Total da Carga Automático */}
+                <div className="p-3 rounded-xl bg-orange-50/70 border border-orange-200 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 text-slate-800">
+                    <Weight className="w-4 h-4 text-[#EA580C]" />
+                    <span className="font-bold">Peso Total da Carga (Cálculo Automático):</span>
+                  </div>
+                  <span className="font-mono font-bold text-[#EA580C] text-sm">
+                    {budget.totalWeightKg} kg
+                  </span>
+                </div>
+
+                {/* Novos Campos: Data e Horário da Coleta */}
+                <div className="pt-2 border-t border-slate-200/80">
+                  <div className="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-[#EA580C]" />
+                    <span>Programação da Coleta (Para a Loja se Preparar):</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <CustomDatePicker
+                      label="Data da Coleta:"
+                      value={pickupDate}
+                      onChange={setPickupDate}
+                      placeholder="Selecione data da coleta"
+                    />
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        Horário da Coleta (hh:mm):
+                      </label>
+                      <select
+                        value={pickupTime}
+                        onChange={(e) => setPickupTime(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200/90 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono cursor-pointer"
+                      >
+                        {TIME_SLOTS.map((slot) => (
+                          <option key={slot} value={slot}>
+                            {slot}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* If Instalação: Standard installation fee */}
+            {/* Se for Instalação na Loja */}
             {fulfillment === 'instalacao_loja' && (
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
-                <span className="text-slate-600">Taxa de Instalação ({selectedVehicle?.model}):</span>
-                <span className="font-mono font-bold text-orange-700">
-                  {formatCurrency(selectedVehicle?.standard_installation_cost || 0)}
-                </span>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3.5">
+                {/* Custo da Instalação (modificável) */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                    Custo da Instalação (R$):
+                  </label>
+                  <input
+                    type="number"
+                    value={installationCost || ''}
+                    onChange={(e) => setInstallationCost(parseFloat(e.target.value) || 0)}
+                    className="w-full sm:w-48 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
+                    placeholder="200.00"
+                  />
+                  <span className="text-[10px] text-slate-400 block mt-1">
+                    Padrão do catálogo: {formatCurrency(selectedVehicle?.standard_installation_cost || 200)} (Totalmente modificável)
+                  </span>
+                </div>
+
+                {/* Novos Campos: Data e Horário da Instalação */}
+                <div className="pt-2 border-t border-slate-200/80">
+                  <div className="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-[#EA580C]" />
+                    <span>Agendamento da Instalação na Loja (Baia Única):</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <CustomDatePicker
+                      label="Data da Instalação:"
+                      value={installationDate}
+                      onChange={setInstallationDate}
+                      placeholder="Selecione data da instalação"
+                    />
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        Horário da Instalação (hh:mm):
+                      </label>
+                      <select
+                        value={installationTime}
+                        onChange={(e) => setInstallationTime(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200/90 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono cursor-pointer"
+                      >
+                        {TIME_SLOTS.map((slot) => (
+                          <option key={slot} value={slot}>
+                            {slot}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Right Column: Helena/Kommo Style Quotation Sheet */}
+        {/* Right Column: Helena/Kommo Style Official Quotation Sheet */}
         <div className="lg:col-span-5 space-y-4">
           <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm sticky top-20">
             {/* Sheet Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
               <div className="flex items-center gap-2">
-                <img src={`${import.meta.env.BASE_URL}robusty-logo.png`} alt="Robusty" className="h-7 w-auto object-contain" />
+                <img 
+                  src={`${import.meta.env.BASE_URL}robusty-logo.png`} 
+                  alt="Robusty" 
+                  className="h-7 w-auto object-contain" 
+                />
               </div>
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-                PROPOSTA OFICIAL
-              </span>
+              <div className="text-right">
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                  PROPOSTA OFICIAL
+                </span>
+                <div className="text-[10px] font-mono text-slate-400 mt-0.5">
+                  #ROB-{orderNumber}
+                </div>
+              </div>
             </div>
 
             {/* Customer & Vehicle Header */}
-            <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-100 space-y-1 text-xs mb-4">
-              <div className="flex justify-between">
+            <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-100 space-y-1.5 text-xs mb-4">
+              <div className="flex justify-between items-center">
                 <span className="text-slate-500">Cliente:</span>
                 <span className="font-bold text-slate-900">{customerName || 'Cliente não informado'}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-slate-500">Veículo:</span>
-                <span className="font-semibold text-slate-800">{selectedVehicle?.model || 'Não selecionado'}</span>
+                <span className="font-semibold text-slate-800">
+                  {selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Não selecionado'}
+                </span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-slate-500">Modalidade:</span>
                 <span className="text-slate-800 font-medium">
-                  {fulfillment === 'transportadora_envio' ? 'Transportadora' : 'Instalação na Loja'}
+                  {fulfillment === 'transportadora_envio' ? 'Envio por Transportadora' : 'Instalação na Loja'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Responsável:</span>
+                <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-[10px]">
+                  {assignedTo}
                 </span>
               </div>
             </div>
 
             {/* Items List */}
             <div className="space-y-2 mb-4">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Itens Adicionados ({items.length})
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <span>Itens Adicionados ({items.length})</span>
+                {budget.totalWeightKg > 0 && (
+                  <span className="font-mono text-slate-500">Peso Total: {budget.totalWeightKg} kg</span>
+                )}
               </div>
 
               {items.length === 0 ? (
                 <div className="py-6 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                  Nenhum item selecionado
+                  Nenhum produto adicionado ao orçamento
                 </div>
               ) : (
                 <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
@@ -477,32 +1039,30 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       <div className="flex-1 min-w-0 pr-2">
                         <div className="font-bold text-slate-900 truncate">{i.product.name}</div>
                         <div className="text-[10px] text-slate-500 font-mono">
-                          {i.quantity}x {formatCurrency(
-                            paymentMethod === 'pix'
-                              ? i.product.max_discount_price_10pct
-                              : paymentMethod === 'boleto'
-                              ? i.product.cash_price_5pct
-                              : i.product.base_price_10x
-                          )}
+                          {i.quantity}x {formatCurrency(i.product.base_price_10x)}
+                          {i.product.weight_kg ? ` • ${i.product.weight_kg * i.quantity} kg` : ''}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
+                          type="button"
                           onClick={() => handleQuantityChange(i.product.id, -1)}
-                          className="w-5 h-5 rounded bg-white text-slate-600 hover:bg-slate-200 flex items-center justify-center font-mono border border-slate-200"
+                          className="w-5 h-5 rounded bg-white text-slate-600 hover:bg-slate-200 flex items-center justify-center font-mono border border-slate-200 cursor-pointer"
                         >
                           -
                         </button>
                         <span className="text-xs font-mono font-bold text-slate-900 px-1">{i.quantity}</span>
                         <button
+                          type="button"
                           onClick={() => handleQuantityChange(i.product.id, 1)}
-                          className="w-5 h-5 rounded bg-white text-slate-600 hover:bg-slate-200 flex items-center justify-center font-mono border border-slate-200"
+                          className="w-5 h-5 rounded bg-white text-slate-600 hover:bg-slate-200 flex items-center justify-center font-mono border border-slate-200 cursor-pointer"
                         >
                           +
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleRemoveItem(i.product.id)}
-                          className="ml-1 text-slate-400 hover:text-red-500 p-0.5"
+                          className="ml-1 text-slate-400 hover:text-red-500 p-0.5 cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -513,66 +1073,170 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               )}
             </div>
 
-            {/* Payment Method Pills */}
-            <div className="space-y-1.5 mb-4 pt-3 border-t border-slate-100">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Condição de Pagamento:
+            {/* Condição de Pagamento (Obrigatório selecionar primeiro a forma de pagamento antes dos descontos) */}
+            <div className="pt-3 border-t border-slate-100 mb-4 space-y-3">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                Forma de Pagamento:
               </label>
+
               <div className="grid grid-cols-3 gap-2">
                 <button
-                  onClick={() => setPaymentMethod('pix')}
-                  className={`py-2.5 px-1 text-center rounded-full text-xs font-bold border transition-all cursor-pointer ${
+                  type="button"
+                  onClick={() => handlePaymentMethodSelect('pix')}
+                  className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
                     paymentMethod === 'pix'
-                      ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-sm shadow-orange-500/20'
+                      ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-xs'
                       : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
-                  <div>PIX (10%)</div>
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span>PIX (Até 10%)</span>
                 </button>
 
                 <button
-                  onClick={() => setPaymentMethod('boleto')}
-                  className={`py-2.5 px-1 text-center rounded-full text-xs font-bold border transition-all cursor-pointer ${
+                  type="button"
+                  onClick={() => handlePaymentMethodSelect('boleto')}
+                  className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
                     paymentMethod === 'boleto'
-                      ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-sm shadow-orange-500/20'
+                      ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-xs'
                       : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
-                  <div>Boleto (5%)</div>
+                  <ReceiptText className="w-3.5 h-3.5" />
+                  <span>Boleto (Até 5%)</span>
                 </button>
 
                 <button
-                  onClick={() => setPaymentMethod('cartao_link_igor')}
-                  className={`py-2.5 px-1 text-center rounded-full text-xs font-bold border transition-all cursor-pointer ${
-                    paymentMethod === 'cartao_link_igor'
-                      ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-sm shadow-orange-500/20'
+                  type="button"
+                  onClick={() => handlePaymentMethodSelect('cartao_link_igor')}
+                  className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                    paymentMethod === 'cartao_link_igor' || paymentMethod === 'cartao_presencial'
+                      ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-xs'
                       : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
-                  <div>10x Cartão</div>
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>Cartão (Até 10x)</span>
                 </button>
               </div>
+
+              {/* Se a forma de pagamento ainda não foi selecionada */}
+              {!paymentMethod ? (
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Selecione a forma de pagamento acima para definir as opções de parcelas e descontos.</span>
+                </div>
+              ) : (
+                /* Opções de Desconto e Parcelas de acordo com a forma selecionada */
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2.5">
+                  {/* Se for Cartão: Seleção de Parcelas */}
+                  {(paymentMethod === 'cartao_link_igor' || paymentMethod === 'cartao_presencial') && (
+                    <div>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-slate-600 font-bold">Parcelas:</span>
+                        <span className="font-mono text-slate-800 font-bold">
+                          {cardInstallments}x de {formatCurrency(budget.finalTotal / cardInstallments)}
+                        </span>
+                      </div>
+                      <select
+                        value={cardInstallments}
+                        onChange={(e) => setCardInstallments(parseInt(e.target.value))}
+                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono cursor-pointer"
+                      >
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                          <option key={num} value={num}>
+                            {num}x sem juros ({formatCurrency(budget.finalTotal / num)})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Controle de Desconto condicionado aos limites exatos estabelecidos */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-slate-600 font-bold">
+                        Desconto Aplicado (Máximo {maxAllowedDiscount}%):
+                      </span>
+                      <span className="font-mono text-[#EA580C] font-bold">{discountPercent}%</span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="0"
+                        max={maxAllowedDiscount}
+                        step="1"
+                        value={discountPercent}
+                        onChange={(e) => setDiscountPercent(parseInt(e.target.value) || 0)}
+                        className="flex-1 accent-[#EA580C] cursor-pointer"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        max={maxAllowedDiscount}
+                        value={discountPercent}
+                        onChange={(e) => {
+                          const val = Math.min(Math.max(parseInt(e.target.value) || 0, 0), maxAllowedDiscount)
+                          setDiscountPercent(val)
+                        }}
+                        className="w-14 bg-white border border-slate-200 rounded-md px-2 py-0.5 text-xs text-center font-mono font-bold"
+                      />
+                      <span className="text-xs font-mono text-slate-500">%</span>
+                    </div>
+
+                    <div className="flex gap-1.5 mt-2">
+                      {paymentMethod === 'pix' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setDiscountPercent(10)}
+                            className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-700 hover:border-[#EA580C] cursor-pointer"
+                          >
+                            10% Padrão
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDiscountPercent(5)}
+                            className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-700 hover:border-[#EA580C] cursor-pointer"
+                          >
+                            5%
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDiscountPercent(0)}
+                            className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-700 hover:border-[#EA580C] cursor-pointer"
+                          >
+                            0%
+                          </button>
+                        </>
+                      )}
+                      {paymentMethod === 'boleto' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setDiscountPercent(5)}
+                            className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-700 hover:border-[#EA580C] cursor-pointer"
+                          >
+                            5% Padrão
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDiscountPercent(0)}
+                            className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-700 hover:border-[#EA580C] cursor-pointer"
+                          >
+                            0%
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Manual Discount Slider */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-slate-600 font-bold">Desconto Manual:</span>
-                <span className="font-mono text-[#EA580C] font-bold">{discountPercent}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="10"
-                step="1"
-                value={discountPercent}
-                onChange={(e) => setDiscountPercent(parseInt(e.target.value))}
-                className="w-full accent-[#EA580C] cursor-pointer"
-              />
-            </div>
-
-            {/* Financial Summary Breakdown */}
-            <div className="bg-[#F8F9FA] p-5 rounded-2xl border border-slate-100 space-y-2 font-mono text-xs mb-5">
+            {/* Resumo Financeiro */}
+            <div className="bg-[#F8F9FA] p-4 rounded-2xl border border-slate-100 space-y-2 font-mono text-xs mb-4">
               <div className="flex justify-between text-slate-600">
                 <span>Subtotal Produtos:</span>
                 <span className="text-[#121212] font-bold">{formatCurrency(budget.subtotal)}</span>
@@ -613,33 +1277,122 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               )}
             </div>
 
-            {/* Actions (Nexo Pill Buttons) */}
+            {/* Ações do Orçamento */}
             <div className="space-y-2.5">
+              {/* Botão Copiar WhatsApp */}
               <button
+                type="button"
                 onClick={handleCopyProposal}
                 disabled={items.length === 0}
-                className={`w-full py-3 px-5 rounded-full text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   copied
                     ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 disabled:opacity-50 active:scale-98'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20 disabled:opacity-50 active:scale-98'
                 }`}
               >
                 {copied ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                 <span>{copied ? 'Copiado para o WhatsApp!' : 'Copiar Texto para o WhatsApp'}</span>
               </button>
 
-              <button
-                onClick={handleSaveToCrm}
-                disabled={items.length === 0}
-                className="w-full py-3 px-5 rounded-full text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] text-white shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-98"
-              >
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-                <span>Salvar como Card no Funil de Vendas</span>
-              </button>
+              {/* Botões Principais: Salvar ou Gerar Pedido */}
+              <div className="grid grid-cols-2 gap-2">
+                {/* Botão Salvar (Cria/atualiza o card no Funil de Vendas) */}
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={items.length === 0}
+                  className="py-3 px-3 rounded-xl text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] text-white shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-98"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Salvar</span>
+                </button>
+
+                {/* Botão Gerar Pedido (Integra diretamente com o Funil de Pedidos) */}
+                <button
+                  type="button"
+                  onClick={handleGenerateOrderAction}
+                  disabled={items.length === 0}
+                  className="py-3 px-3 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-98"
+                >
+                  <Truck className="w-4 h-4" />
+                  <span>Gerar Pedido</span>
+                </button>
+              </div>
 
               {savedSuccess && (
-                <div className="text-center text-xs text-emerald-700 py-1 font-bold animate-fade-in">
-                  Card de oportunidade salvo no banco Supabase e adicionado ao Pipeline!
+                <div className="text-center text-xs text-emerald-700 py-1 font-bold animate-fade-in bg-emerald-50 rounded-lg p-2 border border-emerald-200">
+                  ✓ Card de oportunidade salvo no Funil de Vendas (#ROB-{orderNumber})!
+                </div>
+              )}
+
+              {orderGeneratedSuccess && (
+                <div className="text-center text-xs text-blue-700 py-1 font-bold animate-fade-in bg-blue-50 rounded-lg p-2 border border-blue-200">
+                  ✓ Pedido gerado e integrado ao Funil de Pedidos (#ROB-{orderNumber})!
+                </div>
+              )}
+
+              {/* Ações Secundárias: Encerrar Negociação (Venda Perdida) e Apagar Orçamento */}
+              {initialOpportunity && (
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                  {/* Opção Marcar como Venda Perdida / Encerrar Negociação */}
+                  {confirmLost ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-amber-700 font-bold">Encerrar negociação?</span>
+                      <button
+                        type="button"
+                        onClick={handleMarkLost}
+                        className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[11px] font-bold cursor-pointer"
+                      >
+                        Sim
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmLost(false)}
+                        className="px-2 py-1 bg-slate-200 text-slate-700 rounded text-[11px] cursor-pointer"
+                      >
+                        Não
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmLost(true)}
+                      className="text-slate-500 hover:text-amber-600 transition-colors cursor-pointer flex items-center gap-1 font-medium"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span>Encerrar Negociação</span>
+                    </button>
+                  )}
+
+                  {/* Opção Apagar Orçamento */}
+                  {confirmDelete ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-red-600 font-bold">Excluir?</span>
+                      <button
+                        type="button"
+                        onClick={handleDelete}
+                        className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-bold cursor-pointer"
+                      >
+                        Confirmar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDelete(false)}
+                        className="px-2 py-1 bg-slate-200 text-slate-700 rounded text-[11px] cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(true)}
+                      className="text-slate-400 hover:text-red-600 transition-colors cursor-pointer flex items-center gap-1 font-medium"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Apagar Orçamento</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>

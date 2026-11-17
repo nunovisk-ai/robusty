@@ -27,6 +27,7 @@ interface KanbanViewProps {
   onUpdateOrderStatus?: (orderId: string, newStatus: OrderStatus) => void
   onConvertToOrder?: (opp: Opportunity) => void
   onOpenNewBudget?: () => void
+  onSelectOpportunity?: (opp: Opportunity) => void
 }
 
 type PipelineType = 'vendas' | 'pedidos'
@@ -134,7 +135,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   onMoveStage,
   onUpdateOrderStatus,
   onConvertToOrder,
-  onOpenNewBudget 
+  onOpenNewBudget,
+  onSelectOpportunity
 }) => {
   const [pipelineType, setPipelineType] = useState<PipelineType>('vendas')
   const [searchTerm, setSearchTerm] = useState('')
@@ -398,7 +400,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               className="flex items-center justify-center gap-1.5 px-4 py-1.5 bg-[#EA580C] hover:bg-[#C2410C] text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-98 cursor-pointer shrink-0 outline-none"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Novo Orçamento</span>
+              <span>Nova Oportunidade</span>
             </button>
           )}
         </div>
@@ -476,21 +478,30 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             draggedItemId === opp.id ? 'opacity-40 scale-95' : ''
                           }`}
                         >
-                          {/* Linha 1: Modelo do Veículo em destaque (Pill Preto) + Responsável */}
-                          <div className="flex items-center justify-between gap-1">
+                          {/* Linha 1: Modelo do Veículo em destaque (Pill Preto) + Número do Pedido + Responsável */}
+                          <div className="flex items-center justify-between gap-1 flex-wrap">
                             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1.5 shadow-2xs">
                               {renderVehicleIcon(vehicle.iconType)}
                               <span>{vehicle.modelName}</span>
                             </span>
 
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
-                              🔵 Norlando
-                            </span>
+                            <div className="flex items-center gap-1">
+                              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                #ROB-{opp.order_number || 1040}
+                              </span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                                🔵 {opp.assigned_to || 'Norlando'}
+                              </span>
+                            </div>
                           </div>
 
                           {/* Linha 2: Nome do Cliente & Valor */}
                           <div className="flex items-start justify-between gap-2">
-                            <h4 className="font-heading font-bold text-xs text-slate-900 hover:text-[#EA580C] transition-colors cursor-pointer leading-snug line-clamp-2">
+                            <h4 
+                              onClick={() => onSelectOpportunity?.(opp)}
+                              className="font-heading font-bold text-xs text-slate-900 hover:text-[#EA580C] transition-colors cursor-pointer leading-snug line-clamp-2"
+                              title="Clique para abrir e editar orçamento"
+                            >
                               {opp.contact?.full_name || 'Cliente'}
                             </h4>
                             <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
@@ -534,7 +545,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                               >
                                 {renderPlatformIconFA(opp.contact?.origin)}
                               </button>
-                              <button className="text-[11px] text-slate-500 hover:text-slate-900 font-medium cursor-pointer">
+                              <button 
+                                onClick={() => onSelectOpportunity?.(opp)}
+                                className="text-[11px] text-slate-500 hover:text-slate-900 font-medium cursor-pointer"
+                              >
                                 Detalhes
                               </button>
                             </div>
@@ -646,10 +660,43 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     </div>
                   ) : (
                     colOrders.map((ord) => {
+                      const linkedOpp = ord.opportunity || opportunities.find((o) => o.id === ord.opportunity_id || o.order_number === ord.order_number)
                       const vehicle = getVehicleModelInfo(getOrderVehicleModel(ord))
                       const ordTotal = getOrderTotal(ord)
                       const canMovePrev = colIdx > 0
                       const canMoveNext = colIdx < ORDER_STAGES.length - 1 && col.id !== 'pedido_concluido' && col.id !== 'pedido_cancelado'
+
+                      const handleOpenOrderDetails = () => {
+                        if (onSelectOpportunity) {
+                          if (linkedOpp) {
+                            onSelectOpportunity(linkedOpp)
+                          } else {
+                            onSelectOpportunity({
+                              id: ord.opportunity_id || `opp-${ord.id}`,
+                              order_number: ord.order_number,
+                              assigned_to: ord.assigned_to || 'Igor',
+                              contact_id: ord.contact_id,
+                              contact: ord.contact,
+                              vehicle_model_year: vehicle.modelName,
+                              stage: 'venda_ganha',
+                              fulfillment_type: ord.fulfillment_type,
+                              subtotal_products: ordTotal,
+                              freight_value: 0,
+                              installation_value: 0,
+                              discount_value: 0,
+                              discount_percent: 0,
+                              final_total: ordTotal,
+                              payment_method: 'pix',
+                              pickup_date: ord.pickup_date,
+                              pickup_time: ord.pickup_time,
+                              installation_date: ord.installation_date,
+                              installation_time: ord.installation_time,
+                              created_at: ord.created_at,
+                              updated_at: ord.created_at,
+                            })
+                          }
+                        }
+                      }
 
                       return (
                         <div
@@ -661,21 +708,30 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             draggedItemId === ord.id ? 'opacity-40 scale-95' : ''
                           }`}
                         >
-                          {/* Linha 1: Modelo do Veículo em destaque (Pill Preto) + Responsável Igor */}
-                          <div className="flex items-center justify-between gap-1">
+                          {/* Linha 1: Modelo do Veículo em destaque (Pill Preto) + Número do Pedido + Responsável */}
+                          <div className="flex items-center justify-between gap-1 flex-wrap">
                             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1.5 shadow-2xs">
                               {renderVehicleIcon(vehicle.iconType)}
                               <span>{vehicle.modelName}</span>
                             </span>
 
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
-                              🔵 Igor
-                            </span>
+                            <div className="flex items-center gap-1">
+                              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                #ROB-{ord.order_number}
+                              </span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                                🔵 {ord.assigned_to || linkedOpp?.assigned_to || 'Igor'}
+                              </span>
+                            </div>
                           </div>
 
                           {/* Linha 2: Cliente & Valor em Destaque Verde */}
                           <div className="flex items-start justify-between gap-2">
-                            <h4 className="font-heading font-bold text-xs text-slate-900 hover:text-[#EA580C] transition-colors cursor-pointer leading-snug line-clamp-2">
+                            <h4 
+                              onClick={handleOpenOrderDetails}
+                              className="font-heading font-bold text-xs text-slate-900 hover:text-[#EA580C] transition-colors cursor-pointer leading-snug line-clamp-2"
+                              title="Clique para abrir e editar pedido espelho"
+                            >
                               {ord.contact?.full_name || 'Cliente'}
                             </h4>
                             <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
@@ -717,7 +773,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                               >
                                 {renderPlatformIconFA(ord.contact?.origin)}
                               </button>
-                              <button className="text-[11px] text-slate-500 hover:text-slate-900 font-medium cursor-pointer">
+                              <button 
+                                onClick={handleOpenOrderDetails}
+                                className="text-[11px] text-slate-500 hover:text-slate-900 font-medium cursor-pointer"
+                              >
                                 Detalhes
                               </button>
                             </div>

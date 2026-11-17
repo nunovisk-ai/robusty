@@ -102,7 +102,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
             onClick={onNavigateToBudget}
             className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-xl text-xs transition-all shadow-sm shadow-orange-600/20 self-start sm:self-auto cursor-pointer"
           >
-            <span>Montar Novo Orçamento</span>
+            <span>Criar Nova Oportunidade</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         )}

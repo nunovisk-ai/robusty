@@ -16,6 +16,8 @@ export type LeadOrigin =
   | 'loja_presencial' 
   | 'site_form' 
   | 'indicacao'
+  | 'manual'
+  | 'site'
 
 export type OpportunityStage = 
   | 'novo_lead'
@@ -72,6 +74,7 @@ export interface Product {
   compatible_vehicle_id?: string
   model_version?: string
   dimensions?: string
+  weight_kg?: number
   base_price_10x: number
   cash_price_5pct: number
   max_discount_price_10pct: number
@@ -121,6 +124,9 @@ export interface OpportunityItem {
 
 export interface Opportunity {
   id: string
+  order_number?: number
+  order_code?: string
+  assigned_to?: 'Igor' | 'Norlando' | 'Loja'
   contact_id: string
   contact?: Contact
   assigned_user_id?: string
@@ -137,6 +143,14 @@ export interface Opportunity {
   final_total: number
   payment_method?: PaymentMethod
   payment_link_url?: string
+  card_installments?: number
+  pickup_date?: string
+  pickup_time?: string
+  installation_date?: string
+  installation_time?: string
+  total_weight_kg?: number
+  customer_email?: string
+  address?: Partial<Address>
   lost_reason?: string
   notes?: string
   items?: OpportunityItem[]
@@ -147,10 +161,13 @@ export interface Opportunity {
 export interface Order {
   id: string
   order_number: number
+  order_code?: string
+  assigned_to?: 'Igor' | 'Norlando' | 'Loja'
   opportunity_id: string
   opportunity?: Opportunity
   contact_id: string
   contact?: Contact
+  customer_email?: string
   fulfillment_type: FulfillmentType
   status: OrderStatus
   payment_status: string
@@ -159,6 +176,11 @@ export interface Order {
   invoice_key?: string
   shipping_carrier_name?: string
   shipping_tracking_code?: string
+  pickup_date?: string
+  pickup_time?: string
+  installation_date?: string
+  installation_time?: string
+  total_weight_kg?: number
   internal_notes?: string
   created_at: string
 }

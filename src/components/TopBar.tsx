@@ -21,7 +21,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   const getTabTitle = (tab: ActiveTab) => {
     switch (tab) {
       case 'kanban': return 'Pipeline'
-      case 'budget': return 'Montador de Orçamento'
+      case 'budget': return 'Gerador de Orçamento'
       case 'catalog': return 'Catálogo Oficial Fev/2026'
       case 'orders': return 'Funil Operacional de Pedidos'
       case 'calendar': return 'Agenda de Instalações (Baia Única)'

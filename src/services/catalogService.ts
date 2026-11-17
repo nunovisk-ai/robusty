@@ -52,43 +52,40 @@ export interface BudgetCalculationResult {
   installationValue: number
   finalTotal: number
   savingsVs10x: number
+  totalWeightKg: number
+}
+
+export function getMaxDiscountForPaymentMethod(method?: string): number {
+  if (method === 'pix') return 10
+  if (method === 'boleto') return 5
+  if (method?.includes('cartao')) return 10
+  return 10
+}
+
+export function calculateTotalWeight(items: { product: Product; quantity: number }[]): number {
+  return items.reduce((acc, i) => acc + (i.product.weight_kg || 0) * i.quantity, 0)
 }
 
 export function calculateBudget(
   items: { product: Product; quantity: number }[],
   paymentMethod: PaymentMethod,
-  manualDiscountPercent: number = 0,
+  discountPercent: number = 0,
   freightValue: number = 0,
   installationValue: number = 0
 ): BudgetCalculationResult {
-  let subtotal = 0
+  // Base products subtotal using catalog base price
+  const subtotal = items.reduce(
+    (acc, { product, quantity }) => acc + (product.base_price_10x || 0) * quantity,
+    0
+  )
 
-  // Calculate base price for each product
-  items.forEach(({ product, quantity }) => {
-    let unitPrice = product.base_price_10x
-
-    if (paymentMethod === 'pix') {
-      unitPrice = product.max_discount_price_10pct
-    } else if (paymentMethod === 'boleto') {
-      unitPrice = product.cash_price_5pct
-    }
-
-    subtotal += unitPrice * quantity
-  })
-
-  // Apply manual discount (between 0% and 10%)
-  const clampedDiscount = Math.min(Math.max(manualDiscountPercent, 0), 10)
+  const maxDiscount = getMaxDiscountForPaymentMethod(paymentMethod)
+  const clampedDiscount = Math.min(Math.max(discountPercent, 0), maxDiscount)
   const discountValue = Math.round(((subtotal * clampedDiscount) / 100) * 100) / 100
 
   const finalTotal = Math.max(0, subtotal - discountValue + freightValue + installationValue)
-
-  // Calculate reference 10x full price for showing savings
-  const full10xTotal = items.reduce(
-    (acc, { product, quantity }) => acc + product.base_price_10x * quantity,
-    0
-  ) + freightValue + installationValue
-
-  const savingsVs10x = Math.max(0, full10xTotal - finalTotal)
+  const savingsVs10x = discountValue
+  const totalWeightKg = calculateTotalWeight(items)
 
   return {
     subtotal,
@@ -98,5 +95,6 @@ export function calculateBudget(
     installationValue,
     finalTotal,
     savingsVs10x,
+    totalWeightKg,
   }
 }
