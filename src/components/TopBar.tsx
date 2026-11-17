@@ -32,7 +32,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   const title = getTabTitle(activeTab)
 
   return (
-    <header className="sticky top-0 z-20 h-20 bg-white/90 backdrop-blur-md border-b border-slate-100 px-6 sm:px-8 flex items-center justify-between">
+    <header className="sticky top-0 z-20 h-16 bg-white/90 backdrop-blur-md border-b border-slate-100 px-6 sm:px-8 flex items-center justify-between">
       {/* Left: Mobile trigger & Page Title */}
       <div className="flex items-center gap-4">
         <button
@@ -47,17 +47,6 @@ export const TopBar: React.FC<TopBarProps> = ({
             {title}
           </h1>
         </div>
-      </div>
-
-      {/* Right: User / Status Info */}
-      <div className="flex items-center gap-3">
-        {currentUser && (
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200/60 text-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-            <span className="text-slate-500">Acessando como</span>
-            <span className="font-semibold text-slate-800">{currentUser.name}</span>
-          </div>
-        )}
       </div>
     </header>
   )

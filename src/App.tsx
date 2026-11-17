@@ -423,7 +423,7 @@ export function App() {
       />
 
       {/* Main Area */}
-      <div className="md:pl-64 flex-1 flex flex-col min-w-0">
+      <div className={`md:pl-64 flex-1 flex flex-col min-w-0 ${activeTab === 'kanban' ? 'h-screen overflow-hidden' : ''}`}>
         <TopBar
           activeTab={activeTab}
           onToggleMobile={() => setIsMobileSidebarOpen(true)}
@@ -432,7 +432,7 @@ export function App() {
           onLogout={handleLogout}
         />
 
-        <main className={`flex-1 p-4 sm:p-6 sm:py-8 w-full mx-auto ${activeTab === 'kanban' ? 'max-w-[1700px]' : 'max-w-7xl'}`}>
+        <main className={`flex-1 w-full ${activeTab === 'kanban' ? 'p-3 sm:px-6 sm:py-3 flex flex-col min-h-0 overflow-hidden max-w-full' : 'p-4 sm:p-6 sm:py-8 max-w-7xl mx-auto'}`}>
           {activeTab === 'kanban' && (
             <KanbanView
               opportunities={opportunities}
@@ -498,9 +498,11 @@ export function App() {
           )}
         </main>
 
-        <footer className="border-t border-slate-200/80 bg-white py-4 px-6 text-center text-xs text-slate-400">
-          CRM Robusty © 2026 — Fabricação e Comercialização de Bagageiros Automotivos
-        </footer>
+        {activeTab !== 'kanban' && (
+          <footer className="border-t border-slate-200/80 bg-white py-4 px-6 text-center text-xs text-slate-400">
+            CRM Robusty © 2026 — Fabricação e Comercialização de Bagageiros Automotivos
+          </footer>
+        )}
       </div>
     </div>
   )
