@@ -7,7 +7,10 @@ import {
   Truck, 
   ArrowLeft,
   ArrowRight,
-  CheckCircle2
+  CheckCircle2,
+  X,
+  LayoutGrid,
+  List
 } from 'lucide-react'
 import { 
   FaWhatsapp, 
@@ -140,6 +143,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 }) => {
   const [pipelineType, setPipelineType] = useState<PipelineType>('vendas')
   const [searchTerm, setSearchTerm] = useState('')
+  const [density, setDensity] = useState<'detailed' | 'compact'>('detailed')
 
   // Drag and Drop State
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null)
@@ -276,31 +280,49 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 
   const getOriginTitle = (origin?: string) => {
     switch (origin) {
-      case 'whatsapp_inbound': return 'Origem: WhatsApp'
-      case 'instagram_direct': return 'Origem: Instagram Direct'
-      case 'meta_lead_ads': return 'Origem: Facebook Leads'
-      default: return 'Origem: Balcão / Loja Presencial'
+      case 'whatsapp_inbound': return 'Canal: WhatsApp Comercial Robusty'
+      case 'instagram_direct': return 'Canal: Direct Instagram @robusty'
+      case 'meta_lead_ads': return 'Canal: Meta Lead Ads (Facebook/Instagram)'
+      case 'site_form':
+      case 'site': return 'Canal: Formulário do Site Robusty'
+      case 'loja_presencial':
+      case 'manual': return 'Canal: Balcão / Loja Presencial'
+      default: return 'Canal: Atendimento Direto'
     }
   }
 
-  // Filtrar Oportunidades de Vendas
+  const getWhatsAppLink = (phone?: string) => {
+    if (!phone) return null
+    const clean = phone.replace(/\D/g, '')
+    if (!clean) return null
+    const full = clean.startsWith('55') ? clean : `55${clean}`
+    return `https://wa.me/${full}`
+  }
+
+  // Filtrar Oportunidades de Vendas (Nome, Telefone, Veículo, Número do Pedido, Transportadora)
   const filteredOpportunities = opportunities.filter((opp) => {
-    const q = searchTerm.toLowerCase()
+    const q = searchTerm.toLowerCase().trim()
+    if (!q) return true
     return (
       (opp.contact?.full_name || '').toLowerCase().includes(q) ||
       (opp.vehicle_model_year || '').toLowerCase().includes(q) ||
       (opp.vehicle?.model || '').toLowerCase().includes(q) ||
-      (opp.contact?.phone_e164 || '').includes(q)
+      (opp.contact?.phone_e164 || '').includes(q) ||
+      (opp.order_number?.toString() || '').includes(q) ||
+      (opp.shipping_carrier_name || '').toLowerCase().includes(q)
     )
   })
 
-  // Filtrar Pedidos Operacionais
+  // Filtrar Pedidos Operacionais (Nome, Número, Veículo, Transportadora, Telefone)
   const filteredOrders = orders.filter((ord) => {
-    const q = searchTerm.toLowerCase()
+    const q = searchTerm.toLowerCase().trim()
+    if (!q) return true
     return (
       (ord.contact?.full_name || '').toLowerCase().includes(q) ||
       (ord.order_number?.toString() || '').includes(q) ||
-      (ord.shipping_carrier_name || '').toLowerCase().includes(q)
+      (ord.shipping_carrier_name || '').toLowerCase().includes(q) ||
+      (ord.contact?.phone_e164 || '').includes(q) ||
+      (getOrderVehicleModel(ord) || '').toLowerCase().includes(q)
     )
   })
 
@@ -381,26 +403,68 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
           </button>
         </div>
 
-        {/* Busca e Botão Novo Orçamento */}
-        <div className="flex items-center gap-2.5 flex-1 max-w-md justify-end">
-          <div className="relative flex-1 max-w-xs">
+        {/* Controles: Densidade, Busca e Botão Novo Orçamento */}
+        <div className="flex items-center gap-2 flex-1 max-w-lg justify-end flex-wrap">
+          {/* Seletor de Densidade (Detalhado vs Compacto) */}
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 shrink-0">
+            <button
+              type="button"
+              onClick={() => setDensity('detailed')}
+              title="Exibição Detalhada dos Cards"
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                density === 'detailed'
+                  ? 'bg-white text-slate-800 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline text-[11px]">Detalhado</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDensity('compact')}
+              title="Exibição Compacta (Alta Densidade)"
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                density === 'compact'
+                  ? 'bg-white text-slate-800 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <List className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline text-[11px]">Compacto</span>
+            </button>
+          </div>
+
+          {/* Busca em Tempo Real com Botão Limpar */}
+          <div className="relative flex-1 min-w-[170px] max-w-xs">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder={pipelineType === 'vendas' ? 'Buscar cliente ou veículo...' : 'Buscar pedido ou transportadora...'}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] transition-all font-medium"
+              className="w-full pl-9 pr-7 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] transition-all font-medium"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                title="Limpar busca"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           {onOpenNewBudget && (
             <button
               onClick={onOpenNewBudget}
-              className="flex items-center justify-center gap-1.5 px-4 py-1.5 bg-[#EA580C] hover:bg-[#C2410C] text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-98 cursor-pointer shrink-0 outline-none"
+              className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-[#EA580C] hover:bg-[#C2410C] text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-98 cursor-pointer shrink-0 outline-none"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Nova Oportunidade</span>
+              <span className="hidden sm:inline">Nova Oportunidade</span>
+              <span className="sm:hidden">Novo</span>
             </button>
           )}
         </div>
@@ -468,130 +532,240 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       const canMovePrev = colIdx > 0
                       const canMoveNext = colIdx < SALES_STAGES.length - 1 && !isWonStage && col.id !== 'venda_perdida'
 
+                      const oppWhatsappUrl = getWhatsAppLink(opp.contact?.phone_e164)
+
                       return (
                         <div
                           key={opp.id}
                           draggable={true}
                           onDragStart={(e) => handleDragStart(e, opp.id)}
                           onDragEnd={handleDragEnd}
-                          className={`bg-white p-3.5 rounded-xl border border-slate-200/90 hover:border-[#EA580C] shadow-2xs hover:shadow-md transition-all cursor-grab active:cursor-grabbing group space-y-2.5 select-none ${
-                            draggedItemId === opp.id ? 'opacity-40 scale-95' : ''
+                          className={`bg-white rounded-xl border border-slate-200/90 hover:border-[#EA580C] shadow-2xs hover:shadow-md transition-all duration-150 cursor-grab active:cursor-grabbing group select-none ${
+                            density === 'compact' ? 'p-2.5 space-y-2' : 'p-3.5 space-y-2.5'
+                          } ${
+                            draggedItemId === opp.id ? 'opacity-30 scale-95 -rotate-1 shadow-2xl ring-2 ring-orange-500/20' : 'hover:-translate-y-0.5'
                           }`}
                         >
-                          {/* Linha 1: Modelo do Veículo em destaque (Pill Preto) + Número do Pedido + Responsável */}
-                          <div className="flex items-center justify-between gap-1 flex-wrap">
-                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1.5 shadow-2xs">
-                              {renderVehicleIcon(vehicle.iconType)}
-                              <span>{vehicle.modelName}</span>
-                            </span>
+                          {density === 'compact' ? (
+                            /* Layout Compacto (Alta Densidade) */
+                            <>
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1 shadow-2xs">
+                                  {renderVehicleIcon(vehicle.iconType)}
+                                  <span className="truncate max-w-[100px]">{vehicle.modelName}</span>
+                                </span>
+                                <span className="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                  #ROB-{opp.order_number || 1040}
+                                </span>
+                              </div>
 
-                            <div className="flex items-center gap-1">
-                              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                                #ROB-{opp.order_number || 1040}
-                              </span>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
-                                🔵 {opp.assigned_to || 'Norlando'}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Linha 2: Nome do Cliente & Valor */}
-                          <div className="flex items-start justify-between gap-2">
-                            <h4 
-                              onClick={() => onSelectOpportunity?.(opp)}
-                              className="font-heading font-bold text-xs text-slate-900 hover:text-[#EA580C] transition-colors cursor-pointer leading-snug line-clamp-2"
-                              title="Clique para abrir e editar orçamento"
-                            >
-                              {opp.contact?.full_name || 'Cliente'}
-                            </h4>
-                            <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
-                              {formatCurrency(opp.final_total)}
-                            </span>
-                          </div>
-
-                          {/* Linha 3: Caixa de Descrição do Produto & Especificações */}
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-[11px] space-y-0.5">
-                            <p className="font-medium text-slate-800 truncate">
-                              Bagageiro {vehicle.modelName} Modelo EXTREME
-                            </p>
-                            <div className="flex items-center justify-between text-[10px] text-slate-500">
-                              <span>
-                                {opp.fulfillment_type === 'instalacao_loja' 
-                                  ? 'Caminho B: Instalação na Loja' 
-                                  : 'Caminho A: Entrega Transportadora'}
-                              </span>
-                              <span className="font-mono">Preto Epóxi</span>
-                            </div>
-                          </div>
-
-                          {/* Linha 4: Badges Operacionais */}
-                          <div className="flex flex-wrap gap-1">
-                            <span className="text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 font-medium">
-                              📦 {opp.fulfillment_type === 'instalacao_loja' ? 'Instalação Loja' : 'Cotação Igor'}
-                            </span>
-                            {opp.fulfillment_type === 'transportadora_envio' && (
-                              <span className="text-[9px] bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 font-medium">
-                                🧾 Nota Fiscal
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Linha 5: Rodapé com Ícone da Plataforma (FontAwesome) + Ações */}
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <button 
-                                title={getOriginTitle(opp.contact?.origin)} 
-                                className="p-1 hover:bg-slate-100 rounded transition-colors cursor-pointer"
-                              >
-                                {renderPlatformIconFA(opp.contact?.origin)}
-                              </button>
-                              <button 
-                                onClick={() => onSelectOpportunity?.(opp)}
-                                className="text-[11px] text-slate-500 hover:text-slate-900 font-medium cursor-pointer"
-                              >
-                                Detalhes
-                              </button>
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              {canMovePrev && (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    onMoveStage(opp.id, SALES_STAGES[colIdx - 1].id)
-                                  }}
-                                  title="Voltar etapa" 
-                                  className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 
+                                  onClick={() => onSelectOpportunity?.(opp)}
+                                  className="font-heading font-bold text-xs text-slate-900 hover:text-[#EA580C] transition-colors cursor-pointer truncate"
+                                  title="Clique para abrir e editar orçamento"
                                 >
-                                  <ArrowLeft className="w-3.5 h-3.5" />
-                                </button>
-                              )}
+                                  {opp.contact?.full_name || 'Cliente'}
+                                </h4>
+                                <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
+                                  {formatCurrency(opp.final_total)}
+                                </span>
+                              </div>
 
-                              {isWonStage ? (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    onConvertToOrder && onConvertToOrder(opp)
-                                  }}
-                                  className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                              <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-1.5">
+                                  <span title={getOriginTitle(opp.contact?.origin)}>
+                                    {renderPlatformIconFA(opp.contact?.origin)}
+                                  </span>
+                                  {oppWhatsappUrl && (
+                                    <a
+                                      href={oppWhatsappUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      title={`Conversar com ${opp.contact?.full_name} no WhatsApp`}
+                                      className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-600 text-[#25D366] hover:text-white border border-emerald-200 hover:border-emerald-600 transition-colors text-[10px] font-bold cursor-pointer"
+                                    >
+                                      <FaWhatsapp className="w-2.5 h-2.5" />
+                                      <span>Zap</span>
+                                    </a>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  {canMovePrev && (
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onMoveStage(opp.id, SALES_STAGES[colIdx - 1].id)
+                                      }}
+                                      title="Voltar etapa" 
+                                      className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                    >
+                                      <ArrowLeft className="w-3 h-3" />
+                                    </button>
+                                  )}
+
+                                  {isWonStage ? (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onConvertToOrder && onConvertToOrder(opp)
+                                      }}
+                                      className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                                    >
+                                      <CheckCircle2 className="w-2.5 h-2.5" />
+                                      <span>Pedido</span>
+                                    </button>
+                                  ) : canMoveNext ? (
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onMoveStage(opp.id, SALES_STAGES[colIdx + 1].id)
+                                      }}
+                                      title="Avançar etapa" 
+                                      className="p-1 bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white rounded transition-colors cursor-pointer"
+                                    >
+                                      <ArrowRight className="w-3 h-3" />
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            /* Layout Detalhado (Padrão Completo) */
+                            <>
+                              {/* Linha 1: Modelo do Veículo em destaque (Pill Preto) + Número do Pedido + Responsável */}
+                              <div className="flex items-center justify-between gap-1 flex-wrap">
+                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1.5 shadow-2xs">
+                                  {renderVehicleIcon(vehicle.iconType)}
+                                  <span>{vehicle.modelName}</span>
+                                </span>
+
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                    #ROB-{opp.order_number || 1040}
+                                  </span>
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                                    🔵 {opp.assigned_to || 'Norlando'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Linha 2: Nome do Cliente & Valor */}
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 
+                                  onClick={() => onSelectOpportunity?.(opp)}
+                                  className="font-heading font-bold text-xs text-slate-900 hover:text-[#EA580C] transition-colors cursor-pointer leading-snug line-clamp-2"
+                                  title="Clique para abrir e editar orçamento"
                                 >
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  <span>Gerar Pedido</span>
-                                </button>
-                              ) : canMoveNext ? (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    onMoveStage(opp.id, SALES_STAGES[colIdx + 1].id)
-                                  }}
-                                  title="Avançar etapa" 
-                                  className="p-1 bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white rounded transition-colors cursor-pointer"
-                                >
-                                  <ArrowRight className="w-3.5 h-3.5" />
-                                </button>
-                              ) : null}
-                            </div>
-                          </div>
+                                  {opp.contact?.full_name || 'Cliente'}
+                                </h4>
+                                <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
+                                  {formatCurrency(opp.final_total)}
+                                </span>
+                              </div>
+
+                              {/* Linha 3: Caixa de Descrição do Produto & Especificações */}
+                              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-[11px] space-y-0.5">
+                                <p className="font-medium text-slate-800 truncate">
+                                  Bagageiro {vehicle.modelName} Modelo EXTREME
+                                </p>
+                                <div className="flex items-center justify-between text-[10px] text-slate-500">
+                                  <span>
+                                    {opp.fulfillment_type === 'instalacao_loja' 
+                                      ? 'Caminho B: Instalação na Loja' 
+                                      : 'Caminho A: Entrega Transportadora'}
+                                  </span>
+                                  <span className="font-mono">Preto Epóxi</span>
+                                </div>
+                              </div>
+
+                              {/* Linha 4: Badges Operacionais */}
+                              <div className="flex flex-wrap gap-1">
+                                <span className="text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 font-medium">
+                                  📦 {opp.fulfillment_type === 'instalacao_loja' ? 'Instalação Loja' : 'Cotação Igor'}
+                                </span>
+                                {opp.fulfillment_type === 'transportadora_envio' && (
+                                  <span className="text-[9px] bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 font-medium">
+                                    🧾 Nota Fiscal
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Linha 5: Rodapé com Ícone da Plataforma (FontAwesome) + WhatsApp Direto + Ações */}
+                              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-1.5">
+                                  <button 
+                                    title={getOriginTitle(opp.contact?.origin)} 
+                                    className="p-1 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                  >
+                                    {renderPlatformIconFA(opp.contact?.origin)}
+                                  </button>
+
+                                  {oppWhatsappUrl && (
+                                    <a
+                                      href={oppWhatsappUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      title={`Abrir WhatsApp com ${opp.contact?.full_name}`}
+                                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-[#25D366] hover:text-white border border-emerald-200 hover:border-emerald-600 transition-colors text-[10px] font-bold cursor-pointer"
+                                    >
+                                      <FaWhatsapp className="w-3 h-3" />
+                                      <span>WhatsApp</span>
+                                    </a>
+                                  )}
+
+                                  <button 
+                                    onClick={() => onSelectOpportunity?.(opp)}
+                                    className="text-[11px] text-slate-500 hover:text-slate-900 font-medium cursor-pointer"
+                                  >
+                                    Detalhes
+                                  </button>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  {canMovePrev && (
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onMoveStage(opp.id, SALES_STAGES[colIdx - 1].id)
+                                      }}
+                                      title="Voltar etapa" 
+                                      className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                    >
+                                      <ArrowLeft className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+
+                                  {isWonStage ? (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onConvertToOrder && onConvertToOrder(opp)
+                                      }}
+                                      className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                                    >
+                                      <CheckCircle2 className="w-3 h-3" />
+                                      <span>Gerar Pedido</span>
+                                    </button>
+                                  ) : canMoveNext ? (
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onMoveStage(opp.id, SALES_STAGES[colIdx + 1].id)
+                                      }}
+                                      title="Avançar etapa" 
+                                      className="p-1 bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white rounded transition-colors cursor-pointer"
+                                    >
+                                      <ArrowRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
                       )
                     })
@@ -698,117 +872,216 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         }
                       }
 
+                      const ordWhatsappUrl = getWhatsAppLink(ord.contact?.phone_e164 || linkedOpp?.contact?.phone_e164)
+
                       return (
                         <div
                           key={ord.id}
                           draggable={true}
                           onDragStart={(e) => handleDragStart(e, ord.id)}
                           onDragEnd={handleDragEnd}
-                          className={`bg-white p-3.5 rounded-xl border border-slate-200/90 hover:border-[#EA580C] shadow-2xs hover:shadow-md transition-all cursor-grab active:cursor-grabbing group space-y-2.5 select-none ${
-                            draggedItemId === ord.id ? 'opacity-40 scale-95' : ''
+                          className={`bg-white rounded-xl border border-slate-200/90 hover:border-[#EA580C] shadow-2xs hover:shadow-md transition-all duration-150 cursor-grab active:cursor-grabbing group select-none ${
+                            density === 'compact' ? 'p-2.5 space-y-2' : 'p-3.5 space-y-2.5'
+                          } ${
+                            draggedItemId === ord.id ? 'opacity-30 scale-95 -rotate-1 shadow-2xl ring-2 ring-orange-500/20' : 'hover:-translate-y-0.5'
                           }`}
                         >
-                          {/* Linha 1: Modelo do Veículo em destaque (Pill Preto) + Número do Pedido + Responsável */}
-                          <div className="flex items-center justify-between gap-1 flex-wrap">
-                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1.5 shadow-2xs">
-                              {renderVehicleIcon(vehicle.iconType)}
-                              <span>{vehicle.modelName}</span>
-                            </span>
+                          {density === 'compact' ? (
+                            /* Layout Compacto (Alta Densidade) */
+                            <>
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1 shadow-2xs">
+                                  {renderVehicleIcon(vehicle.iconType)}
+                                  <span className="truncate max-w-[100px]">{vehicle.modelName}</span>
+                                </span>
+                                <span className="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                  #ROB-{ord.order_number}
+                                </span>
+                              </div>
 
-                            <div className="flex items-center gap-1">
-                              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                                #ROB-{ord.order_number}
-                              </span>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
-                                🔵 {ord.assigned_to || linkedOpp?.assigned_to || 'Igor'}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Linha 2: Cliente & Valor em Destaque Verde */}
-                          <div className="flex items-start justify-between gap-2">
-                            <h4 
-                              onClick={handleOpenOrderDetails}
-                              className="font-heading font-bold text-xs text-slate-900 hover:text-[#EA580C] transition-colors cursor-pointer leading-snug line-clamp-2"
-                              title="Clique para abrir e editar pedido espelho"
-                            >
-                              {ord.contact?.full_name || 'Cliente'}
-                            </h4>
-                            <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
-                              {formatCurrency(ordTotal)}
-                            </span>
-                          </div>
-
-                          {/* Linha 3: Caixa de Descrição do Produto & Especificações */}
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-[11px] space-y-0.5">
-                            <p className="font-medium text-slate-800 truncate">
-                              Bagageiro {vehicle.modelName} Modelo EXTREME
-                            </p>
-                            <div className="flex items-center justify-between text-[10px] text-slate-500">
-                              <span>
-                                {ord.fulfillment_type === 'instalacao_loja' 
-                                  ? 'Caminho B: Instalação na Loja' 
-                                  : 'Caminho A: Entrega Transportadora'}
-                              </span>
-                              <span className="font-mono">Preto Epóxi</span>
-                            </div>
-                          </div>
-
-                          {/* Linha 4: Tags Operacionais */}
-                          <div className="flex flex-wrap gap-1">
-                            <span className="text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 font-medium">
-                              📦 {ord.fulfillment_type === 'instalacao_loja' ? 'Instalação Loja' : 'Cotação Igor'}
-                            </span>
-                            <span className="text-[9px] bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 font-medium">
-                              🧾 Nota Fiscal
-                            </span>
-                          </div>
-
-                          {/* Linha 5: Rodapé com Ícone da Plataforma (FontAwesome) + Ações */}
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <button 
-                                title={getOriginTitle(ord.contact?.origin)} 
-                                className="p-1 hover:bg-slate-100 rounded transition-colors cursor-pointer"
-                              >
-                                {renderPlatformIconFA(ord.contact?.origin)}
-                              </button>
-                              <button 
-                                onClick={handleOpenOrderDetails}
-                                className="text-[11px] text-slate-500 hover:text-slate-900 font-medium cursor-pointer"
-                              >
-                                Detalhes
-                              </button>
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              {canMovePrev && onUpdateOrderStatus && (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    onUpdateOrderStatus(ord.id, ORDER_STAGES[colIdx - 1].id)
-                                  }}
-                                  title="Voltar etapa" 
-                                  className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 
+                                  onClick={handleOpenOrderDetails}
+                                  className="font-heading font-bold text-xs text-slate-900 hover:text-[#EA580C] transition-colors cursor-pointer truncate"
+                                  title="Clique para abrir e editar pedido"
                                 >
-                                  <ArrowLeft className="w-3.5 h-3.5" />
-                                </button>
-                              )}
+                                  {ord.contact?.full_name || 'Cliente'}
+                                </h4>
+                                <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
+                                  {formatCurrency(ordTotal)}
+                                </span>
+                              </div>
 
-                              {canMoveNext && onUpdateOrderStatus && (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    onUpdateOrderStatus(ord.id, ORDER_STAGES[colIdx + 1].id)
-                                  }}
-                                  title="Avançar etapa" 
-                                  className="p-1 bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white rounded transition-colors cursor-pointer"
+                              <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-1.5">
+                                  <span title={getOriginTitle(ord.contact?.origin)}>
+                                    {renderPlatformIconFA(ord.contact?.origin)}
+                                  </span>
+                                  {ordWhatsappUrl && (
+                                    <a
+                                      href={ordWhatsappUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      title={`Conversar com ${ord.contact?.full_name} no WhatsApp`}
+                                      className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-600 text-[#25D366] hover:text-white border border-emerald-200 hover:border-emerald-600 transition-colors text-[10px] font-bold cursor-pointer"
+                                    >
+                                      <FaWhatsapp className="w-2.5 h-2.5" />
+                                      <span>Zap</span>
+                                    </a>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  {canMovePrev && onUpdateOrderStatus && (
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onUpdateOrderStatus(ord.id, ORDER_STAGES[colIdx - 1].id)
+                                      }}
+                                      title="Voltar etapa" 
+                                      className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                    >
+                                      <ArrowLeft className="w-3 h-3" />
+                                    </button>
+                                  )}
+
+                                  {canMoveNext && onUpdateOrderStatus && (
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onUpdateOrderStatus(ord.id, ORDER_STAGES[colIdx + 1].id)
+                                      }}
+                                      title="Avançar etapa" 
+                                      className="p-1 bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white rounded transition-colors cursor-pointer"
+                                    >
+                                      <ArrowRight className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            /* Layout Detalhado (Espelho Fiel do Card de Vendas) */
+                            <>
+                              {/* Linha 1: Modelo do Veículo em destaque (Pill Preto) + Número do Pedido + Responsável */}
+                              <div className="flex items-center justify-between gap-1 flex-wrap">
+                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1.5 shadow-2xs">
+                                  {renderVehicleIcon(vehicle.iconType)}
+                                  <span>{vehicle.modelName}</span>
+                                </span>
+
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                    #ROB-{ord.order_number}
+                                  </span>
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                                    🔵 {ord.assigned_to || linkedOpp?.assigned_to || 'Igor'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Linha 2: Cliente & Valor em Destaque Verde */}
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 
+                                  onClick={handleOpenOrderDetails}
+                                  className="font-heading font-bold text-xs text-slate-900 hover:text-[#EA580C] transition-colors cursor-pointer leading-snug line-clamp-2"
+                                  title="Clique para abrir e editar pedido espelho"
                                 >
-                                  <ArrowRight className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
+                                  {ord.contact?.full_name || 'Cliente'}
+                                </h4>
+                                <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
+                                  {formatCurrency(ordTotal)}
+                                </span>
+                              </div>
+
+                              {/* Linha 3: Caixa de Descrição do Produto & Especificações */}
+                              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-[11px] space-y-0.5">
+                                <p className="font-medium text-slate-800 truncate">
+                                  Bagageiro {vehicle.modelName} Modelo EXTREME
+                                </p>
+                                <div className="flex items-center justify-between text-[10px] text-slate-500">
+                                  <span>
+                                    {ord.fulfillment_type === 'instalacao_loja' 
+                                      ? 'Caminho B: Instalação na Loja' 
+                                      : 'Caminho A: Entrega Transportadora'}
+                                  </span>
+                                  <span className="font-mono">Preto Epóxi</span>
+                                </div>
+                              </div>
+
+                              {/* Linha 4: Tags Operacionais */}
+                              <div className="flex flex-wrap gap-1">
+                                <span className="text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 font-medium">
+                                  📦 {ord.fulfillment_type === 'instalacao_loja' ? 'Instalação Loja' : 'Cotação Igor'}
+                                </span>
+                                <span className="text-[9px] bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 font-medium">
+                                  🧾 Nota Fiscal
+                                </span>
+                              </div>
+
+                              {/* Linha 5: Rodapé com Ícone da Plataforma (FontAwesome) + WhatsApp Direto + Ações */}
+                              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-1.5">
+                                  <button 
+                                    title={getOriginTitle(ord.contact?.origin)} 
+                                    className="p-1 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                  >
+                                    {renderPlatformIconFA(ord.contact?.origin)}
+                                  </button>
+
+                                  {ordWhatsappUrl && (
+                                    <a
+                                      href={ordWhatsappUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      title={`Abrir WhatsApp com ${ord.contact?.full_name}`}
+                                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-[#25D366] hover:text-white border border-emerald-200 hover:border-emerald-600 transition-colors text-[10px] font-bold cursor-pointer"
+                                    >
+                                      <FaWhatsapp className="w-3 h-3" />
+                                      <span>WhatsApp</span>
+                                    </a>
+                                  )}
+
+                                  <button 
+                                    onClick={handleOpenOrderDetails}
+                                    className="text-[11px] text-slate-500 hover:text-slate-900 font-medium cursor-pointer"
+                                  >
+                                    Detalhes
+                                  </button>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  {canMovePrev && onUpdateOrderStatus && (
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onUpdateOrderStatus(ord.id, ORDER_STAGES[colIdx - 1].id)
+                                      }}
+                                      title="Voltar etapa" 
+                                      className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                    >
+                                      <ArrowLeft className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+
+                                  {canMoveNext && onUpdateOrderStatus && (
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onUpdateOrderStatus(ord.id, ORDER_STAGES[colIdx + 1].id)
+                                      }}
+                                      title="Avançar etapa" 
+                                      className="p-1 bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white rounded transition-colors cursor-pointer"
+                                    >
+                                      <ArrowRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
                       )
                     })

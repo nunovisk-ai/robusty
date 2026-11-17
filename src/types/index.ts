@@ -158,6 +158,8 @@ export interface Opportunity {
   pickup_time?: string
   installation_date?: string
   installation_time?: string
+  shipping_carrier_name?: string
+  shipping_tracking_code?: string
   total_weight_kg?: number
   customer_email?: string
   address?: Partial<Address>

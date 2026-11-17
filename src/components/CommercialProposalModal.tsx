@@ -15,7 +15,8 @@ import {
   Phone,
   Mail,
   User,
-  Weight
+  Weight,
+  Download
 } from 'lucide-react'
 import { FaWhatsapp } from 'react-icons/fa6'
 
@@ -87,6 +88,47 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
   const handlePrint = () => {
     window.print()
+  }
+
+  const handleDownloadProposalDocument = () => {
+    const printableElement = document.getElementById('commercial-proposal-printable')
+    if (!printableElement) return
+
+    const sanitizedName = (data.customerName || 'Cliente').trim().replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚãõÃÕâêîôûÂÊÎÔÛçÇ_-]/g, '_')
+    const fileName = `Proposta_ROB-${data.orderNumber}_${sanitizedName}.html`
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Proposta Comercial ROB-${data.orderNumber} - Robusty Bagageiros</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #ffffff; color: #1e293b; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    @media print {
+      @page { margin: 12mm; size: A4; }
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body class="p-8 max-w-4xl mx-auto">
+  ${printableElement.innerHTML}
+</body>
+</html>`
+
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
   const handleAttachToOrder = () => {
@@ -172,6 +214,15 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             >
               <Paperclip className="w-3.5 h-3.5 text-slate-500" />
               <span>{attached ? 'Anexado aos Documentos!' : 'Anexar ao Pedido'}</span>
+            </button>
+
+            <button
+              onClick={handleDownloadProposalDocument}
+              title="Baixar proposta em documento autônomo formatado"
+              className="px-3.5 py-1.5 rounded-full text-xs font-bold border border-orange-200 hover:border-[#EA580C] text-[#EA580C] hover:bg-orange-50 bg-white transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Baixar Proposta</span>
             </button>
 
             <button

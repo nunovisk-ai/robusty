@@ -161,9 +161,14 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [cepError, setCepError] = useState<string | null>(null)
 
   // Transportadora
+  const [shippingCarrierName, setShippingCarrierName] = useState(() => initialOpportunity?.shipping_carrier_name || '')
+  const [shippingTrackingCode, setShippingTrackingCode] = useState(() => initialOpportunity?.shipping_tracking_code || '')
   const [freightValue, setFreightValue] = useState<number>(() => initialOpportunity?.freight_value || 0)
   const [pickupDate, setPickupDate] = useState<string>(() => initialOpportunity?.pickup_date || '')
   const [pickupTime, setPickupTime] = useState<string>(() => initialOpportunity?.pickup_time || '10:00')
+
+  // Filtro Rápido de Categorias de Produtos
+  const [productCategoryFilter, setProductCategoryFilter] = useState<'all' | 'bagageiro' | 'escada' | 'suporte' | 'outros'>('all')
 
   // Instalação na Loja
   const [installationDate, setInstallationDate] = useState<string>(() => initialOpportunity?.installation_date || '')
@@ -234,6 +239,20 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       (p) => !p.compatible_vehicle_id || p.compatible_vehicle_id === selectedVehicleId
     )
   }, [allProducts, selectedVehicleId])
+
+  // Filtragem rápida por categoria solicitada pelo usuário (Bagageiros, Escadas, Suportes, Outros)
+  const filteredCompatibleProducts = useMemo(() => {
+    return compatibleProducts.filter((p) => {
+      if (productCategoryFilter === 'all') return true
+      if (productCategoryFilter === 'bagageiro') return p.category === 'bagageiro'
+      if (productCategoryFilter === 'escada') return p.category === 'escada'
+      if (productCategoryFilter === 'suporte') return p.category === 'suporte' || p.category === 'acessorio_fixacao'
+      if (productCategoryFilter === 'outros') {
+        return p.category !== 'bagageiro' && p.category !== 'escada' && p.category !== 'suporte' && p.category !== 'acessorio_fixacao'
+      }
+      return true
+    })
+  }, [compatibleProducts, productCategoryFilter])
 
   // Recalculate installation cost default when vehicle changes if not custom edited
   useEffect(() => {
@@ -361,6 +380,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       `*Veículo:* ${selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Utilitário'}`,
       `*Modalidade:* ${fulfillment === 'instalacao_loja' ? 'Instalação na Loja Robusty' : 'Envio por Transportadora'}`,
       ...(fulfillment === 'transportadora_envio' && city ? [`*Destino:* ${city}/${state} (CEP: ${cep})`] : []),
+      ...(fulfillment === 'transportadora_envio' && shippingCarrierName ? [`*Transportadora:* ${shippingCarrierName}`] : []),
+      ...(fulfillment === 'transportadora_envio' && shippingTrackingCode ? [`*Código de Rastreio:* ${shippingTrackingCode}`] : []),
       ...(fulfillment === 'transportadora_envio' && pickupDate ? [`*Previsão de Coleta:* ${pickupDate} às ${pickupTime}`] : []),
       ...(fulfillment === 'instalacao_loja' && installationDate ? [`*Agendamento Instalação:* ${installationDate} às ${installationTime}`] : []),
       ``,
@@ -433,6 +454,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         state,
       },
       freightValue,
+      shippingCarrierName,
+      shippingTrackingCode,
       pickupDate,
       pickupTime,
       installationDate,
@@ -883,18 +906,47 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 3. Bagageiros e Acessórios Compatíveis
               </h3>
               <span className="text-xs text-slate-400 font-mono">
-                {compatibleProducts.length} itens disponíveis
+                {filteredCompatibleProducts.length} de {compatibleProducts.length} itens
               </span>
             </div>
 
+            {/* Pílulas de Filtragem Rápida por Categoria */}
+            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+              {[
+                { id: 'all', label: 'Todos' },
+                { id: 'bagageiro', label: 'Bagageiros' },
+                { id: 'escada', label: 'Escadas' },
+                { id: 'suporte', label: 'Suportes & Fixação' },
+                { id: 'outros', label: 'Outros' }
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setProductCategoryFilter(cat.id as any)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    productCategoryFilter === cat.id
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'bg-slate-100 hover:bg-slate-200/80 text-slate-600'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
             <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-              {compatibleProducts.map((p) => {
-                const inBudget = items.find((i) => i.product.id === p.id)
-                return (
-                  <div
-                    key={p.id}
-                    className="p-3 rounded-xl bg-slate-50/80 border border-slate-200/80 hover:border-slate-300 flex items-center justify-between gap-3 transition-colors"
-                  >
+              {filteredCompatibleProducts.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400 font-medium border border-dashed border-slate-200 rounded-xl">
+                  Nenhum produto encontrado nesta categoria para este veículo.
+                </div>
+              ) : (
+                filteredCompatibleProducts.map((p) => {
+                  const inBudget = items.find((i) => i.product.id === p.id)
+                  return (
+                    <div
+                      key={p.id}
+                      className="p-3 rounded-xl bg-slate-50/80 border border-slate-200/80 hover:border-slate-300 flex items-center justify-between gap-3 transition-colors"
+                    >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-slate-900 truncate">{p.name}</span>
@@ -932,7 +984,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     </button>
                   </div>
                 )
-              })}
+              }))}
             </div>
           </div>
 
@@ -1098,6 +1150,35 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     onChange={(e) => setFreightValue(parseFloat(e.target.value) || 0)}
                     className="w-full sm:w-48 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
                   />
+                </div>
+
+                {/* Nome da Transportadora e Código de Rastreio */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200/80">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                      Nome da Transportadora:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Braspress, Jadlog, Jamef..."
+                      value={shippingCarrierName}
+                      onChange={(e) => setShippingCarrierName(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                      Código de Rastreio:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: BR123456789 ou NF-0045"
+                      value={shippingTrackingCode}
+                      onChange={(e) => setShippingTrackingCode(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
+                    />
+                  </div>
                 </div>
 
                 {/* Campos: Data e Horário da Coleta (Sem texto 'para a loja se preparar' e sem 'hh:mm') */}
@@ -1523,16 +1604,28 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
             {/* Ações do Orçamento */}
             <div className="space-y-2.5">
-              {/* Botão Gerar Orçamento em PDF */}
-              <button
-                type="button"
-                onClick={() => setIsProposalModalOpen(true)}
-                disabled={items.length === 0}
-                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold border border-slate-200 hover:border-[#EA580C] hover:text-[#EA580C] text-slate-700 bg-white transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs active:scale-98 disabled:opacity-50"
-              >
-                <FileText className="w-4 h-4 text-[#EA580C]" />
-                <span>Gerar Orçamento em PDF</span>
-              </button>
+              {/* Botões da Proposta Comercial Oficial */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsProposalModalOpen(true)}
+                  disabled={items.length === 0}
+                  className="py-2.5 px-2 rounded-xl text-xs font-bold border border-slate-200 hover:border-[#EA580C] hover:text-[#EA580C] text-slate-700 bg-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-98 disabled:opacity-50"
+                >
+                  <FileText className="w-3.5 h-3.5 text-[#EA580C]" />
+                  <span>Visualizar PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsProposalModalOpen(true)}
+                  disabled={items.length === 0}
+                  className="py-2.5 px-2 rounded-xl text-xs font-bold border border-orange-200 hover:border-[#EA580C] text-[#EA580C] hover:bg-orange-50 bg-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-98 disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Baixar Proposta</span>
+                </button>
+              </div>
 
               {/* Botão Copiar WhatsApp */}
               <button
