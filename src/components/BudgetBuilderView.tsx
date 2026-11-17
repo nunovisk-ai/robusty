@@ -933,9 +933,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     <Share2 className="w-4 h-4 text-[#EA580C]" />
                     <span>Redes Sociais & Website do Cliente</span>
                   </h3>
-                  <span className="text-[11px] text-slate-400 font-medium">
-                    Integra com a doca social no Kanban
-                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
@@ -943,12 +940,12 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   <div>
                     <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 mb-1">
                       <FaInstagram className="w-3.5 h-3.5 text-[#E1306C]" />
-                      <span>Instagram:</span>
+                      <span>Link do Instagram:</span>
                     </label>
                     <div className="relative flex items-center">
                       <input
-                        type="text"
-                        placeholder="@usuario ou link"
+                        type="url"
+                        placeholder="https://instagram.com/perfil"
                         value={instagramUrl}
                         onChange={(e) => setInstagramUrl(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 pr-8 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#E1306C] focus:ring-2 focus:ring-[#E1306C]/10 transition-all font-medium"
@@ -958,6 +955,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                           href={
                             instagramUrl.trim().startsWith('http')
                               ? instagramUrl.trim()
+                              : instagramUrl.trim().startsWith('instagram.com')
+                              ? `https://${instagramUrl.trim()}`
                               : `https://instagram.com/${instagramUrl.trim().replace(/^@/, '')}`
                           }
                           target="_blank"
@@ -975,12 +974,12 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   <div>
                     <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 mb-1">
                       <FaFacebook className="w-3.5 h-3.5 text-[#1877F2]" />
-                      <span>Facebook:</span>
+                      <span>Link do Facebook:</span>
                     </label>
                     <div className="relative flex items-center">
                       <input
-                        type="text"
-                        placeholder="Página ou link do perfil"
+                        type="url"
+                        placeholder="https://facebook.com/pagina"
                         value={facebookUrl}
                         onChange={(e) => setFacebookUrl(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 pr-8 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#1877F2] focus:ring-2 focus:ring-[#1877F2]/10 transition-all font-medium"
@@ -990,6 +989,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                           href={
                             facebookUrl.trim().startsWith('http')
                               ? facebookUrl.trim()
+                              : facebookUrl.trim().startsWith('facebook.com')
+                              ? `https://${facebookUrl.trim()}`
                               : `https://facebook.com/${facebookUrl.trim()}`
                           }
                           target="_blank"
@@ -1011,8 +1012,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     </label>
                     <div className="relative flex items-center">
                       <input
-                        type="text"
-                        placeholder="www.empresa.com.br"
+                        type="url"
+                        placeholder="https://www.empresa.com.br"
                         value={websiteUrl}
                         onChange={(e) => setWebsiteUrl(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 pr-8 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-600/10 transition-all font-medium"

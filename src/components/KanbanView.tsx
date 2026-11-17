@@ -363,6 +363,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     const clean = val.trim()
     if (!clean) return null
     if (clean.startsWith('http://') || clean.startsWith('https://')) return clean
+    if (clean.startsWith('instagram.com/')) return `https://${clean}`
     const handle = clean.replace(/^@/, '')
     return `https://instagram.com/${handle}`
   }
@@ -372,6 +373,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     const clean = val.trim()
     if (!clean) return null
     if (clean.startsWith('http://') || clean.startsWith('https://')) return clean
+    if (clean.startsWith('facebook.com/')) return `https://${clean}`
     return `https://facebook.com/${clean}`
   }
 
