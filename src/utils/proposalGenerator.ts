@@ -77,7 +77,7 @@ export function generateProposalHtml(data: ProposalPayload): string {
         </div>
         <div>
           <strong>Previsão de Coleta: </strong>
-          ${data.pickupDate ? `${data.pickupDate.split('-').reverse().join('/')} às ${data.pickupTime || '10:00'}` : 'A alinhar com transportadora'}
+          ${data.pickupDate ? `${data.pickupDate.split('-').reverse().join('/')}${data.pickupTime ? ` às ${data.pickupTime}` : ' (horário a definir)'}` : 'A alinhar com transportadora'}
         </div>
       </div>
     `

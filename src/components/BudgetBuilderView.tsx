@@ -55,7 +55,9 @@ import {
   FileSpreadsheet,
   File,
   Search,
-  X
+  X,
+  Lock,
+  Pencil
 } from 'lucide-react'
 import { 
   FaWhatsapp, 
@@ -200,7 +202,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [shippingTrackingCode, setShippingTrackingCode] = useState(() => initialOpportunity?.shipping_tracking_code || '')
   const [freightValue, setFreightValue] = useState<number>(() => initialOpportunity?.freight_value || 0)
   const [pickupDate, setPickupDate] = useState<string>(() => initialOpportunity?.pickup_date || '')
-  const [pickupTime, setPickupTime] = useState<string>(() => initialOpportunity?.pickup_time || '10:00')
+  const [pickupTime, setPickupTime] = useState<string>(() => initialOpportunity?.pickup_time || '')
+
+  // Peso Total da Carga (calculado automaticamente com opção de edição manual)
+  const [customWeight, setCustomWeight] = useState<number | null>(null)
+  const [isEditingWeight, setIsEditingWeight] = useState(false)
 
   // Filtro Rápido de Categorias e Busca de Produtos
   const [productCategoryFilter, setProductCategoryFilter] = useState<'all' | 'bagageiro' | 'escada' | 'suporte' | 'outros'>('all')
@@ -372,6 +378,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     fulfillment === 'instalacao_loja' ? installationCost : 0
   )
 
+  const effectiveWeightKg = customWeight !== null ? customWeight : budget.totalWeightKg
+
   // Vehicle silhouette icon mapper
   const renderVehicleIcon = (modelStr?: string) => {
     const s = (modelStr || '').toLowerCase()
@@ -470,7 +478,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       ...(fulfillment === 'transportadora_envio' && city ? [`*Destino:* ${city}/${state} (CEP: ${cep})`] : []),
       ...(fulfillment === 'transportadora_envio' && shippingCarrierName ? [`*Transportadora:* ${shippingCarrierName}`] : []),
       ...(fulfillment === 'transportadora_envio' && shippingTrackingCode ? [`*Código de Rastreio:* ${shippingTrackingCode}`] : []),
-      ...(fulfillment === 'transportadora_envio' && pickupDate ? [`*Previsão de Coleta:* ${pickupDate} às ${pickupTime}`] : []),
+      ...(fulfillment === 'transportadora_envio' && pickupDate ? [`*Previsão de Coleta:* ${pickupDate}${pickupTime ? ` às ${pickupTime}` : ' (horário a definir)'}`] : []),
       ...(fulfillment === 'instalacao_loja' && installationDate ? [`*Agendamento Instalação:* ${installationDate} às ${installationTime}`] : []),
       ``,
       `*ITENS DO ORÇAMENTO:*`,
@@ -482,7 +490,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       `*RESUMO FINANCEIRO:*`,
       `• Subtotal Produtos: ${formatCurrency(budget.subtotal)}`,
       ...(budget.discountValue > 0 ? [`• Desconto Comercial (${budget.discountPercent}%): -${formatCurrency(budget.discountValue)}`] : []),
-      ...(fulfillment === 'transportadora_envio' && budget.freightValue > 0 ? [`• Frete Transportadora: ${formatCurrency(budget.freightValue)} (Peso Total: ${budget.totalWeightKg} kg)`] : []),
+      ...(fulfillment === 'transportadora_envio' && budget.freightValue > 0 ? [`• Frete Transportadora: ${formatCurrency(budget.freightValue)} (Peso Total: ${effectiveWeightKg} kg)`] : []),
       ...(fulfillment === 'instalacao_loja' && budget.installationValue > 0 ? [`• Custo de Instalação: ${formatCurrency(budget.installationValue)}`] : []),
       ``,
       `*VALOR TOTAL:* *${formatCurrency(budget.finalTotal)}*`,
@@ -552,7 +560,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       installationDate,
       installationTime,
       installationCost,
-      totalWeightKg: budget.totalWeightKg,
+      totalWeightKg: effectiveWeightKg,
       budget,
       paymentMethod: (paymentMethod as PaymentMethod) || 'pix',
       discountPercent: budget.discountPercent,
@@ -672,7 +680,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       installationDate,
       installationTime,
       paymentMethod: (paymentMethod as PaymentMethod) || 'pix',
-      totalWeightKg: budget.totalWeightKg,
+      totalWeightKg: effectiveWeightKg,
       assignedTo: currentUser?.name || assignedTo,
     }
   }
@@ -1675,29 +1683,93 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Peso Total da Carga */}
-                    <div className="p-3 rounded-xl bg-orange-50/70 border border-orange-200 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 text-slate-800">
-                        <Weight className="w-4 h-4 text-[#EA580C]" />
-                        <span className="font-bold">Peso Total da Carga:</span>
+                    {/* Peso Total da Carga e Valor do Frete alinhados */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Peso Total da Carga */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
+                            <FaWeightHanging className="w-3 h-3 text-slate-400" />
+                            <span>Peso Total da Carga:</span>
+                          </label>
+                          {isEditingWeight ? (
+                            <div className="flex items-center gap-2">
+                              {customWeight !== null && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCustomWeight(null)
+                                    setIsEditingWeight(false)
+                                  }}
+                                  className="text-[10px] text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                                  title="Restaurar soma automática dos produtos do orçamento"
+                                >
+                                  Restaurar auto
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setIsEditingWeight(false)}
+                                className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5 cursor-pointer"
+                              >
+                                <Check className="w-3 h-3" /> Concluir
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (customWeight === null) {
+                                  setCustomWeight(budget.totalWeightKg)
+                                }
+                                setIsEditingWeight(true)
+                              }}
+                              className="text-[10px] font-bold text-[#EA580C] hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <Pencil className="w-2.5 h-2.5" />
+                              {customWeight !== null ? 'Alterar manual' : 'Editar'}
+                            </button>
+                          )}
+                        </div>
+                        <div className="relative flex items-center">
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            readOnly={!isEditingWeight}
+                            disabled={!isEditingWeight}
+                            value={customWeight !== null ? customWeight : (budget.totalWeightKg || '')}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? null : parseFloat(e.target.value)
+                              setCustomWeight(val)
+                            }}
+                            className={`w-full border rounded-xl px-3 py-2 pr-12 text-xs font-mono transition-colors ${
+                              isEditingWeight
+                                ? 'bg-white border-[#EA580C] text-slate-900 focus:outline-none ring-2 ring-orange-500/10'
+                                : 'bg-slate-50 border-slate-200 text-slate-700 cursor-not-allowed select-none'
+                            }`}
+                            placeholder="0"
+                          />
+                          <div className="absolute right-3 flex items-center gap-1 text-slate-400 pointer-events-none">
+                            {!isEditingWeight && <Lock className="w-3 h-3 text-slate-400" />}
+                            <span className="text-xs font-mono">kg</span>
+                          </div>
+                        </div>
                       </div>
-                      <span className="font-mono font-bold text-[#EA580C] text-sm">
-                        {budget.totalWeightKg} kg
-                      </span>
-                    </div>
 
-                    {/* Valor do Frete */}
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                        Valor do Frete (R$):
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="0.00"
-                        value={freightValue || ''}
-                        onChange={(e) => setFreightValue(parseFloat(e.target.value) || 0)}
-                        className="w-full sm:w-48 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
-                      />
+                      {/* Valor do Frete */}
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                          Valor do Frete (R$):
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="0.00"
+                          value={freightValue || ''}
+                          onChange={(e) => setFreightValue(parseFloat(e.target.value) || 0)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
+                        />
+                      </div>
                     </div>
 
                     {/* Nome da Transportadora e Código de Rastreio */}
@@ -1752,6 +1824,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                             onChange={(e) => setPickupTime(e.target.value)}
                             className="w-full bg-slate-50 border border-slate-200/90 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono cursor-pointer"
                           >
+                            <option value="">A definir / Sem horário</option>
                             {TIME_SLOTS.map((slot) => (
                               <option key={slot} value={slot}>
                                 {slot}
@@ -2432,8 +2505,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
             <div className="space-y-2 mb-4">
               <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
                 <span>Itens Adicionados ({items.length})</span>
-                {budget.totalWeightKg > 0 && (
-                  <span className="font-mono text-slate-500">Peso Total: {budget.totalWeightKg} kg</span>
+                {effectiveWeightKg > 0 && (
+                  <span className="font-mono text-slate-500">Peso Total: {effectiveWeightKg} kg</span>
                 )}
               </div>
 
