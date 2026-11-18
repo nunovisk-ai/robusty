@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import type { Opportunity, OpportunityStage, Order, OrderStatus } from '../types'
+import { formatOrderCode } from '../utils/formatters'
 import { 
   Search, 
   Plus, 
@@ -756,10 +757,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           {density === 'compact' ? (
                             /* Layout Compacto (Alta Densidade) */
                             <>
-                              {/* Linha 1: Headline #ROB-xxxx + Badge Origem */}
+                              {/* Linha 1: Headline #00000 + Badge Origem */}
                               <div className="flex items-center justify-between gap-1">
                                 <span className="font-mono font-bold text-[10px] text-slate-800 tracking-tight">
-                                  #ROB-{opp.order_number || 1040}
+                                  {formatOrderCode(opp.order_number)}
                                 </span>
                                 <span 
                                   className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border flex items-center gap-1 shadow-2xs ${originBadge.bgClasses}`}
@@ -885,11 +886,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           ) : (
                             /* Layout Detalhado (Padrão Completo) */
                             <>
-                              {/* Linha 1: Headline #ROB-xxxx no topo à esquerda + Badge completo de Origem no topo à direita */}
+                              {/* Linha 1: Headline #00000 no topo à esquerda + Badge completo de Origem no topo à direita */}
                               <div className="flex items-center justify-between gap-1.5 pb-0.5">
-                                <span className="font-mono font-bold text-xs text-slate-800 tracking-tight flex items-center gap-1">
-                                  <span className="text-slate-400 font-normal">#</span>
-                                  ROB-{opp.order_number || 1040}
+                                <span className="font-mono font-bold text-xs text-slate-800 tracking-tight">
+                                  {formatOrderCode(opp.order_number)}
                                 </span>
                                 <span 
                                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1.5 shadow-2xs ${originBadge.bgClasses}`}
@@ -1161,10 +1161,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           {density === 'compact' ? (
                             /* Layout Compacto (Alta Densidade) */
                             <>
-                              {/* Linha 1: Headline #ROB-xxxx + Badge Origem */}
+                              {/* Linha 1: Headline #00000 + Badge Origem */}
                               <div className="flex items-center justify-between gap-1">
                                 <span className="font-mono font-bold text-[10px] text-slate-800 tracking-tight">
-                                  #ROB-{ord.order_number}
+                                  {formatOrderCode(ord.order_number)}
                                 </span>
                                 <span 
                                   className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border flex items-center gap-1 shadow-2xs ${originBadge.bgClasses}`}
@@ -1237,11 +1237,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           ) : (
                             /* Layout Detalhado (Espelho Fiel do Card de Vendas) */
                             <>
-                              {/* Linha 1: Headline #ROB-xxxx no topo à esquerda + Badge completo de Origem no topo à direita */}
+                              {/* Linha 1: Headline #00000 no topo à esquerda + Badge completo de Origem no topo à direita */}
                               <div className="flex items-center justify-between gap-1.5 pb-0.5">
-                                <span className="font-mono font-bold text-xs text-slate-800 tracking-tight flex items-center gap-1">
-                                  <span className="text-slate-400 font-normal">#</span>
-                                  ROB-{ord.order_number}
+                                <span className="font-mono font-bold text-xs text-slate-800 tracking-tight">
+                                  {formatOrderCode(ord.order_number)}
                                 </span>
                                 <span 
                                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1.5 shadow-2xs ${originBadge.bgClasses}`}

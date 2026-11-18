@@ -4,6 +4,7 @@ import { FaStore, FaUser } from 'react-icons/fa6'
 import type { ActiveTab } from './Sidebar'
 import type { CurrentUser } from './LoginView'
 import type { Opportunity, OpportunityTask } from '../types'
+import { formatOrderCode } from '../utils/formatters'
 
 interface TopBarProps {
   activeTab: ActiveTab
@@ -199,7 +200,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                           <div className="flex items-center justify-between gap-1 text-[11px] text-slate-500">
                             <span className="truncate">
                               {opportunity.contact?.full_name || 'Cliente'} •{' '}
-                              <strong className="text-slate-700">#ROB-{opportunity.order_number || task.order_number}</strong>
+                              <strong className="text-slate-700">{formatOrderCode(opportunity.order_number || task.order_number)}</strong>
                             </span>
                             {task.due_time && (
                               <span className="font-mono text-[10px] text-slate-400">
@@ -242,14 +243,17 @@ export const TopBar: React.FC<TopBarProps> = ({
           )}
         </div>
 
-        {/* Botão Novo Lead / Orçamento */}
-        <button
-          onClick={onNewLeadClick}
-          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-[#EA580C] hover:bg-[#c2410c] text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-all cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Novo Lead</span>
-        </button>
+        {/* Botão Nova Oportunidade (Exibido nas outras abas; na aba Kanban permanece o botão exclusivo no subheader) */}
+        {activeTab !== 'kanban' && activeTab !== 'budget' && (
+          <button
+            onClick={onNewLeadClick}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-[#EA580C] hover:bg-[#c2410c] text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Nova Oportunidade</span>
+            <span className="sm:hidden">Novo</span>
+          </button>
+        )}
       </div>
     </header>
   )

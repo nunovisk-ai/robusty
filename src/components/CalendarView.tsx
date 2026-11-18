@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import type { Order, Opportunity, Appointment, LeadOrigin } from '../types'
+import { formatOrderCode } from '../utils/formatters'
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -162,7 +163,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           date: ord.pickup_date,
           time: ord.pickup_time || '10:00',
           orderNumber: ord.order_number,
-          orderCode: ord.order_code || `#ROB-${ord.order_number}`,
+          orderCode: ord.order_code || formatOrderCode(ord.order_number),
           clientName: ord.contact?.full_name || opp?.contact?.full_name || 'Cliente Robusty',
           clientPhone: ord.contact?.phone_e164 || opp?.contact?.phone_e164,
           clientEmail: ord.customer_email || ord.contact?.email || opp?.contact?.email,
@@ -187,7 +188,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           date: ord.installation_date,
           time: ord.installation_time || '14:00',
           orderNumber: ord.order_number,
-          orderCode: ord.order_code || `#ROB-${ord.order_number}`,
+          orderCode: ord.order_code || formatOrderCode(ord.order_number),
           clientName: ord.contact?.full_name || opp?.contact?.full_name || 'Cliente Robusty',
           clientPhone: ord.contact?.phone_e164 || opp?.contact?.phone_e164,
           clientEmail: ord.customer_email || ord.contact?.email || opp?.contact?.email,
@@ -224,7 +225,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           date: opp.pickup_date,
           time: opp.pickup_time || '10:00',
           orderNumber: opp.order_number,
-          orderCode: opp.order_code || (opp.order_number ? `#ROB-${opp.order_number}` : '#ORÇ-ROB'),
+          orderCode: opp.order_code || formatOrderCode(opp.order_number),
           clientName: opp.contact?.full_name || 'Cliente Oportunidade',
           clientPhone: opp.contact?.phone_e164,
           clientEmail: opp.customer_email || opp.contact?.email,
@@ -249,7 +250,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           date: opp.installation_date,
           time: opp.installation_time || '14:00',
           orderNumber: opp.order_number,
-          orderCode: opp.order_code || (opp.order_number ? `#ROB-${opp.order_number}` : '#ORÇ-ROB'),
+          orderCode: opp.order_code || formatOrderCode(opp.order_number),
           clientName: opp.contact?.full_name || 'Cliente Oportunidade',
           clientPhone: opp.contact?.phone_e164,
           clientEmail: opp.customer_email || opp.contact?.email,
@@ -1093,7 +1094,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     </span>
                   </h3>
                   <div className="text-xs text-slate-500 font-mono">
-                    {selectedEventModal.orderCode || '#ROB-GERAL'}
+                    {selectedEventModal.orderCode || formatOrderCode(selectedEventModal.orderNumber)}
                   </div>
                 </div>
               </div>

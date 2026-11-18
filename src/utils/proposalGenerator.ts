@@ -1,4 +1,5 @@
 import { ROBUSTY_LOGO_BASE64 } from '../assets/logoBase64'
+import { formatOrderCode } from './formatters'
 
 export interface ProposalPayload {
   orderNumber: number
@@ -116,7 +117,7 @@ export function generateProposalHtml(data: ProposalPayload): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Proposta Comercial #ROB-${data.orderNumber} - Robusty Bagageiros</title>
+  <title>Proposta Comercial ${formatOrderCode(data.orderNumber)} - Robusty Bagageiros</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;600;700&display=swap" rel="stylesheet">
@@ -161,7 +162,7 @@ export function generateProposalHtml(data: ProposalPayload): string {
   <header class="no-print sticky top-0 z-50 bg-slate-900 text-white shadow-md border-b border-slate-800 px-4 py-3 flex items-center justify-between gap-3">
     <div class="flex items-center gap-3">
       <img src="${ROBUSTY_LOGO_BASE64}" alt="Robusty" class="h-6 w-auto object-contain brightness-0 invert" />
-      <span class="text-xs font-mono font-bold text-orange-400">#ROB-${data.orderNumber}</span>
+      <span class="text-xs font-mono font-bold text-orange-400">${formatOrderCode(data.orderNumber)}</span>
       <span class="hidden sm:inline text-xs text-slate-300">| Proposta Comercial Oficial</span>
     </div>
 
@@ -199,7 +200,7 @@ export function generateProposalHtml(data: ProposalPayload): string {
 
       <div class="text-left sm:text-right text-xs">
         <div class="text-base sm:text-lg font-extrabold font-mono text-[#EA580C]">
-          PROPOSTA #ROB-${data.orderNumber}
+          PROPOSTA ${formatOrderCode(data.orderNumber)}
         </div>
         <div class="text-slate-500 text-[11px]">
           Emissão: <strong class="text-slate-800">${todayStr}</strong>

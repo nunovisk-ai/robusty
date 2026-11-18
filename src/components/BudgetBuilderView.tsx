@@ -21,7 +21,7 @@ import { CustomAlertModal } from './CustomAlertModal'
 import { generateProposalHtml, type ProposalPayload } from '../utils/proposalGenerator'
 import { ROBUSTY_LOGO_BASE64 } from '../assets/logoBase64'
 import type { CurrentUser } from './LoginView'
-import { formatBRPhone, formatBRCep, formatCurrency, getCleanVehicleModel } from '../utils/formatters'
+import { formatBRPhone, formatBRCep, formatCurrency, getCleanVehicleModel, formatOrderCode } from '../utils/formatters'
 import { 
   Truck, 
   Wrench, 
@@ -130,12 +130,12 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [orderNumber] = useState<number>(() => {
     if (initialOpportunity?.order_number) return initialOpportunity.order_number
     if (existingOrderNumber) return existingOrderNumber
-    return Math.floor(1040 + Math.random() * 80)
+    return 1
   })
 
-  // Responsável: Igor, Norlando ou Loja
-  const [assignedTo, setAssignedTo] = useState<'Igor' | 'Norlando' | 'Loja'>(() => {
-    return initialOpportunity?.assigned_to || 'Norlando'
+  // Responsável: Igor, Norlando ou Loja (por padrão vazio para nova oportunidade)
+  const [assignedTo, setAssignedTo] = useState<'Igor' | 'Norlando' | 'Loja' | ''>(() => {
+    return initialOpportunity?.assigned_to || ''
   })
 
   // 1. Dados do Contato & Redes Sociais
@@ -217,10 +217,10 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
   // Instalação na Loja
   const [installationDate, setInstallationDate] = useState<string>(() => initialOpportunity?.installation_date || '')
-  const [installationTime, setInstallationTime] = useState<string>(() => initialOpportunity?.installation_time || '14:00')
+  const [installationTime, setInstallationTime] = useState<string>(() => initialOpportunity?.installation_time || '')
   const [installationCost, setInstallationCost] = useState<number>(() => {
     if (initialOpportunity?.installation_value !== undefined) return initialOpportunity.installation_value
-    return 200
+    return 0
   })
 
   // 4. Condições de Pagamento e Desconto
@@ -268,7 +268,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         id: `hist-init-${Date.now()}`,
         opportunity_id: initialOpportunity?.id,
         type: 'created',
-        description: `Orçamento #ROB-${orderNumber} criado no CRM`,
+        description: `Orçamento ${formatOrderCode(orderNumber)} criado no CRM`,
         user: assignedTo,
         created_at: initialOpportunity?.created_at || new Date().toISOString()
       }
@@ -298,9 +298,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       const [vList, pList] = await Promise.all([fetchVehicles(), fetchProducts()])
       setVehicles(vList)
       setAllProducts(pList)
-      if (!selectedVehicleId && vList.length > 0) {
-        setSelectedVehicleId(vList[0].id)
-      }
     }
     load()
   }, [])
@@ -312,8 +309,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
   const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId)
 
-  // Compatible products for vehicle
+  // Compatible products for vehicle (se nenhum veículo estiver selecionado, exibe todos os produtos)
   const compatibleProducts = useMemo(() => {
+    if (!selectedVehicleId) return allProducts
     return allProducts.filter(
       (p) => !p.compatible_vehicle_id || p.compatible_vehicle_id === selectedVehicleId
     )
@@ -350,13 +348,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       return searchableText.includes(queryNorm)
     })
   }, [compatibleProducts, productCategoryFilter, productSearchQuery])
-
-  // Recalculate installation cost default when vehicle changes if not custom edited
-  useEffect(() => {
-    if (selectedVehicle && fulfillment === 'instalacao_loja' && !initialOpportunity) {
-      setInstallationCost(selectedVehicle.standard_installation_cost || 200)
-    }
-  }, [selectedVehicleId, fulfillment])
 
   // Automatically enforce discount limits when payment method changes
   const handlePaymentMethodSelect = (method: PaymentMethod) => {
@@ -468,7 +459,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const generateWhatsAppMessage = () => {
     const lines = [
       `*PROPOSTA COMERCIAL ROBUSTY — BAGAGEIROS AUTOMOTIVOS*`,
-      `*Identificador Único:* #ROB-${orderNumber}`,
+      `*Identificador Único:* ${formatOrderCode(orderNumber)}`,
       `*Responsável:* ${assignedTo}`,
       `Olá ${customerName ? customerName : 'Cliente'}! Segue sua proposta oficial:`,
       ``,
@@ -528,7 +519,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     return {
       id: initialOpportunity?.id || `opp-${Date.now()}`,
       orderNumber,
-      orderCode: `#ROB-${orderNumber}`,
+      orderCode: formatOrderCode(orderNumber),
       assignedTo,
       customerName: customerName || 'Novo Cliente',
       customerPhone,
@@ -591,7 +582,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     if (orderConflict) {
       return {
         type: 'order',
-        code: orderConflict.order_code || `#ROB-${orderConflict.order_number}`,
+        code: orderConflict.order_code || formatOrderCode(orderConflict.order_number),
         client: orderConflict.contact?.full_name || 'Cliente com pedido ativo',
         vehicle: orderConflict.opportunity?.vehicle_model_year || 'Veículo utilitário',
         date: installationDate,
@@ -615,7 +606,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     if (oppConflict) {
       return {
         type: 'opportunity',
-        code: oppConflict.order_code || (oppConflict.order_number ? `#ROB-${oppConflict.order_number}` : '#ORÇ-ROB'),
+        code: oppConflict.order_code || formatOrderCode(oppConflict.order_number),
         client: oppConflict.contact?.full_name || 'Lead em negociação',
         vehicle: oppConflict.vehicle_model_year || 'Veículo utilitário',
         date: installationDate,
@@ -694,7 +685,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
     const newProposalDoc: AttachedDocument = {
       id: `doc-prop-${Date.now()}`,
-      name: `Proposta_Comercial_#ROB-${orderNumber}_${cleanCustomer}.html`,
+      name: `Proposta_Comercial_${formatOrderCode(orderNumber)}_${cleanCustomer}.html`,
       type: 'orcamento_pdf',
       file_url: fileUrl,
       file_size: `${Math.max(1, Math.round(blob.size / 1024))} KB`,
@@ -708,7 +699,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       id: `hist-prop-${Date.now()}`,
       opportunity_id: initialOpportunity?.id,
       type: 'note',
-      description: `Gerou e anexou a proposta comercial oficial (#ROB-${orderNumber})`,
+      description: `Gerou e anexou a proposta comercial oficial (${formatOrderCode(orderNumber)})`,
       user: authorName,
       created_at: new Date().toISOString()
     }
@@ -805,7 +796,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   <div class="card">
     <h2>📄 ${doc.name}</h2>
     <div class="item"><span class="label">Tipo:</span> <span class="badge">${doc.type}</span></div>
-    <div class="item"><span class="label">Pedido Vinculado:</span> #ROB-${orderNumber}</div>
+    <div class="item"><span class="label">Pedido Vinculado:</span> ${formatOrderCode(orderNumber)}</div>
     <div class="item"><span class="label">Cliente:</span> ${customerName || 'Cliente'}</div>
     <div class="item"><span class="label">Tamanho:</span> ${doc.file_size || 'N/A'}</div>
     <div class="item"><span class="label">Data de Registro:</span> ${new Date(doc.uploaded_at).toLocaleString('pt-BR')}</div>
@@ -1024,11 +1015,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           <div>
             <div className="flex items-center gap-2.5">
               <h2 className="text-lg sm:text-xl font-bold text-slate-900">
-                Gerador de Orçamento
+                Oportunidade {formatOrderCode(orderNumber)}
               </h2>
-              <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-full bg-[#FFF3EA] text-[#EA580C] border border-[#EA580C]/20 shadow-2xs">
-                #ROB-{orderNumber}
-              </span>
             </div>
           </div>
         </div>
@@ -1042,7 +1030,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               <button
                 type="button"
                 key={resp}
-                onClick={() => setAssignedTo(resp)}
+                onClick={() => setAssignedTo(assignedTo === resp ? '' : resp)}
                 className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   isSelected
                     ? 'bg-[#EA580C] text-white shadow-xs'
@@ -1158,7 +1146,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     <User className="w-4 h-4 text-[#EA580C]" />
                     <span>1. Dados do Contato</span>
                   </span>
-                  <span className="text-[11px] font-mono font-medium text-slate-400">#ROB-{orderNumber}</span>
+                  <span className="text-[11px] font-mono font-medium text-slate-400">{formatOrderCode(orderNumber)}</span>
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -1410,8 +1398,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                         key={v.id}
                         type="button"
                         onClick={() => {
-                          setSelectedVehicleId(v.id)
-                          setItems([]) // clear incompatible items
+                          if (selectedVehicleId === v.id) {
+                            setSelectedVehicleId('')
+                            setItems([])
+                          } else {
+                            setSelectedVehicleId(v.id)
+                            setItems([])
+                          }
                         }}
                         className={`px-4 py-2.5 rounded-xl border flex items-center gap-2 transition-all cursor-pointer ${
                           isSelected
@@ -2447,7 +2440,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               </div>
               <div className="text-right">
                 <span className="text-xs font-mono font-bold text-slate-500">
-                  #ROB-{orderNumber}
+                  {formatOrderCode(orderNumber)}
                 </span>
               </div>
             </div>
@@ -2740,13 +2733,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
               {savedSuccess && (
                 <div className="text-center text-xs text-emerald-700 py-1 font-bold animate-fade-in bg-emerald-50 rounded-lg p-2 border border-emerald-200">
-                  ✓ Card de oportunidade salvo no Funil de Vendas (#ROB-{orderNumber})!
+                  ✓ Card de oportunidade salvo no Funil de Vendas ({formatOrderCode(orderNumber)})!
                 </div>
               )}
 
               {orderGeneratedSuccess && (
                 <div className="text-center text-xs text-blue-700 py-1 font-bold animate-fade-in bg-blue-50 rounded-lg p-2 border border-blue-200">
-                  ✓ Pedido criado e integrado ao Funil de Pedidos (#ROB-{orderNumber})!
+                  ✓ Pedido criado e integrado ao Funil de Pedidos ({formatOrderCode(orderNumber)})!
                 </div>
               )}
 
@@ -2822,7 +2815,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         type="danger"
         title="Apagar Orçamento"
         message="Tem certeza que deseja apagar permanentemente este orçamento? Esta ação removerá os dados do Pipeline e do Funil de Pedidos."
-        details={`Orçamento: #ROB-${orderNumber} — Cliente: ${customerName || 'Cliente'}`}
+        details={`Orçamento: ${formatOrderCode(orderNumber)} — Cliente: ${customerName || 'Cliente'}`}
         primaryButtonText="Sim, Apagar Orçamento"
         onPrimaryAction={handleDelete}
         secondaryButtonText="Cancelar"

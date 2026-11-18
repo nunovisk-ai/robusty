@@ -38,3 +38,13 @@ export function getCleanVehicleModel(modelStr?: string): string {
     .trim()
   return clean || 'Utilitário'
 }
+
+/**
+ * Format opportunity or order identification code without prefix (e.g., #00002, #00003)
+ */
+export function formatOrderCode(orderNumber?: number | string): string {
+  if (orderNumber === undefined || orderNumber === null || orderNumber === '') return '#00001'
+  const numeric = typeof orderNumber === 'string' ? parseInt(orderNumber.replace(/\D/g, ''), 10) : orderNumber
+  if (isNaN(numeric) || numeric <= 0) return '#00001'
+  return `#${String(numeric).padStart(5, '0')}`
+}

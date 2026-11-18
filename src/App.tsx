@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Sidebar, type ActiveTab } from './components/Sidebar'
 import { TopBar } from './components/TopBar'
+import { formatOrderCode } from './utils/formatters'
 import { CatalogView } from './components/CatalogView'
 import { BudgetBuilderView } from './components/BudgetBuilderView'
 import { KanbanView } from './components/KanbanView'
@@ -43,7 +44,7 @@ const defaultOpportunities: Opportunity[] = [
   {
     id: 'opp-1',
     order_number: 1040,
-    order_code: '#ROB-1040',
+    order_code: '#01040',
     assigned_to: 'Norlando',
     contact_id: 'c-1',
     contact: {
@@ -100,7 +101,7 @@ const defaultOpportunities: Opportunity[] = [
         id: 'hist-1',
         opportunity_id: 'opp-1',
         type: 'created',
-        description: 'Orçamento #ROB-1040 criado no CRM via WhatsApp Inbound',
+        description: 'Orçamento #01040 criado no CRM via WhatsApp Inbound',
         user: 'Norlando',
         created_at: new Date(Date.now() - 3600000 * 5).toISOString()
       }
@@ -111,7 +112,7 @@ const defaultOpportunities: Opportunity[] = [
   {
     id: 'opp-2',
     order_number: 1041,
-    order_code: '#ROB-1041',
+    order_code: '#01041',
     assigned_to: 'Igor',
     contact_id: 'c-2',
     contact: {
@@ -173,7 +174,7 @@ const defaultOpportunities: Opportunity[] = [
   {
     id: 'opp-3',
     order_number: 1042,
-    order_code: '#ROB-1042',
+    order_code: '#01042',
     assigned_to: 'Norlando',
     contact_id: 'c-3',
     contact: {
@@ -204,7 +205,7 @@ const defaultOpportunities: Opportunity[] = [
   {
     id: 'opp-4',
     order_number: 1043,
-    order_code: '#ROB-1043',
+    order_code: '#01043',
     assigned_to: 'Loja',
     contact_id: 'c-4',
     contact: {
@@ -231,7 +232,7 @@ const defaultOpportunities: Opportunity[] = [
   {
     id: 'opp-5',
     order_number: 1044,
-    order_code: '#ROB-1044',
+    order_code: '#01044',
     assigned_to: 'Norlando',
     contact_id: 'c-5',
     contact: {
@@ -263,7 +264,7 @@ const defaultOrders: Order[] = [
   {
     id: 'ord-100',
     order_number: 1040,
-    order_code: '#ROB-1040',
+    order_code: '#01040',
     assigned_to: 'Norlando',
     opportunity_id: 'opp-1',
     contact_id: 'c-1',
@@ -289,7 +290,7 @@ const defaultOrders: Order[] = [
   {
     id: 'ord-101',
     order_number: 1041,
-    order_code: '#ROB-1041',
+    order_code: '#01041',
     assigned_to: 'Igor',
     opportunity_id: 'opp-2',
     contact_id: 'c-2',
@@ -313,7 +314,7 @@ const defaultOrders: Order[] = [
   {
     id: 'ord-102',
     order_number: 1042,
-    order_code: '#ROB-1042',
+    order_code: '#01042',
     assigned_to: 'Norlando',
     opportunity_id: 'opp-3',
     contact_id: 'c-3',
@@ -427,9 +428,26 @@ export function App() {
     loadData()
   }, [])
 
+  // Next sequential order/opportunity number across all records
+  const nextOpportunityNumber = useMemo(() => {
+    const oppNums = opportunities
+      .map((o) => o.order_number)
+      .filter((n): n is number => typeof n === 'number' && !isNaN(n))
+    const ordNums = orders
+      .map((o) => o.order_number)
+      .filter((n): n is number => typeof n === 'number' && !isNaN(n))
+    const allNums = [...oppNums, ...ordNums]
+    if (allNums.length === 0) return 1
+    return Math.max(...allNums) + 1
+  }, [opportunities, orders])
+
+  const [budgetInstanceKey, setBudgetInstanceKey] = useState<number>(() => Date.now())
+
   // Open fresh Gerador de Orçamento (Nova Oportunidade)
   const handleOpenNewOpportunity = () => {
+    setSelectedVehicleForBudget(undefined)
     setEditingOpportunity(null)
+    setBudgetInstanceKey(Date.now())
     setActiveTab('budget')
   }
 
@@ -542,7 +560,7 @@ export function App() {
 
   // Convert Opportunity to Order directly
   const handleConvertToOrder = async (opp: Opportunity) => {
-    const nextOrderNumber = opp.order_number || (orders.length > 0 ? Math.max(...orders.map((o) => o.order_number)) + 1 : 1001)
+    const nextOrderNumber = opp.order_number || nextOpportunityNumber
     
     // Mark opportunity as won
     setOpportunities((prev) =>
@@ -552,7 +570,7 @@ export function App() {
     const newOrder: Order = {
       id: `ord-${Date.now()}`,
       order_number: nextOrderNumber,
-      order_code: `#ROB-${nextOrderNumber}`,
+      order_code: opp.order_code || formatOrderCode(nextOrderNumber),
       assigned_to: opp.assigned_to || 'Igor',
       opportunity_id: opp.id,
       opportunity: { ...opp, stage: 'venda_ganha' },
@@ -964,9 +982,10 @@ export function App() {
 
           {activeTab === 'budget' && (
             <BudgetBuilderView
+              key={editingOpportunity ? editingOpportunity.id : `new-budget-${budgetInstanceKey}`}
               initialVehicleId={selectedVehicleForBudget}
               initialOpportunity={editingOpportunity}
-              existingOrderNumber={orders.length > 0 ? Math.max(...orders.map((o) => o.order_number)) + 1 : 1045}
+              existingOrderNumber={nextOpportunityNumber}
               existingOrders={orders}
               existingOpportunities={opportunities}
               existingAppointments={appointments}
