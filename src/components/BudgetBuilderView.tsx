@@ -32,7 +32,6 @@ import {
   Clock,
   Send,
   ArrowLeft,
-  ArrowRight,
   CheckCircle2,
   XCircle,
   Weight,
@@ -1237,18 +1236,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   </div>
                 </div>
               </div>
-
-              {/* Navegação Rápida para Aba 2 */}
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setActiveFormTab('products')}
-                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
-                >
-                  <span>Próximo: 2. Veículo & Produtos</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
             </>
           )}
 
@@ -1387,26 +1374,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     })
                   )}
                 </div>
-              </div>
-
-              {/* Navegação entre Abas */}
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setActiveFormTab('contact')}
-                  className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>1. Contato & Redes</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveFormTab('fulfillment')}
-                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
-                >
-                  <span>Próximo: 3. Modalidade & Entrega/Coleta</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
               </div>
             </>
           )}
@@ -1718,26 +1685,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   </div>
                 )}
               </div>
-
-              {/* Navegação entre Abas */}
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setActiveFormTab('products')}
-                  className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>2. Veículo & Produtos</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveFormTab('documents')}
-                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
-                >
-                  <span>Próximo: 4. Documentos & NFs</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
             </>
           )}
 
@@ -1895,27 +1842,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     })}
                   </div>
                 )}
-              </div>
-
-              {/* Navegação de Abas */}
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setActiveFormTab('fulfillment')}
-                  className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>3. Modalidade & Entrega/Coleta</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveFormTab('history')}
-                  className="px-4 py-2.5 rounded-xl bg-[#EA580C] hover:bg-[#c2410c] text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
-                >
-                  <span>5. Histórico & Tarefas</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
               </div>
             </>
           )}
@@ -2212,18 +2138,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     ))}
                   </div>
                 )}
-              </div>
-
-              {/* Navegação de Retorno */}
-              <div className="flex items-center justify-start">
-                <button
-                  type="button"
-                  onClick={() => setActiveFormTab('documents')}
-                  className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>4. Documentos & NFs</span>
-                </button>
               </div>
             </>
           )}
