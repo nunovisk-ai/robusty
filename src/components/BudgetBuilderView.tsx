@@ -38,7 +38,7 @@ import {
   XCircle,
   Weight,
   CreditCard,
-  QrCode,
+  Banknote,
   ReceiptText,
   AlertTriangle,
   FileText,
@@ -2566,7 +2566,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
-                  <QrCode className="w-3.5 h-3.5" />
+                  <Banknote className="w-3.5 h-3.5" />
                   <span>À vista</span>
                 </button>
 
