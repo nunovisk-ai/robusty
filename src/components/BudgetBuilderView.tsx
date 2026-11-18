@@ -17,7 +17,8 @@ import { fetchVehicles, fetchProducts, calculateBudget, getMaxDiscountForPayment
 import { lookupCep } from '../services/cepService'
 import { CustomDatePicker } from './CustomDatePicker'
 import { CustomAlertModal } from './CustomAlertModal'
-import { CommercialProposalModal } from './CommercialProposalModal'
+import { generateProposalHtml, type ProposalPayload } from '../utils/proposalGenerator'
+import { ROBUSTY_LOGO_BASE64 } from '../assets/logoBase64'
 import type { CurrentUser } from './LoginView'
 import { formatBRPhone, formatBRCep, formatCurrency, getCleanVehicleModel } from '../utils/formatters'
 import { 
@@ -235,7 +236,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [attachments, setAttachments] = useState<AttachedDocument[]>(() => {
     return initialOpportunity?.attachments || []
   })
-  const [isProposalModalOpen, setIsProposalModalOpen] = useState(false)
+  const [proposalSuccessMsg, setProposalSuccessMsg] = useState(false)
   const [attachmentToDelete, setAttachmentToDelete] = useState<AttachedDocument | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -626,35 +627,48 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     orderNumber
   ])
 
-  const handleAttachProposal = (doc: AttachedDocument) => {
-    const authorName = currentUser?.name || assignedTo || 'Usuário'
-    const docWithUser: AttachedDocument = {
-      ...doc,
-      uploaded_by: authorName,
-      uploaded_at: new Date().toISOString()
+  const buildProposalPayload = (): ProposalPayload => {
+    return {
+      orderNumber,
+      customerName,
+      customerPhone,
+      customerEmail,
+      vehicleModel: selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Utilitário',
+      items,
+      budget,
+      fulfillment,
+      address: {
+        street,
+        number,
+        neighborhood,
+        city,
+        state,
+        cep,
+      },
+      pickupDate,
+      pickupTime,
+      installationDate,
+      installationTime,
+      paymentMethod: (paymentMethod as PaymentMethod) || 'pix',
+      totalWeightKg: budget.totalWeightKg,
+      assignedTo: currentUser?.name || assignedTo,
     }
-    setAttachments((prev) => [docWithUser, ...prev.filter((d) => d.id !== doc.id)])
-
-    // Registra na linha do tempo do lead
-    const historyEvent: OpportunityHistoryEvent = {
-      id: `hist-prop-${Date.now()}`,
-      opportunity_id: initialOpportunity?.id,
-      type: 'note',
-      description: `Gerou a proposta comercial em PDF (#ROB-${orderNumber})`,
-      user: authorName,
-      created_at: new Date().toISOString()
-    }
-    setHistory((prev) => [historyEvent, ...prev])
   }
 
   const handleGenerateAndAttachProposal = () => {
     const authorName = currentUser?.name || assignedTo || 'Usuário'
-    const cleanCustomer = (customerName || 'Cliente').trim().replace(/\s+/g, '_')
+    const cleanCustomer = (customerName || 'Cliente').trim().replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚãõÃÕâêîôûÂÊÎÔÛçÇ_-]/g, '_')
+    const payload = buildProposalPayload()
+    const htmlContent = generateProposalHtml(payload)
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
+    const fileUrl = URL.createObjectURL(blob)
+
     const newProposalDoc: AttachedDocument = {
       id: `doc-prop-${Date.now()}`,
-      name: `Proposta_Comercial_#ROB-${orderNumber}_${cleanCustomer}.pdf`,
+      name: `Proposta_Comercial_#ROB-${orderNumber}_${cleanCustomer}.html`,
       type: 'orcamento_pdf',
-      file_size: '185 KB',
+      file_url: fileUrl,
+      file_size: `${Math.max(1, Math.round(blob.size / 1024))} KB`,
       uploaded_at: new Date().toISOString(),
       uploaded_by: authorName
     }
@@ -665,13 +679,14 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       id: `hist-prop-${Date.now()}`,
       opportunity_id: initialOpportunity?.id,
       type: 'note',
-      description: `Gerou a proposta comercial em PDF (#ROB-${orderNumber})`,
+      description: `Gerou e anexou a proposta comercial oficial (#ROB-${orderNumber})`,
       user: authorName,
       created_at: new Date().toISOString()
     }
     setHistory((prev) => [historyEvent, ...prev])
 
-    setIsProposalModalOpen(true)
+    setProposalSuccessMsg(true)
+    setTimeout(() => setProposalSuccessMsg(false), 4000)
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -736,7 +751,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       return
     }
     if (doc.type === 'orcamento_pdf') {
-      setIsProposalModalOpen(true)
+      const payload = buildProposalPayload()
+      const htmlContent = generateProposalHtml(payload)
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
       return
     }
     const fallbackHtml = `<!DOCTYPE html>
@@ -771,17 +790,20 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   }
 
   const handleDownloadDocument = (doc: AttachedDocument) => {
-    if (doc.file_url) {
+    let url = doc.file_url
+    if (!url && doc.type === 'orcamento_pdf') {
+      const payload = buildProposalPayload()
+      const htmlContent = generateProposalHtml(payload)
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
+      url = URL.createObjectURL(blob)
+    }
+    if (url) {
       const a = document.createElement('a')
-      a.href = doc.file_url
+      a.href = url
       a.download = doc.name
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      return
-    }
-    if (doc.type === 'orcamento_pdf') {
-      setIsProposalModalOpen(true)
       return
     }
   }
@@ -2150,6 +2172,14 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     </div>
                   </button>
                 </div>
+
+                {/* Feedback de Sucesso ao Gerar Proposta */}
+                {proposalSuccessMsg && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2 animate-fade-in shadow-2xs">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>✓ Proposta comercial gerada com sucesso e anexada automaticamente ao pedido!</span>
+                  </div>
+                )}
               </div>
 
               {/* Lista e Histórico de Anexos */}
@@ -2302,7 +2332,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
             <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
               <div className="flex items-center gap-2">
                 <img 
-                  src={`${import.meta.env.BASE_URL}robusty-logo.png`} 
+                  src={ROBUSTY_LOGO_BASE64} 
                   alt="Robusty" 
                   className="h-7 w-auto object-contain" 
                 />
@@ -2682,37 +2712,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         </div>
       </div>
 
-      {/* MODAL 1: PROPOSTA COMERCIAL EM PDF */}
-      <CommercialProposalModal
-        isOpen={isProposalModalOpen}
-        onClose={() => setIsProposalModalOpen(false)}
-        onAttachProposal={handleAttachProposal}
-        data={{
-          orderNumber,
-          customerName,
-          customerPhone,
-          customerEmail,
-          vehicleModel: selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Utilitário',
-          items,
-          budget,
-          fulfillment,
-          address: {
-            street,
-            number,
-            neighborhood,
-            city,
-            state,
-            cep,
-          },
-          pickupDate,
-          pickupTime,
-          installationDate,
-          installationTime,
-          paymentMethod: (paymentMethod as PaymentMethod) || 'pix',
-          totalWeightKg: budget.totalWeightKg,
-          assignedTo: currentUser?.name || assignedTo,
-        }}
-      />
 
       {/* MODAL 2: ALERTA PADRONIZADO DE CONFLITO DE INSTALAÇÃO */}
       <CustomAlertModal
