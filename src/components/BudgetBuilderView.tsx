@@ -277,11 +277,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     return initialOpportunity?.tasks || []
   })
   const [newTaskTitle, setNewTaskTitle] = useState('')
-  const [newTaskDate, setNewTaskDate] = useState(() => {
-    return new Date().toISOString().split('T')[0]
-  })
-  const [newTaskTime, setNewTaskTime] = useState('14:00')
-  const [newTaskAssignee, setNewTaskAssignee] = useState<'Norlando' | 'Igor' | 'Loja'>(assignedTo)
+  const [newTaskDate, setNewTaskDate] = useState('')
+  const [newTaskTime, setNewTaskTime] = useState('')
+  const [newTaskAssignee, setNewTaskAssignee] = useState<'Norlando' | 'Igor' | 'Loja' | ''>('')
   const [historyFilter, setHistoryFilter] = useState<'all' | 'comments' | 'history'>('all')
 
   // Modais Padronizados
@@ -861,14 +859,17 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       order_number: orderNumber,
       client_name: customerName || 'Cliente',
       title: newTaskTitle.trim(),
-      due_date: newTaskDate,
-      due_time: newTaskTime,
-      assigned_to: newTaskAssignee,
+      due_date: newTaskDate || undefined,
+      due_time: newTaskTime || undefined,
+      assigned_to: newTaskAssignee || undefined,
       completed: false,
       created_at: new Date().toISOString()
     }
     setTasks((prev) => [task, ...prev])
     setNewTaskTitle('')
+    setNewTaskDate('')
+    setNewTaskTime('')
+    setNewTaskAssignee('')
   }
 
   const handleToggleTask = (taskId: string) => {
@@ -1938,33 +1939,44 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       />
                     </div>
                     <div className="md:col-span-3">
-                      <select
+                      <CustomTimePicker
                         value={newTaskTime}
-                        onChange={(e) => setNewTaskTime(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#EA580C]/20 focus:border-[#EA580C]"
-                      >
-                        {TIME_SLOTS.map((t) => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
+                        onChange={setNewTaskTime}
+                        placeholder="Horário do lembrete"
+                      />
                     </div>
                     <div className="md:col-span-3">
-                      <select
-                        value={newTaskAssignee}
-                        onChange={(e) => setNewTaskAssignee(e.target.value as any)}
-                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#EA580C]/20 focus:border-[#EA580C]"
-                      >
-                        <option value="Norlando">Norlando</option>
-                        <option value="Igor">Igor</option>
-                        <option value="Loja">Loja</option>
-                      </select>
+                      <div className="relative flex items-center">
+                        <select
+                          value={newTaskAssignee}
+                          onChange={(e) => setNewTaskAssignee(e.target.value as any)}
+                          className={`w-full pl-3 pr-8 py-2 bg-slate-50 hover:bg-white border border-slate-200/90 rounded-xl text-xs transition-all focus:outline-none focus:ring-2 focus:ring-[#EA580C]/10 focus:border-[#EA580C] cursor-pointer shadow-2xs ${
+                            newTaskAssignee ? 'text-slate-900 font-bold' : 'text-slate-400 font-sans'
+                          }`}
+                        >
+                          <option value="">Responsável</option>
+                          <option value="Norlando">Norlando</option>
+                          <option value="Igor">Igor</option>
+                          <option value="Loja">Loja</option>
+                        </select>
+                        {newTaskAssignee && (
+                          <button
+                            type="button"
+                            onClick={() => setNewTaskAssignee('')}
+                            className="absolute right-7 p-1 hover:bg-slate-200 rounded-md text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                            title="Limpar responsável"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="md:col-span-2">
                       <button
                         type="button"
                         onClick={handleAddTask}
                         disabled={!newTaskTitle.trim()}
-                        className="w-full py-2.5 px-3 bg-[#EA580C] hover:bg-[#c2410c] disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                        className="w-full py-2 px-3 bg-[#EA580C] hover:bg-[#c2410c] disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Criar</span>
@@ -1982,8 +1994,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   <div className="space-y-2">
                     {tasks.map((task) => {
                       const today = new Date().toISOString().split('T')[0]
-                      const isOverdue = !task.completed && task.due_date < today
-                      const isToday = !task.completed && task.due_date === today
+                      const isOverdue = !task.completed && Boolean(task.due_date && task.due_date < today)
+                      const isToday = !task.completed && Boolean(task.due_date && task.due_date === today)
 
                       return (
                         <div
@@ -2015,10 +2027,14 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                                 {task.title}
                               </p>
                               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
-                                  {task.assigned_to === 'Loja' ? <FaStore className="w-2.5 h-2.5 text-amber-600" /> : <FaUser className="w-2.5 h-2.5 text-slate-400" />}
-                                  {task.assigned_to}
-                                </span>
+                                {task.assigned_to ? (
+                                  <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
+                                    {task.assigned_to === 'Loja' ? <FaStore className="w-2.5 h-2.5 text-amber-600" /> : <FaUser className="w-2.5 h-2.5 text-slate-400" />}
+                                    {task.assigned_to}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-slate-400 italic">Sem responsável</span>
+                                )}
                                 <span>•</span>
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                                   task.completed
@@ -2031,11 +2047,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                                 }`}>
                                   {task.completed
                                     ? 'Concluída'
+                                    : !task.due_date
+                                    ? 'Sem prazo'
                                     : isOverdue
-                                    ? `⚠️ Atrasada: ${task.due_date} às ${task.due_time}`
+                                    ? `⚠️ Atrasada: ${task.due_date}${task.due_time ? ` às ${task.due_time}` : ''}`
                                     : isToday
-                                    ? `⏰ Hoje às ${task.due_time}`
-                                    : `📅 ${task.due_date} às ${task.due_time}`}
+                                    ? `⏰ Hoje${task.due_time ? ` às ${task.due_time}` : ''}`
+                                    : `📅 ${task.due_date}${task.due_time ? ` às ${task.due_time}` : ''}`}
                                 </span>
                               </div>
                             </div>

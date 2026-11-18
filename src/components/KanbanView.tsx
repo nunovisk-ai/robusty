@@ -794,8 +794,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                 <div className="flex items-center justify-between gap-1 text-[9px]">
                                   {pendingTasks.length > 0 ? (() => {
                                     const today = new Date().toISOString().split('T')[0]
-                                    const overdue = pendingTasks.find((t) => t.due_date < today)
-                                    const todayTask = pendingTasks.find((t) => t.due_date === today)
+                                    const overdue = pendingTasks.find((t) => Boolean(t.due_date && t.due_date < today))
+                                    const todayTask = pendingTasks.find((t) => Boolean(t.due_date && t.due_date === today))
                                     const targetTask = overdue || todayTask || pendingTasks[0]
 
                                     if (overdue) {
@@ -948,8 +948,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                 <div className="flex items-center justify-between gap-1 text-[10px] pt-1 border-t border-slate-100/70">
                                   {pendingTasks.length > 0 ? (() => {
                                     const today = new Date().toISOString().split('T')[0]
-                                    const overdue = pendingTasks.find((t) => t.due_date < today)
-                                    const todayTask = pendingTasks.find((t) => t.due_date === today)
+                                    const overdue = pendingTasks.find((t) => Boolean(t.due_date && t.due_date < today))
+                                    const todayTask = pendingTasks.find((t) => Boolean(t.due_date && t.due_date === today))
                                     const targetTask = overdue || todayTask || pendingTasks[0]
 
                                     if (overdue) {

@@ -161,7 +161,7 @@ export interface OpportunityTask {
   order_number?: number
   client_name?: string
   title: string
-  due_date: string // YYYY-MM-DD
+  due_date?: string // YYYY-MM-DD
   due_time?: string // HH:mm
   assigned_to?: 'Igor' | 'Norlando' | 'Loja' | string
   completed: boolean

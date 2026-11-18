@@ -57,10 +57,10 @@ export const TopBar: React.FC<TopBarProps> = ({
       }
     })
 
-    // Ordenar: primeiro tarefas atrasadas, depois hoje, depois futuras
+    // Ordenar: primeiro tarefas atrasadas, depois hoje, depois futuras, por fim sem prazo
     return list.sort((a, b) => {
-      const dateA = a.task.due_date + 'T' + (a.task.due_time || '00:00')
-      const dateB = b.task.due_date + 'T' + (b.task.due_time || '00:00')
+      const dateA = (a.task.due_date || '9999-12-31') + 'T' + (a.task.due_time || '00:00')
+      const dateB = (b.task.due_date || '9999-12-31') + 'T' + (b.task.due_time || '00:00')
       return dateA.localeCompare(dateB)
     })
   }, [opportunities])
@@ -69,7 +69,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   // Tarefas urgentes (atrasadas ou hoje)
   const urgentCount = useMemo(() => {
-    return allPendingTasks.filter((item) => item.task.due_date <= todayStr).length
+    return allPendingTasks.filter((item) => Boolean(item.task.due_date && item.task.due_date <= todayStr)).length
   }, [allPendingTasks, todayStr])
 
   // Fechar dropdown ao clicar fora
@@ -158,8 +158,8 @@ export const TopBar: React.FC<TopBarProps> = ({
                   </div>
                 ) : (
                   allPendingTasks.map(({ task, opportunity }) => {
-                    const isOverdue = task.due_date < todayStr
-                    const isToday = task.due_date === todayStr
+                    const isOverdue = Boolean(task.due_date && task.due_date < todayStr)
+                    const isToday = Boolean(task.due_date && task.due_date === todayStr)
 
                     return (
                       <div
@@ -192,7 +192,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                                   : 'bg-slate-100 text-slate-600'
                               }`}
                             >
-                              {isOverdue ? '⚠️ Atrasada' : isToday ? '⏰ Hoje' : `📅 ${task.due_date}`}
+                              {!task.due_date ? 'Sem prazo' : isOverdue ? '⚠️ Atrasada' : isToday ? '⏰ Hoje' : `📅 ${task.due_date}`}
                             </span>
                           </div>
 
@@ -201,9 +201,11 @@ export const TopBar: React.FC<TopBarProps> = ({
                               {opportunity.contact?.full_name || 'Cliente'} •{' '}
                               <strong className="text-slate-700">#ROB-{opportunity.order_number || task.order_number}</strong>
                             </span>
-                            <span className="font-mono text-[10px] text-slate-400">
-                              {task.due_time}
-                            </span>
+                            {task.due_time && (
+                              <span className="font-mono text-[10px] text-slate-400">
+                                {task.due_time}
+                              </span>
+                            )}
                           </div>
 
                           <div className="flex items-center justify-between gap-2 pt-1">
@@ -213,7 +215,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                               ) : (
                                 <FaUser className="w-2.5 h-2.5 text-slate-400" />
                               )}
-                              <span>{task.assigned_to}</span>
+                              <span>{task.assigned_to || 'Sem responsável'}</span>
                             </span>
 
                             {onSelectOpportunity && (
