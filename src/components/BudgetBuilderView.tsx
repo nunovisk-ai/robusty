@@ -16,6 +16,7 @@ import type {
 import { fetchVehicles, fetchProducts, calculateBudget, getMaxDiscountForPaymentMethod } from '../services/catalogService'
 import { lookupCep } from '../services/cepService'
 import { CustomDatePicker } from './CustomDatePicker'
+import { CustomTimePicker } from './CustomTimePicker'
 import { CustomAlertModal } from './CustomAlertModal'
 import { generateProposalHtml, type ProposalPayload } from '../utils/proposalGenerator'
 import { ROBUSTY_LOGO_BASE64 } from '../assets/logoBase64'
@@ -1815,23 +1816,12 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                           placeholder="Selecione data da coleta"
                         />
 
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                            Horário da Coleta:
-                          </label>
-                          <select
-                            value={pickupTime}
-                            onChange={(e) => setPickupTime(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200/90 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono cursor-pointer"
-                          >
-                            <option value="">A definir / Sem horário</option>
-                            {TIME_SLOTS.map((slot) => (
-                              <option key={slot} value={slot}>
-                                {slot}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                        <CustomTimePicker
+                          label="Horário da Coleta:"
+                          value={pickupTime}
+                          onChange={setPickupTime}
+                          placeholder="Selecione horário da coleta"
+                        />
                       </div>
                     </div>
                   </div>
@@ -1871,22 +1861,12 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                           placeholder="Selecione data da instalação"
                         />
 
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                            Horário da Instalação:
-                          </label>
-                          <select
-                            value={installationTime}
-                            onChange={(e) => setInstallationTime(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200/90 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono cursor-pointer"
-                          >
-                            {TIME_SLOTS.map((slot) => (
-                              <option key={slot} value={slot}>
-                                {slot}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                        <CustomTimePicker
+                          label="Horário da Instalação:"
+                          value={installationTime}
+                          onChange={setInstallationTime}
+                          placeholder="Selecione horário da instalação"
+                        />
 
                         {installationConflict && (
                           <div className="sm:col-span-2 p-3.5 rounded-2xl bg-amber-50 border border-amber-300/80 text-amber-900 text-xs flex items-start gap-3 shadow-2xs">
