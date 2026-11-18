@@ -64,6 +64,7 @@ export interface CommercialProposalModalProps {
     installationTime?: string
     paymentMethod?: string
     totalWeightKg?: number
+    assignedTo?: string
   }
 }
 
@@ -171,7 +172,8 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         name: `Proposta_Comercial_ROB-${data.orderNumber}_${data.customerName.trim().replace(/\s+/g, '_') || 'Cliente'}.pdf`,
         type: 'orcamento_pdf',
         file_size: '185 KB',
-        uploaded_at: new Date().toISOString()
+        uploaded_at: new Date().toISOString(),
+        uploaded_by: data.assignedTo || 'Equipe'
       }
       onAttachProposal(doc)
       setAttached(true)

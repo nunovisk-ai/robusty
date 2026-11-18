@@ -48,14 +48,18 @@ import {
   ExternalLink,
   MessageSquare,
   History,
-  ListTodo
+  ListTodo,
+  Download,
+  Image as ImageIcon,
+  FileSpreadsheet,
+  File
 } from 'lucide-react'
 import { 
   FaWhatsapp, 
   FaInstagram, 
   FaFacebook, 
   FaStore, 
-  FaUser,
+  FaUser, 
   FaGlobe, 
   FaVanShuttle, 
   FaTruck, 
@@ -63,7 +67,7 @@ import {
   FaTruckPickup 
 } from 'react-icons/fa6'
 
-type BudgetFormTab = 'contact' | 'products' | 'fulfillment' | 'documents' | 'history'
+type BudgetFormTab = 'contact' | 'products' | 'fulfillment' | 'history' | 'attachments'
 
 interface BudgetBuilderViewProps {
   initialVehicleId?: string
@@ -223,18 +227,17 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false)
   const [orderGeneratedSuccess, setOrderGeneratedSuccess] = useState(false)
 
-  // 4 Abas Limpas do Gerador de Orçamento:
-  // 1. Contato & Redes | 2. Veículo & Produtos | 3. Modalidade & Entrega/Coleta | 4. Documentos & NFs
+  // 5 Abas do Gerador de Orçamento:
+  // 1. Contato & Redes | 2. Veículo & Produtos | 3. Modalidade & Entrega | 4. Histórico & Tarefas | 5. Anexos
   const [activeFormTab, setActiveFormTab] = useState<BudgetFormTab>('contact')
 
-  // Documentos Anexados (NFs e Proposta em PDF)
+  // Anexos & Propostas em PDF
   const [attachments, setAttachments] = useState<AttachedDocument[]>(() => {
     return initialOpportunity?.attachments || []
   })
-  const [nfeKeyInput, setNfeKeyInput] = useState('')
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false)
   const [attachmentToDelete, setAttachmentToDelete] = useState<AttachedDocument | null>(null)
-  const nfFileInputRef = useRef<HTMLInputElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   // 5. Histórico, Comentários & Tarefas (Aba 5)
   const [comments, setComments] = useState<OpportunityComment[]>(() => {
@@ -624,28 +627,106 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   ])
 
   const handleAttachProposal = (doc: AttachedDocument) => {
-    setAttachments((prev) => [doc, ...prev])
+    const authorName = currentUser?.name || assignedTo || 'Usuário'
+    const docWithUser: AttachedDocument = {
+      ...doc,
+      uploaded_by: authorName,
+      uploaded_at: new Date().toISOString()
+    }
+    setAttachments((prev) => [docWithUser, ...prev.filter((d) => d.id !== doc.id)])
+
+    // Registra na linha do tempo do lead
+    const historyEvent: OpportunityHistoryEvent = {
+      id: `hist-prop-${Date.now()}`,
+      opportunity_id: initialOpportunity?.id,
+      type: 'note',
+      description: `Gerou a proposta comercial em PDF (#ROB-${orderNumber})`,
+      user: authorName,
+      created_at: new Date().toISOString()
+    }
+    setHistory((prev) => [historyEvent, ...prev])
+  }
+
+  const handleGenerateAndAttachProposal = () => {
+    const authorName = currentUser?.name || assignedTo || 'Usuário'
+    const cleanCustomer = (customerName || 'Cliente').trim().replace(/\s+/g, '_')
+    const newProposalDoc: AttachedDocument = {
+      id: `doc-prop-${Date.now()}`,
+      name: `Proposta_Comercial_#ROB-${orderNumber}_${cleanCustomer}.pdf`,
+      type: 'orcamento_pdf',
+      file_size: '185 KB',
+      uploaded_at: new Date().toISOString(),
+      uploaded_by: authorName
+    }
+
+    setAttachments((prev) => [newProposalDoc, ...prev.filter((d) => d.type !== 'orcamento_pdf')])
+
+    const historyEvent: OpportunityHistoryEvent = {
+      id: `hist-prop-${Date.now()}`,
+      opportunity_id: initialOpportunity?.id,
+      type: 'note',
+      description: `Gerou a proposta comercial em PDF (#ROB-${orderNumber})`,
+      user: authorName,
+      created_at: new Date().toISOString()
+    }
+    setHistory((prev) => [historyEvent, ...prev])
+
+    setIsProposalModalOpen(true)
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = e.target.files
+    if (!files || files.length === 0) return
 
-    const fileUrl = URL.createObjectURL(file)
-    const isXml = file.name.toLowerCase().endsWith('.xml')
-    const isPdf = file.name.toLowerCase().endsWith('.pdf')
-    const newDoc: AttachedDocument = {
-      id: `doc-nfe-${Date.now()}`,
-      name: file.name,
-      type: isXml ? 'nfe_xml' : isPdf ? 'nfe_pdf' : 'outro',
-      file_url: fileUrl,
-      file_size: `${Math.max(1, Math.round(file.size / 1024))} KB`,
-      uploaded_at: new Date().toISOString(),
-      nfe_access_key: nfeKeyInput.trim() || undefined
-    }
+    const authorName = currentUser?.name || assignedTo || 'Usuário'
+    const newDocs: AttachedDocument[] = []
+    const newHistoryEvents: OpportunityHistoryEvent[] = []
 
-    setAttachments((prev) => [newDoc, ...prev])
-    setNfeKeyInput('')
+    Array.from(files).forEach((file, index) => {
+      const fileUrl = URL.createObjectURL(file)
+      const nameLower = file.name.toLowerCase()
+
+      const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(nameLower)
+      const isXml = nameLower.endsWith('.xml')
+      const isPdf = nameLower.endsWith('.pdf')
+      const isSpreadsheet = /\.(xlsx?|csv)$/i.test(nameLower)
+      const isDoc = /\.(docx?|txt|rtf|odt)$/i.test(nameLower)
+
+      const docType: AttachedDocument['type'] = isImage 
+        ? 'imagem' 
+        : isXml 
+        ? 'nfe_xml' 
+        : isPdf 
+        ? (nameLower.includes('nf') || nameLower.includes('danfe') ? 'nfe_pdf' : 'documento')
+        : isSpreadsheet 
+        ? 'planilha' 
+        : isDoc 
+        ? 'documento' 
+        : 'outro'
+
+      const doc: AttachedDocument = {
+        id: `doc-${Date.now()}-${index}`,
+        name: file.name,
+        type: docType,
+        file_url: fileUrl,
+        file_size: `${Math.max(1, Math.round(file.size / 1024))} KB`,
+        uploaded_at: new Date().toISOString(),
+        uploaded_by: authorName
+      }
+      newDocs.push(doc)
+
+      newHistoryEvents.push({
+        id: `hist-attach-${Date.now()}-${index}`,
+        opportunity_id: initialOpportunity?.id,
+        type: 'note',
+        description: `Anexou o arquivo "${file.name}"`,
+        user: authorName,
+        created_at: new Date().toISOString()
+      })
+    })
+
+    setAttachments((prev) => [...newDocs, ...prev])
+    setHistory((prev) => [...newHistoryEvents, ...prev])
     e.target.value = ''
   }
 
@@ -675,18 +756,34 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 <body>
   <div class="card">
     <h2>📄 ${doc.name}</h2>
-    <div class="item"><span class="label">Tipo:</span> <span class="badge">${doc.type === 'nfe_xml' ? 'Nota Fiscal XML' : doc.type === 'nfe_pdf' ? 'Nota Fiscal PDF' : 'Documento / Anexo'}</span></div>
+    <div class="item"><span class="label">Tipo:</span> <span class="badge">${doc.type}</span></div>
     <div class="item"><span class="label">Pedido Vinculado:</span> #ROB-${orderNumber}</div>
     <div class="item"><span class="label">Cliente:</span> ${customerName || 'Cliente'}</div>
     <div class="item"><span class="label">Tamanho:</span> ${doc.file_size || 'N/A'}</div>
-    <div class="item"><span class="label">Data de Upload:</span> ${new Date(doc.uploaded_at).toLocaleString('pt-BR')}</div>
-    ${doc.nfe_access_key ? `<div class="item"><span class="label">Chave de Acesso NF-e:</span> <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;">${doc.nfe_access_key}</code></div>` : ''}
+    <div class="item"><span class="label">Data de Registro:</span> ${new Date(doc.uploaded_at).toLocaleString('pt-BR')}</div>
+    ${doc.uploaded_by ? `<div class="item"><span class="label">Registrado por:</span> <strong>${doc.uploaded_by}</strong></div>` : ''}
   </div>
 </body>
 </html>`
     const blob = new Blob([fallbackHtml], { type: 'text/html;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     window.open(url, '_blank')
+  }
+
+  const handleDownloadDocument = (doc: AttachedDocument) => {
+    if (doc.file_url) {
+      const a = document.createElement('a')
+      a.href = doc.file_url
+      a.download = doc.name
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      return
+    }
+    if (doc.type === 'orcamento_pdf') {
+      setIsProposalModalOpen(true)
+      return
+    }
   }
 
   const handleAddComment = () => {
@@ -959,24 +1056,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
         <button
           type="button"
-          onClick={() => setActiveFormTab('documents')}
-          className={`flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeFormTab === 'documents'
-              ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-          }`}
-        >
-          <FileText className="w-4 h-4 shrink-0" />
-          <span className="truncate">4. Documentos & NFs</span>
-          <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-            activeFormTab === 'documents' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-          }`}>
-            {attachments.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
           onClick={() => setActiveFormTab('history')}
           className={`flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeFormTab === 'history'
@@ -985,12 +1064,25 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           }`}
         >
           <History className="w-4 h-4 shrink-0" />
-          <span className="truncate">5. Histórico & Tarefas</span>
-          {(comments.length > 0 || tasks.filter((t) => !t.completed).length > 0) && (
+          <span className="truncate">4. Histórico & Tarefas</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveFormTab('attachments')}
+          className={`flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeFormTab === 'attachments'
+              ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <Paperclip className="w-4 h-4 shrink-0" />
+          <span className="truncate">5. Anexos</span>
+          {attachments.length > 0 && (
             <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              activeFormTab === 'history' ? 'bg-white/20 text-white' : 'bg-orange-50 text-[#EA580C]'
+              activeFormTab === 'attachments' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
             }`}>
-              {tasks.filter((t) => !t.completed).length > 0 ? `${tasks.filter((t) => !t.completed).length} tar` : `${comments.length}`}
+              {attachments.length}
             </span>
           )}
         </button>
@@ -1689,164 +1781,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           )}
 
           {/* =========================================================================
-              ABA 4: 4. DOCUMENTOS & NFs
+              ABA 4: 4. HISTÓRICO, COMENTÁRIOS & TAREFAS
              ========================================================================= */}
-          {activeFormTab === 'documents' && (
-            <>
-              {/* Upload e Inclusão de Arquivos / Nota Fiscal */}
-              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-                  <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                      <Paperclip className="w-4 h-4 text-[#EA580C]" />
-                      <span>Anexar Documentos & Notas Fiscais (NF-e / Danfe)</span>
-                    </h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Anexe notas fiscais (PDF/XML), comprovantes de pagamento ou documentos do veículo.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                  <div className="md:col-span-8">
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                      Chave de Acesso NF-e (Opcional - 44 dígitos):
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={44}
-                      placeholder="Ex: 35260112345678000199550010000012341234567890"
-                      value={nfeKeyInput}
-                      onChange={(e) => setNfeKeyInput(e.target.value.replace(/\D/g, ''))}
-                      className="w-full bg-slate-50 border border-slate-200/90 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C]"
-                    />
-                  </div>
-
-                  <div className="md:col-span-4">
-                    <label className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 shadow-xs">
-                      <Upload className="w-4 h-4" />
-                      <span>Selecionar Arquivo</span>
-                      <input
-                        type="file"
-                        accept=".pdf,.xml,.png,.jpg,.jpeg"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Lista de Documentos Anexados ao Lead / Pedido */}
-              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-nexo space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                      Documentos Anexados ao Pedido / Lead
-                    </h3>
-                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                      {attachments.length} {attachments.length === 1 ? 'documento' : 'documentos'}
-                    </span>
-                  </div>
-                </div>
-
-                {attachments.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-slate-400 italic space-y-1.5 border border-dashed border-slate-200 rounded-xl">
-                    <p className="font-medium text-slate-500">Nenhum documento ou nota fiscal anexada até o momento.</p>
-                    <p className="text-[11px] text-slate-400">
-                      Utilize o campo acima para anexar arquivos (PDF/XML) ou gere a proposta comercial pelo botão da barra lateral.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2.5">
-                    {attachments.map((doc) => {
-                      const isXml = doc.type === 'nfe_xml' || doc.name.toLowerCase().endsWith('.xml')
-
-                      return (
-                        <div
-                          key={doc.id}
-                          className="p-3.5 rounded-xl border border-slate-200/80 hover:border-slate-300 bg-slate-50/60 flex items-center justify-between gap-3 transition-all"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                              doc.type === 'orcamento_pdf'
-                                ? 'bg-orange-100 text-[#EA580C]'
-                                : isXml
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : 'bg-sky-100 text-sky-700'
-                            }`}>
-                              {doc.type === 'orcamento_pdf' ? (
-                                <FileText className="w-5 h-5" />
-                              ) : isXml ? (
-                                <ReceiptText className="w-5 h-5" />
-                              ) : (
-                                <Paperclip className="w-5 h-5" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-bold text-slate-900 truncate max-w-[280px] sm:max-w-[400px]">
-                                  {doc.name}
-                                </span>
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  doc.type === 'orcamento_pdf'
-                                    ? 'bg-orange-50 text-[#EA580C] border border-orange-200'
-                                    : isXml
-                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                    : 'bg-sky-50 text-sky-700 border border-sky-200'
-                                }`}>
-                                  {doc.type === 'orcamento_pdf'
-                                    ? 'Proposta Comercial'
-                                    : isXml
-                                    ? 'Nota Fiscal (XML)'
-                                    : 'Nota Fiscal (PDF/Danfe)'}
-                                </span>
-                              </div>
-                              <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
-                                <span>{doc.file_size || '120 KB'}</span>
-                                <span>•</span>
-                                <span>{new Date(doc.uploaded_at).toLocaleString('pt-BR')}</span>
-                              </div>
-                              {doc.nfe_access_key && (
-                                <div className="text-[10px] font-mono text-slate-500 truncate mt-0.5">
-                                  Chave NF-e: <strong>{doc.nfe_access_key}</strong>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {/* Botão de Visualização em Nova Aba */}
-                            <button
-                              type="button"
-                              onClick={() => handleViewDocument(doc)}
-                              title="Visualizar em nova aba do navegador"
-                              className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-                              <span className="hidden sm:inline">Visualizar</span>
-                            </button>
-
-                            {/* Botão de Excluir */}
-                            <button
-                              type="button"
-                              onClick={() => setAttachmentToDelete(doc)}
-                              title="Remover documento"
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-
-          {/* TAB 5: HISTÓRICO, COMENTÁRIOS & TAREFAS */}
           {activeFormTab === 'history' && (
             <>
               {/* Card 1: Tarefas & Lembretes */}
@@ -2141,22 +2077,226 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               </div>
             </>
           )}
+
+          {/* =========================================================================
+              ABA 5: 5. ANEXOS & PROPOSTAS
+             ========================================================================= */}
+          {activeFormTab === 'attachments' && (
+            <>
+              {/* Central de Ações & Upload de Anexos */}
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                      <Paperclip className="w-4 h-4 text-[#EA580C]" />
+                      <span>Central de Anexos & Propostas</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Histórico completo de propostas comerciais em PDF, fotos, notas fiscais e documentos do orçamento.
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 self-start sm:self-auto">
+                    {attachments.length} {attachments.length === 1 ? 'arquivo' : 'arquivos'}
+                  </span>
+                </div>
+
+                {/* Input de arquivo universal oculto */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.xml,.txt,.csv"
+                  multiple
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+
+                {/* Grid de Ações Rápidas: Gerar Orçamento PDF + Anexar Arquivos */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Card/Botão 1: Gerar Orçamento PDF */}
+                  <button
+                    type="button"
+                    onClick={handleGenerateAndAttachProposal}
+                    className="p-4 rounded-xl border border-orange-200 bg-orange-50/50 hover:bg-orange-50 hover:border-[#EA580C] text-left transition-all cursor-pointer group flex items-start gap-3.5 shadow-2xs active:scale-[0.99]"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-[#EA580C] text-white flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors flex items-center gap-1.5">
+                        <span>Gerar Orçamento em PDF</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                        Gera a proposta comercial oficial e salva automaticamente no histórico de anexos.
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Card/Botão 2: Anexar Arquivos ou Fotos */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100/80 hover:border-slate-300 text-left transition-all cursor-pointer group flex items-start gap-3.5 shadow-2xs active:scale-[0.99]"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                      <Upload className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                        <span>Anexar Arquivos ou Fotos</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                        Imagens, PDFs, notas fiscais, planilhas e comprovantes de pagamento.
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Lista e Histórico de Anexos */}
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-nexo space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Arquivos Anexados ao Pedido / Lead
+                    </h3>
+                  </div>
+                </div>
+
+                {attachments.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400 italic space-y-1.5 border border-dashed border-slate-200 rounded-xl">
+                    <p className="font-medium text-slate-500">Nenhum anexo registrado até o momento.</p>
+                    <p className="text-[11px] text-slate-400">
+                      Gere a proposta comercial em PDF ou anexe arquivos pelos botões acima.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {attachments.map((doc) => {
+                      const isXml = doc.type === 'nfe_xml' || doc.name.toLowerCase().endsWith('.xml')
+                      const isImage = doc.type === 'imagem' || /\.(png|jpe?g|webp|gif|svg)$/i.test(doc.name)
+                      const isSpreadsheet = doc.type === 'planilha' || /\.(xlsx?|csv)$/i.test(doc.name)
+                      const isProposal = doc.type === 'orcamento_pdf'
+
+                      return (
+                        <div
+                          key={doc.id}
+                          className="p-3.5 rounded-xl border border-slate-200/80 hover:border-slate-300 bg-slate-50/60 flex items-center justify-between gap-3 transition-all"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                              isProposal
+                                ? 'bg-orange-100 text-[#EA580C]'
+                                : isImage
+                                ? 'bg-purple-100 text-purple-700'
+                                : isSpreadsheet
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : isXml
+                                ? 'bg-teal-100 text-teal-700'
+                                : 'bg-sky-100 text-sky-700'
+                            }`}>
+                              {isProposal ? (
+                                <FileText className="w-5 h-5" />
+                              ) : isImage ? (
+                                <ImageIcon className="w-5 h-5" />
+                              ) : isSpreadsheet ? (
+                                <FileSpreadsheet className="w-5 h-5" />
+                              ) : isXml ? (
+                                <ReceiptText className="w-5 h-5" />
+                              ) : (
+                                <File className="w-5 h-5" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-bold text-slate-900 truncate max-w-[280px] sm:max-w-[360px]" title={doc.name}>
+                                  {doc.name}
+                                </span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  isProposal
+                                    ? 'bg-orange-50 text-[#EA580C] border border-orange-200'
+                                    : isImage
+                                    ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                                    : isSpreadsheet
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : isXml
+                                    ? 'bg-teal-50 text-teal-700 border border-teal-200'
+                                    : 'bg-sky-50 text-sky-700 border border-sky-200'
+                                }`}>
+                                  {isProposal
+                                    ? 'Proposta Comercial (PDF)'
+                                    : isImage
+                                    ? 'Imagem'
+                                    : isSpreadsheet
+                                    ? 'Planilha'
+                                    : isXml
+                                    ? 'Nota Fiscal (XML)'
+                                    : doc.type === 'nfe_pdf'
+                                    ? 'Nota Fiscal (PDF/Danfe)'
+                                    : 'Documento'}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-2 flex-wrap">
+                                <span>{doc.file_size || 'N/A'}</span>
+                                <span>•</span>
+                                <span>{new Date(doc.uploaded_at).toLocaleString('pt-BR')}</span>
+                                {doc.uploaded_by && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="font-sans text-slate-600">
+                                      {isProposal ? 'Gerado por:' : 'Anexado por:'} <strong className="text-slate-800">{doc.uploaded_by}</strong>
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {/* Visualizar */}
+                            <button
+                              type="button"
+                              onClick={() => handleViewDocument(doc)}
+                              title="Visualizar em nova aba"
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                              <span className="hidden sm:inline">Visualizar</span>
+                            </button>
+
+                            {/* Baixar */}
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadDocument(doc)}
+                              title="Baixar arquivo"
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                            >
+                              <Download className="w-3.5 h-3.5 text-slate-500" />
+                              <span className="hidden sm:inline">Baixar</span>
+                            </button>
+
+                            {/* Excluir */}
+                            <button
+                              type="button"
+                              onClick={() => setAttachmentToDelete(doc)}
+                              title="Remover anexo"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Right Column: Persistent Sticky Official Quotation Sheet & Quick Actions */}
         <div className="lg:col-span-5 space-y-4">
           <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm sticky top-20">
-            {/* Hidden file input for Quick Action "Anexar NF" */}
-            <input
-              ref={nfFileInputRef}
-              type="file"
-              accept=".pdf,.xml"
-              onChange={(e) => {
-                handleFileUpload(e)
-                setActiveFormTab('documents')
-              }}
-              className="hidden"
-            />
 
             {/* Sheet Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
@@ -2479,38 +2619,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               )}
             </div>
 
-            {/* Botões de Ação Rápida na Barra Lateral Fixa */}
+            {/* Botões Principais: Salvar + Gerar Pedido */}
             <div className="space-y-2.5">
-              {/* Linha 1 de Ações Rápidas: Gerar Orçamento PDF + Anexar NF */}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsProposalModalOpen(true)}
-                  className="py-2.5 px-2.5 rounded-xl text-xs font-bold border border-orange-200 hover:border-[#EA580C] text-[#EA580C] hover:bg-orange-50 bg-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-98"
-                >
-                  <FileText className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">Gerar Orçamento PDF</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveFormTab('documents')
-                    nfFileInputRef.current?.click()
-                  }}
-                  className="py-2.5 px-2.5 rounded-xl text-xs font-bold border border-slate-200 hover:border-sky-600 text-slate-700 hover:text-sky-700 hover:bg-sky-50/60 bg-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-98"
-                >
-                  <Paperclip className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                  <span className="truncate">Anexar NF</span>
-                  {attachments.length > 0 && (
-                    <span className="text-[10px] font-mono bg-sky-100 text-sky-800 px-1.5 py-0.2 rounded-full">
-                      {attachments.length}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {/* Botões Principais: Salvar + Gerar Pedido */}
               <div className="grid grid-cols-2 gap-2">
                 {/* Botão Salvar (Cria/atualiza o card no Funil de Vendas) */}
                 <button
@@ -2600,6 +2710,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           installationTime,
           paymentMethod: (paymentMethod as PaymentMethod) || 'pix',
           totalWeightKg: budget.totalWeightKg,
+          assignedTo: currentUser?.name || assignedTo,
         }}
       />
 

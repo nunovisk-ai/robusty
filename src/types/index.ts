@@ -128,10 +128,11 @@ export interface OpportunityItem {
 export interface AttachedDocument {
   id: string
   name: string
-  type: 'nfe_pdf' | 'nfe_xml' | 'orcamento_pdf' | 'comprovante' | 'outro'
+  type: 'imagem' | 'documento' | 'orcamento_pdf' | 'nfe_pdf' | 'nfe_xml' | 'comprovante' | 'planilha' | 'outro'
   file_url?: string
   file_size?: string
   uploaded_at: string
+  uploaded_by?: string
   nfe_access_key?: string
 }
 
