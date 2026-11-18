@@ -1118,7 +1118,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           }`}
         >
           <History className="w-4 h-4 shrink-0" />
-          <span className="truncate">4. Histórico & Tarefas</span>
+          <span className="truncate">4. Observações & Tarefas</span>
         </button>
 
         <button
@@ -1901,7 +1901,47 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
              ========================================================================= */}
           {activeFormTab === 'history' && (
             <>
-              {/* Card 1: Tarefas & Lembretes */}
+              {/* Card 1: Observações Internas */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-sky-100 flex items-center justify-center text-sky-600">
+                      <MessageSquare className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Observações Internas</h3>
+                      <p className="text-xs text-slate-500">Múltiplos registros salvos com autor, data e hora de registro.</p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                    {comments.length} registro(s)
+                  </span>
+                </div>
+
+                {/* Caixa de Entrada de Observação */}
+                <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200 space-y-3">
+                  <textarea
+                    value={newCommentText}
+                    onChange={(e) => setNewCommentText(e.target.value)}
+                    placeholder="Adicione uma observação sobre o cliente, negociação de valores, detalhes do veículo..."
+                    rows={3}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EA580C]/20 focus:border-[#EA580C] transition-all resize-none"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleAddComment}
+                      disabled={!newCommentText.trim()}
+                      className="px-4 py-2 bg-[#EA580C] hover:bg-[#c2410c] disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Adicionar Observação</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Tarefas & Lembretes */}
               <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                   <div className="flex items-center gap-2.5">
@@ -2073,49 +2113,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 )}
               </div>
 
-              {/* Card 2: Comentários & Observações */}
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-sky-100 flex items-center justify-center text-sky-600">
-                      <MessageSquare className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900">Comentários & Observações Internas</h3>
-                      <p className="text-xs text-slate-500">Múltiplos comentários salvos com autor, data e hora de registro.</p>
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                    {comments.length} registro(s)
-                  </span>
-                </div>
-
-                {/* Caixa de Entrada de Comentário */}
-                <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200 space-y-3">
-                  <textarea
-                    value={newCommentText}
-                    onChange={(e) => setNewCommentText(e.target.value)}
-                    placeholder="Adicione uma observação sobre o cliente, negociação de valores, detalhes do veículo..."
-                    rows={3}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EA580C]/20 focus:border-[#EA580C] transition-all resize-none"
-                  />
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
-                      <FaUser className="w-2.5 h-2.5 text-slate-400" />
-                      <span>Registrando automaticamente como: <strong className="text-slate-800">{currentUser?.name || assignedTo}</strong></span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleAddComment}
-                      disabled={!newCommentText.trim()}
-                      className="px-4 py-2 bg-[#EA580C] hover:bg-[#c2410c] disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Adicionar Comentário</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
 
               {/* Card 3: Linha do Tempo & Histórico Completo do Lead */}
               <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-4">
