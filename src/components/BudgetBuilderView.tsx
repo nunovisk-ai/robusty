@@ -58,7 +58,9 @@ import {
   Search,
   X,
   Lock,
-  Pencil
+  Pencil,
+  Save,
+  Percent
 } from 'lucide-react'
 import { 
   FaWhatsapp, 
@@ -287,6 +289,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [pendingAction, setPendingAction] = useState<'save' | 'order' | null>(null)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [lostModalOpen, setLostModalOpen] = useState(false)
+  const [discountModalOpen, setDiscountModalOpen] = useState(false)
+  const [tempDiscountPercent, setTempDiscountPercent] = useState(0)
 
   // Load Vehicles & Products
   useEffect(() => {
@@ -358,13 +362,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const handlePaymentMethodSelect = (method: PaymentMethod) => {
     setPaymentMethod(method)
     const maxDiscount = getMaxDiscountForPaymentMethod(method)
-    // Preset defaults
-    if (method === 'pix') {
-      setDiscountPercent(10)
-    } else if (method === 'boleto') {
-      setDiscountPercent(5)
-    } else {
-      setDiscountPercent(0)
+    // Only clamp if current discount exceeds max allowed; never force discount on change
+    if (discountPercent > maxDiscount) {
+      setDiscountPercent(maxDiscount)
     }
   }
 
@@ -2446,12 +2446,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 />
               </div>
               <div className="text-right">
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                  RESUMO & AÇÕES RÁPIDAS
-                </span>
-                <div className="text-[10px] font-mono text-slate-400 mt-0.5">
+                <span className="text-xs font-mono font-bold text-slate-500">
                   #ROB-{orderNumber}
-                </div>
+                </span>
               </div>
             </div>
 
@@ -2570,7 +2567,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   }`}
                 >
                   <QrCode className="w-3.5 h-3.5" />
-                  <span>PIX (Até 10%)</span>
+                  <span>À vista</span>
                 </button>
 
                 <button
@@ -2583,7 +2580,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   }`}
                 >
                   <ReceiptText className="w-3.5 h-3.5" />
-                  <span>Boleto (Até 5%)</span>
+                  <span>Boleto</span>
                 </button>
 
                 <button
@@ -2596,121 +2593,81 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   }`}
                 >
                   <CreditCard className="w-3.5 h-3.5" />
-                  <span>Cartão (Até 10x)</span>
+                  <span>Cartão de Crédito</span>
                 </button>
               </div>
 
-              {/* Se a forma de pagamento ainda não foi selecionada */}
-              {!paymentMethod ? (
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>Selecione a forma de pagamento acima para definir as opções de parcelas e descontos.</span>
+              {/* Se for Cartão: Seleção de Parcelas */}
+              {(paymentMethod === 'cartao_link_igor' || paymentMethod === 'cartao_presencial') && (
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-slate-600 font-bold">Parcelas no Cartão:</span>
+                    <span className="font-mono text-slate-800 font-bold">
+                      {cardInstallments}x de {formatCurrency(budget.finalTotal / cardInstallments)}
+                    </span>
+                  </div>
+                  <select
+                    value={cardInstallments}
+                    onChange={(e) => setCardInstallments(parseInt(e.target.value))}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono cursor-pointer"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                      <option key={num} value={num}>
+                        {num}x sem juros ({formatCurrency(budget.finalTotal / num)})
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              ) : (
-                /* Opções de Desconto e Parcelas de acordo com a forma selecionada */
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2.5">
-                  {/* Se for Cartão: Seleção de Parcelas */}
-                  {(paymentMethod === 'cartao_link_igor' || paymentMethod === 'cartao_presencial') && (
-                    <div>
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-slate-600 font-bold">Parcelas:</span>
-                        <span className="font-mono text-slate-800 font-bold">
-                          {cardInstallments}x de {formatCurrency(budget.finalTotal / cardInstallments)}
-                        </span>
+              )}
+
+              {/* Concessão de Desconto Comercial (Exceção) para À vista ou Boleto */}
+              {(paymentMethod === 'pix' || paymentMethod === 'boleto') && maxAllowedDiscount > 0 && (
+                <div>
+                  {discountPercent === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTempDiscountPercent(0)
+                        setDiscountModalOpen(true)
+                      }}
+                      className="w-full py-2.5 px-3 border border-dashed border-slate-300 hover:border-[#EA580C] hover:bg-orange-50/50 rounded-xl text-xs font-semibold text-slate-600 hover:text-[#EA580C] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Percent className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Conceder Desconto (Exceção)</span>
+                    </button>
+                  ) : (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs space-y-1.5 animate-in fade-in-50">
+                      <div className="flex items-center justify-between text-emerald-900 font-bold">
+                        <div className="flex items-center gap-1.5">
+                          <Percent className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Desconto Concedido: {discountPercent}%</span>
+                        </div>
+                        <span className="font-mono text-emerald-700">-{formatCurrency(budget.discountValue)}</span>
                       </div>
-                      <select
-                        value={cardInstallments}
-                        onChange={(e) => setCardInstallments(parseInt(e.target.value))}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono cursor-pointer"
-                      >
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                          <option key={num} value={num}>
-                            {num}x sem juros ({formatCurrency(budget.finalTotal / num)})
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-emerald-200/60">
+                        <span className="italic">Exceção comercial autorizada</span>
+                        <div className="flex items-center gap-2 font-bold">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTempDiscountPercent(discountPercent)
+                              setDiscountModalOpen(true)
+                            }}
+                            className="text-[#EA580C] hover:underline cursor-pointer"
+                          >
+                            Alterar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDiscountPercent(0)}
+                            className="text-rose-600 hover:underline cursor-pointer"
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
-
-                  {/* Controle de Desconto condicionado aos limites exatos estabelecidos */}
-                  <div>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-slate-600 font-bold">
-                        Desconto Aplicado (Máximo {maxAllowedDiscount}%):
-                      </span>
-                      <span className="font-mono text-[#EA580C] font-bold">{discountPercent}%</span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="range"
-                        min="0"
-                        max={maxAllowedDiscount}
-                        step="1"
-                        value={discountPercent}
-                        onChange={(e) => setDiscountPercent(parseInt(e.target.value) || 0)}
-                        className="flex-1 accent-[#EA580C] cursor-pointer"
-                      />
-                      <input
-                        type="number"
-                        min="0"
-                        max={maxAllowedDiscount}
-                        value={discountPercent}
-                        onChange={(e) => {
-                          const val = Math.min(Math.max(parseInt(e.target.value) || 0, 0), maxAllowedDiscount)
-                          setDiscountPercent(val)
-                        }}
-                        className="w-14 bg-white border border-slate-200 rounded-md px-2 py-0.5 text-xs text-center font-mono font-bold"
-                      />
-                      <span className="text-xs font-mono text-slate-500">%</span>
-                    </div>
-
-                    <div className="flex gap-1.5 mt-2">
-                      {paymentMethod === 'pix' && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setDiscountPercent(10)}
-                            className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-700 hover:border-[#EA580C] cursor-pointer"
-                          >
-                            10% Padrão
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDiscountPercent(5)}
-                            className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-700 hover:border-[#EA580C] cursor-pointer"
-                          >
-                            5%
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDiscountPercent(0)}
-                            className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-700 hover:border-[#EA580C] cursor-pointer"
-                          >
-                            0%
-                          </button>
-                        </>
-                      )}
-                      {paymentMethod === 'boleto' && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setDiscountPercent(5)}
-                            className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-700 hover:border-[#EA580C] cursor-pointer"
-                          >
-                            5% Padrão
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDiscountPercent(0)}
-                            className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-700 hover:border-[#EA580C] cursor-pointer"
-                          >
-                            0%
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
                 </div>
               )}
             </div>
@@ -2764,9 +2721,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="py-3 px-3 rounded-xl text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] text-white shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+                  className="py-3 px-3 rounded-xl text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] text-white shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
                 >
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <Save className="w-4 h-4 shrink-0" />
                   <span>Salvar</span>
                 </button>
 
@@ -2896,6 +2853,110 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         secondaryButtonText="Cancelar"
         isDangerAction={true}
       />
+
+      {/* MODAL 6: CONCESSÃO EXCEPCIONAL DE DESCONTO COMERCIAL */}
+      {discountModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in-50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-[#EA580C]">
+                  <Percent className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Aplicar Desconto Especial</h3>
+                  <p className="text-xs text-slate-500">Concessão de desconto comercial por exceção</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDiscountModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200/80 rounded-xl text-xs text-amber-900 space-y-1">
+              <div className="font-bold flex items-center gap-1.5 text-amber-950">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span>Atenção: Concessão Excepcional</span>
+              </div>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                Descontos só devem ser concedidos em situações excepcionais autorizadas. O limite máximo para esta forma de pagamento ({paymentMethod === 'pix' ? 'À vista' : paymentMethod === 'boleto' ? 'Boleto' : 'Cartão'}) é de <strong>{maxAllowedDiscount}%</strong>.
+              </p>
+            </div>
+
+            {/* Configuração do Desconto */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Percentual de Desconto (%):
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min="1"
+                    max={maxAllowedDiscount}
+                    value={tempDiscountPercent || ''}
+                    onChange={(e) => {
+                      const val = Math.min(Math.max(parseInt(e.target.value) || 0, 0), maxAllowedDiscount)
+                      setTempDiscountPercent(val)
+                    }}
+                    placeholder={`1 a ${maxAllowedDiscount}`}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono font-bold text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                    autoFocus
+                  />
+                  <span className="text-sm font-mono font-bold text-slate-500">%</span>
+                </div>
+              </div>
+
+              {/* Pré-visualização do Impacto */}
+              {tempDiscountPercent > 0 && (
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-1.5 text-xs font-mono">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Subtotal Produtos:</span>
+                    <span>{formatCurrency(budget.subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-emerald-700 font-bold">
+                    <span>Desconto ({tempDiscountPercent}%):</span>
+                    <span>-{formatCurrency((budget.subtotal * tempDiscountPercent) / 100)}</span>
+                  </div>
+                  <div className="pt-1.5 border-t border-slate-200 flex justify-between font-bold text-slate-900">
+                    <span>Novo Total Produtos:</span>
+                    <span className="text-[#EA580C]">
+                      {formatCurrency(budget.subtotal - (budget.subtotal * tempDiscountPercent) / 100)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Confirmação e Ações */}
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDiscountModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={tempDiscountPercent <= 0 || tempDiscountPercent > maxAllowedDiscount}
+                onClick={() => {
+                  setDiscountPercent(tempDiscountPercent)
+                  setDiscountModalOpen(false)
+                }}
+                className="px-4 py-2 bg-[#EA580C] hover:bg-[#c2410c] disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Confirmar e Aplicar Desconto</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
