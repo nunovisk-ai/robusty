@@ -19,6 +19,73 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
   }
 }
 
+const SKU_WEIGHT_MAP: Record<string, number> = {
+  'KOM-MX100-PLUS': 38,
+  'KOM-MX200-PLUS': 38,
+  'KOM-MX80-PLUS': 28,
+  'KOM-MX50-PLUS': 16,
+  'KOM-ESCADA': 9,
+  'KOM-VENTOSAS': 1.5,
+  'KOM-ESTEPE': 3.5,
+  'KOM-HASTE-UNID': 0.5,
+  'KOM-KIT-HASTES-8P': 4,
+  'KOM-KIT-FIX-ESC': 0.8,
+  'KOM-SUP-TOLDO': 2,
+  'KOM-SUP-TOLDO-LEROY': 2,
+  'KOM-BARRA-SOLAR': 3.5,
+  'KOM-DECK-MX100': 18,
+  'KOM-MEIO-DECK-MX100': 9,
+  'KOM-DECK-MX80': 12,
+  'KOM-DECK-MX50': 6,
+  'KOM-DECK-ESCADA': 2.5,
+  'KAN-KX100': 24,
+  'KAN-KX200': 24,
+  'KAN-KX200-NOVA': 26,
+  'FIO-FX100': 22,
+  'FIO-FX200': 22,
+  'DOB-DX100': 23,
+  'DOB-DX200': 23,
+  'K0-MX120': 34,
+  'K0-ABA-DUPLA': 35,
+  'K0-EXTREME': 42,
+  'K0-DECK-MX120': 16,
+  'K0-DECK-ESCADA': 2.5,
+  'K0-ESCADA': 10,
+  'K0-SUP-ROLETE': 6,
+  'DUC-MAX-2023': 45,
+  'SAV-CS': 22,
+  'SAV-CD': 20,
+  'SAV-ROLETE': 8,
+  'MAS-L3H2': 48,
+  'EXP-STANDARD': 24,
+  'DAI-FURGAO': 52,
+  'SPR-415-515': 55,
+  'HR-CABINE': 26,
+  'JBOX-L3H2': 46,
+}
+
+function enrichProductWithWeight(product: Product): Product {
+  if (product.weight_kg !== undefined && product.weight_kg !== null && product.weight_kg > 0) {
+    return product
+  }
+
+  const skuUpper = product.sku?.trim().toUpperCase()
+  if (skuUpper && SKU_WEIGHT_MAP[skuUpper] !== undefined) {
+    return { ...product, weight_kg: SKU_WEIGHT_MAP[skuUpper] }
+  }
+
+  const catalogMatch = initialProducts.find(
+    (ip) =>
+      (ip.sku && skuUpper && ip.sku.toUpperCase() === skuUpper) ||
+      ip.name.trim().toLowerCase() === product.name.trim().toLowerCase()
+  )
+  if (catalogMatch?.weight_kg !== undefined) {
+    return { ...product, weight_kg: catalogMatch.weight_kg }
+  }
+
+  return product
+}
+
 export async function fetchProducts(vehicleId?: string): Promise<Product[]> {
   try {
     let query = supabase.from('products').select('*').eq('is_active', true)
@@ -35,7 +102,7 @@ export async function fetchProducts(vehicleId?: string): Promise<Product[]> {
         (p) => !p.compatible_vehicle_id || p.compatible_vehicle_id === vehicleId
       )
     }
-    return data as Product[]
+    return (data as Product[]).map(enrichProductWithWeight)
   } catch {
     if (!vehicleId) return initialProducts
     return initialProducts.filter(

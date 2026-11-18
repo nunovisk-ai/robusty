@@ -53,7 +53,9 @@ import {
   Download,
   Image as ImageIcon,
   FileSpreadsheet,
-  File
+  File,
+  Search,
+  X
 } from 'lucide-react'
 import { 
   FaWhatsapp, 
@@ -65,7 +67,8 @@ import {
   FaVanShuttle, 
   FaTruck, 
   FaCarSide, 
-  FaTruckPickup 
+  FaTruckPickup,
+  FaWeightHanging
 } from 'react-icons/fa6'
 
 type BudgetFormTab = 'contact' | 'products' | 'fulfillment' | 'history' | 'attachments'
@@ -199,8 +202,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [pickupDate, setPickupDate] = useState<string>(() => initialOpportunity?.pickup_date || '')
   const [pickupTime, setPickupTime] = useState<string>(() => initialOpportunity?.pickup_time || '10:00')
 
-  // Filtro Rápido de Categorias de Produtos
+  // Filtro Rápido de Categorias e Busca de Produtos
   const [productCategoryFilter, setProductCategoryFilter] = useState<'all' | 'bagageiro' | 'escada' | 'suporte' | 'outros'>('all')
+  const [productSearchQuery, setProductSearchQuery] = useState('')
 
   // Instalação na Loja
   const [installationDate, setInstallationDate] = useState<string>(() => initialOpportunity?.installation_date || '')
@@ -306,19 +310,37 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     )
   }, [allProducts, selectedVehicleId])
 
-  // Filtragem rápida por categoria solicitada pelo usuário (Bagageiros, Escadas, Suportes, Outros)
+  // Filtragem rápida por categoria e busca dinâmica em tempo real
   const filteredCompatibleProducts = useMemo(() => {
+    const normalizeText = (str: string) =>
+      str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+
+    const queryNorm = normalizeText(productSearchQuery.trim())
+
     return compatibleProducts.filter((p) => {
-      if (productCategoryFilter === 'all') return true
-      if (productCategoryFilter === 'bagageiro') return p.category === 'bagageiro'
-      if (productCategoryFilter === 'escada') return p.category === 'escada'
-      if (productCategoryFilter === 'suporte') return p.category === 'suporte' || p.category === 'acessorio_fixacao'
-      if (productCategoryFilter === 'outros') {
-        return p.category !== 'bagageiro' && p.category !== 'escada' && p.category !== 'suporte' && p.category !== 'acessorio_fixacao'
+      // 1. Filtro por categoria
+      if (productCategoryFilter === 'bagageiro' && p.category !== 'bagageiro') return false
+      if (productCategoryFilter === 'escada' && p.category !== 'escada') return false
+      if (productCategoryFilter === 'suporte' && p.category !== 'suporte' && p.category !== 'acessorio_fixacao') return false
+      if (
+        productCategoryFilter === 'outros' &&
+        (p.category === 'bagageiro' || p.category === 'escada' || p.category === 'suporte' || p.category === 'acessorio_fixacao')
+      ) {
+        return false
       }
-      return true
+
+      // 2. Filtro por busca textual (se vazio, exibe todos os compatíveis)
+      if (!queryNorm) return true
+
+      const searchableText = normalizeText(
+        `${p.name} ${p.sku || ''} ${p.dimensions || ''} ${p.model_version || ''} ${p.description || ''}`
+      )
+      return searchableText.includes(queryNorm)
     })
-  }, [compatibleProducts, productCategoryFilter])
+  }, [compatibleProducts, productCategoryFilter, productSearchQuery])
 
   // Recalculate installation cost default when vehicle changes if not custom edited
   useEffect(() => {
@@ -1358,20 +1380,17 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
              ========================================================================= */}
           {activeFormTab === 'products' && (
             <>
-              {/* 2.1 Veículo do Cliente (Sem parenteses, sem badge laranja, sem rodapé de regras, sem marca, com ícone e rolagem horizontal em ordem alfabética) */}
+              {/* 2.1 Veículo do Cliente */}
               <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
                     <Car className="w-4 h-4 text-[#EA580C]" />
                     <span>Veículo do Cliente</span>
                   </h3>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {sortedVehicles.length} modelos (A-Z)
-                  </span>
                 </div>
 
-                {/* Barra de rolagem horizontal em ordem alfabética */}
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                {/* Grade de veículos distribuída em múltiplas linhas (sem rolagem horizontal) */}
+                <div className="flex flex-wrap gap-2">
                   {sortedVehicles.map((v) => {
                     const isSelected = selectedVehicleId === v.id
                     const cleanModel = getCleanVehicleModel(v.model)
@@ -1384,7 +1403,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                           setSelectedVehicleId(v.id)
                           setItems([]) // clear incompatible items
                         }}
-                        className={`px-4 py-2.5 rounded-xl border flex items-center gap-2 shrink-0 transition-all cursor-pointer ${
+                        className={`px-4 py-2.5 rounded-xl border flex items-center gap-2 transition-all cursor-pointer ${
                           isSelected
                             ? 'bg-[#FFF3EA] border-[#EA580C] text-[#EA580C] font-bold shadow-xs'
                             : 'bg-slate-50 hover:bg-slate-100 border-slate-200/80 text-slate-700 font-medium'
@@ -1400,19 +1419,38 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 </div>
               </div>
 
-              {/* 2.2 Bagageiros e Acessórios Compatíveis (com pesos, medidas, sem condições de pagamento) */}
+              {/* 2.2 Bagageiros e Acessórios Compatíveis */}
               <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
                     Bagageiros e Acessórios Compatíveis
                   </h3>
-                  <span className="text-xs text-slate-400 font-mono">
-                    {filteredCompatibleProducts.length} de {compatibleProducts.length} itens
-                  </span>
+                </div>
+
+                {/* Campo de Busca Dinâmica em Tempo Real */}
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={productSearchQuery}
+                    onChange={(e) => setProductSearchQuery(e.target.value)}
+                    placeholder="Buscar item por nome, medida ou característica..."
+                    className="w-full bg-slate-50 border border-slate-200/80 rounded-xl pl-10 pr-9 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
+                  />
+                  {productSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setProductSearchQuery('')}
+                      title="Limpar busca"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Pílulas de Filtragem Rápida por Categoria */}
-                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+                <div className="flex flex-wrap gap-1.5">
                   {[
                     { id: 'all', label: 'Todos' },
                     { id: 'bagageiro', label: 'Bagageiros' },
@@ -1438,7 +1476,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
                   {filteredCompatibleProducts.length === 0 ? (
                     <div className="py-8 text-center text-xs text-slate-400 font-medium border border-dashed border-slate-200 rounded-xl">
-                      Nenhum produto encontrado nesta categoria para este veículo.
+                      Nenhum produto encontrado para este filtro ou busca.
                     </div>
                   ) : (
                     filteredCompatibleProducts.map((p) => {
@@ -1454,15 +1492,17 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                             </div>
 
                             {/* Dimensões, Peso e Valor do Produto */}
-                            <div className="flex items-center gap-3 text-xs mt-1 font-mono text-slate-500">
+                            <div className="flex items-center gap-2 flex-wrap text-xs mt-1.5 font-mono text-slate-500">
                               {p.dimensions && (
-                                <span className="text-[11px] text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                                  📏 {p.dimensions}
+                                <span className="text-[11px] text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1.5">
+                                  <span>📏</span>
+                                  <span>{p.dimensions}</span>
                                 </span>
                               )}
                               {p.weight_kg !== undefined && p.weight_kg > 0 && (
-                                <span className="text-[11px] text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                                  ⚖️ {p.weight_kg} kg
+                                <span className="text-[11px] text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1.5">
+                                  <FaWeightHanging className="w-3 h-3 text-slate-400 shrink-0" />
+                                  <span>{p.weight_kg} kg</span>
                                 </span>
                               )}
                               <span className="text-slate-900 font-bold ml-auto font-sans">
