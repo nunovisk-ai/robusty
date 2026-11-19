@@ -12,6 +12,9 @@ import {
   X,
   LayoutGrid,
   List,
+  Columns3,
+  Table2,
+  ChevronRight,
   Clock,
   Calendar,
   MessageSquare
@@ -148,6 +151,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   onSelectOpportunity
 }) => {
   const [pipelineType, setPipelineType] = useState<PipelineType>('vendas')
+  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban')
+  const [stageFilter, setStageFilter] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [density, setDensity] = useState<'detailed' | 'compact'>('detailed')
 
@@ -573,14 +578,75 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     setDragOverStageId(null)
   }
 
+  const openOrderDetails = (ord: Order) => {
+    if (!onSelectOpportunity) return
+    const linkedOpp =
+      ord.opportunity ||
+      opportunities.find((o) => o.id === ord.opportunity_id || o.order_number === ord.order_number)
+    if (linkedOpp) {
+      onSelectOpportunity(linkedOpp)
+      return
+    }
+    const vehicle = getVehicleModelInfo(getOrderVehicleModel(ord))
+    const ordTotal = getOrderTotal(ord)
+    onSelectOpportunity({
+      id: ord.opportunity_id || `opp-${ord.id}`,
+      order_number: ord.order_number,
+      assigned_to: ord.assigned_to || 'Igor',
+      contact_id: ord.contact_id,
+      contact: ord.contact,
+      instagram_url: ord.instagram_url || ord.contact?.instagram_url,
+      facebook_url: ord.facebook_url || ord.contact?.facebook_url,
+      website_url: ord.website_url || ord.contact?.website_url,
+      vehicle_model_year: vehicle.modelName,
+      stage: 'venda_ganha',
+      fulfillment_type: ord.fulfillment_type,
+      subtotal_products: ordTotal,
+      freight_value: 0,
+      installation_value: 0,
+      discount_value: 0,
+      discount_percent: 0,
+      final_total: ordTotal,
+      payment_method: 'pix',
+      pickup_date: ord.pickup_date,
+      pickup_time: ord.pickup_time,
+      installation_date: ord.installation_date,
+      installation_time: ord.installation_time,
+      attachments: ord.attachments,
+      created_at: ord.created_at,
+      updated_at: ord.created_at,
+    })
+  }
+
+  const getFulfillmentLabel = (type?: string) => {
+    switch (type) {
+      case 'instalacao_loja': return 'Instalação na Loja'
+      case 'retirada_loja': return 'Retirada na Loja'
+      case 'envio_transportadora': return 'Transportadora'
+      default: return 'A definir'
+    }
+  }
+
+  // Itens filtrados pela etapa selecionada na visualização em Lista
+  const listOpportunities = stageFilter === 'all'
+    ? filteredOpportunities
+    : filteredOpportunities.filter((o) => normalizeOppStage(o.stage) === stageFilter)
+
+  const listOrders = stageFilter === 'all'
+    ? filteredOrders
+    : filteredOrders.filter((o) => normalizeOrdStatus(o.status) === stageFilter)
+
   return (
     <div className="flex-1 flex flex-col min-h-0 space-y-3">
       {/* Top Header & Pipeline Mode Switcher (Sem badges contadoras conforme solicitado) */}
-      <div className="bg-white rounded-2xl p-2.5 sm:px-4 sm:py-2.5 border border-slate-200/90 shadow-2xs shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        {/* Switcher entre os Funis: Funil de Vendas e Funil de Pedidos (sem contadores) */}
-        <div className="flex items-center gap-2">
+      <div className="bg-white rounded-2xl p-2.5 sm:px-4 sm:py-2.5 border border-slate-200/90 shadow-2xs shrink-0 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+        {/* Switcher entre os Funis: Funil de Vendas e Funil de Pedidos */}
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setPipelineType('vendas')}
+            onClick={() => {
+              setPipelineType('vendas')
+              setStageFilter('all')
+            }}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer outline-none ${
               pipelineType === 'vendas'
                 ? 'bg-[#EA580C] text-white shadow-sm ring-1 ring-orange-500/20'
@@ -592,7 +658,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
           </button>
 
           <button
-            onClick={() => setPipelineType('pedidos')}
+            onClick={() => {
+              setPipelineType('pedidos')
+              setStageFilter('all')
+            }}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer outline-none ${
               pipelineType === 'pedidos'
                 ? 'bg-[#EA580C] text-white shadow-sm ring-1 ring-orange-500/20'
@@ -602,39 +671,71 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
             <Truck className={`w-3.5 h-3.5 ${pipelineType === 'pedidos' ? 'text-white' : 'text-slate-500'}`} />
             <span>Funil de Pedidos</span>
           </button>
-        </div>
 
-        {/* Controles: Densidade, Busca e Botão Novo Orçamento */}
-        <div className="flex items-center gap-2 flex-1 max-w-lg justify-end flex-wrap">
-          {/* Seletor de Densidade (Detalhado vs Compacto) */}
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 shrink-0">
+          {/* Alternador de Visualização: Kanban vs Lista */}
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 shrink-0 ml-0 sm:ml-1">
             <button
               type="button"
-              onClick={() => setDensity('detailed')}
-              title="Exibição Detalhada dos Cards"
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                density === 'detailed'
-                  ? 'bg-white text-slate-800 shadow-2xs'
+              onClick={() => setViewMode('kanban')}
+              title="Visualização em Kanban (Colunas)"
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'kanban'
+                  ? 'bg-white text-[#EA580C] shadow-2xs'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline text-[11px]">Detalhado</span>
+              <Columns3 className="w-3.5 h-3.5" />
+              <span className="text-[11px]">Kanban</span>
             </button>
             <button
               type="button"
-              onClick={() => setDensity('compact')}
-              title="Exibição Compacta (Alta Densidade)"
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                density === 'compact'
-                  ? 'bg-white text-slate-800 shadow-2xs'
+              onClick={() => setViewMode('list')}
+              title="Visualização em Lista (Tabela)"
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'list'
+                  ? 'bg-white text-[#EA580C] shadow-2xs'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <List className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline text-[11px]">Compacto</span>
+              <Table2 className="w-3.5 h-3.5" />
+              <span className="text-[11px]">Lista</span>
             </button>
           </div>
+        </div>
+
+        {/* Controles: Densidade (Kanban), Busca e Botão Novo Orçamento */}
+        <div className="flex items-center gap-2 flex-1 lg:max-w-lg justify-end flex-wrap">
+          {/* Seletor de Densidade (Detalhado vs Compacto — apenas no modo Kanban) */}
+          {viewMode === 'kanban' && (
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 shrink-0">
+              <button
+                type="button"
+                onClick={() => setDensity('detailed')}
+                title="Exibição Detalhada dos Cards"
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                  density === 'detailed'
+                    ? 'bg-white text-slate-800 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline text-[11px]">Detalhado</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDensity('compact')}
+                title="Exibição Compacta (Alta Densidade)"
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                  density === 'compact'
+                    ? 'bg-white text-slate-800 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <List className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline text-[11px]">Compacto</span>
+              </button>
+            </div>
+          )}
 
           {/* Busca em Tempo Real com Botão Limpar */}
           <div className="relative flex-1 min-w-[170px] max-w-xs">
@@ -671,9 +772,9 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         </div>
       </div>
 
-      {/* 1. FUNIL DE VENDAS (8 Etapas com borda dinâmica na cor da etapa ao arrastar) */}
-      {pipelineType === 'vendas' && (
-        <div className="flex-1 flex gap-3 overflow-x-auto pb-1 kanban-scroll items-stretch min-h-0">
+      {/* 1A. FUNIL DE VENDAS — MODO KANBAN (8 Etapas com scroll vertical interno por container de etapa) */}
+      {pipelineType === 'vendas' && viewMode === 'kanban' && (
+        <div className="flex-1 flex gap-3 overflow-x-auto pb-2 kanban-scroll items-stretch min-h-0">
           {SALES_STAGES.map((col, colIdx) => {
             const colOpps = filteredOpportunities.filter((o) => normalizeOppStage(o.stage) === col.id)
             const colTotal = colOpps.reduce((sum, o) => sum + (o.final_total || 0), 0)
@@ -685,7 +786,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 onDragOver={(e) => handleDragOver(e, col.id)}
                 onDragLeave={() => handleDragLeave(col.id)}
                 onDrop={(e) => handleDropOpportunity(e, col.id)}
-                className={`w-[290px] flex-shrink-0 bg-slate-100/90 rounded-2xl border border-slate-200/90 flex flex-col h-full max-h-full shadow-2xs transition-all duration-200 overflow-hidden ${
+                className={`w-[290px] flex-shrink-0 bg-slate-100/90 rounded-2xl border border-slate-200/90 flex flex-col h-full max-h-full min-h-0 shadow-2xs transition-all duration-200 overflow-hidden ${
                   isDragTarget ? 'bg-slate-200/70 ring-2 ring-slate-300/80 shadow-inner' : ''
                 }`}
               >
@@ -718,7 +819,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 </div>
 
                 {/* Cards Container com Scroll Vertical Interno por Etapa */}
-                <div className="p-2 space-y-2.5 overflow-y-auto flex-1 kanban-scroll">
+                <div className="p-2 space-y-2.5 overflow-y-auto flex-1 min-h-0 kanban-col-scroll">
                   {colOpps.length === 0 ? (
                     <div className="py-12 text-center text-xs text-slate-400 font-medium border border-dashed border-slate-200 rounded-xl m-0.5 flex items-center justify-center">
                       Nenhum card nesta etapa
@@ -1040,9 +1141,237 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         </div>
       )}
 
-      {/* 2. FUNIL DE PEDIDOS (Espelho fiel do Funil de Vendas com modelo, total da etapa e borda dinâmica) */}
-      {pipelineType === 'pedidos' && (
-        <div className="flex-1 flex gap-3 overflow-x-auto pb-1 kanban-scroll items-stretch min-h-0">
+      {/* 1B. FUNIL DE VENDAS — MODO LISTA (Tabela com filtro por etapa e troca/avanço rápido de etapa) */}
+      {pipelineType === 'vendas' && viewMode === 'list' && (
+        <div className="flex-1 flex flex-col min-h-0 space-y-2.5">
+          {/* Filtro rápido por Etapa + Resumo Financeiro */}
+          <div className="bg-white rounded-2xl p-2 sm:px-3 border border-slate-200/90 shadow-2xs shrink-0 flex items-center justify-between gap-3 overflow-x-auto kanban-scroll">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setStageFilter('all')}
+                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  stageFilter === 'all'
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/80'
+                }`}
+              >
+                <span>Todas</span>
+                <span className={`font-mono text-[10px] px-1.5 py-0.2 rounded-full ${stageFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'}`}>
+                  {filteredOpportunities.length}
+                </span>
+              </button>
+
+              {SALES_STAGES.map((st) => {
+                const count = filteredOpportunities.filter((o) => normalizeOppStage(o.stage) === st.id).length
+                const isSelected = stageFilter === st.id
+                return (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => setStageFilter(st.id)}
+                    style={isSelected ? { backgroundColor: st.stripeColor, borderColor: st.stripeColor } : undefined}
+                    className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                      isSelected
+                        ? 'text-white shadow-2xs'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200/80'
+                    }`}
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-white' : ''}`}
+                      style={!isSelected ? { backgroundColor: st.stripeColor } : undefined}
+                    />
+                    <span className="whitespace-nowrap">{st.title}</span>
+                    <span className={`font-mono text-[10px] px-1.5 rounded-full ${isSelected ? 'bg-white/25 text-white' : 'bg-slate-200/70 text-slate-700'}`}>
+                      {count}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="hidden xl:flex items-center gap-2 shrink-0 pl-3 border-l border-slate-200 text-xs font-mono">
+              <span className="text-slate-400">Total exibido:</span>
+              <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                {formatCurrency(listOpportunities.reduce((sum, o) => sum + (o.final_total || 0), 0))}
+              </span>
+            </div>
+          </div>
+
+          {/* Tabela de Oportunidades com Scroll Interno */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div className="overflow-auto flex-1 min-h-0 kanban-col-scroll">
+              <table className="w-full text-left border-collapse min-w-[920px]">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur border-b border-slate-200/90">
+                  <tr className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <th className="py-3 px-4 w-24">Código</th>
+                    <th className="py-3 px-3">Cliente & Canal</th>
+                    <th className="py-3 px-3">Veículo</th>
+                    <th className="py-3 px-3 w-64">Etapa do Funil</th>
+                    <th className="py-3 px-3 w-32">Responsável</th>
+                    <th className="py-3 px-3 w-32 text-right">Valor</th>
+                    <th className="py-3 px-4 w-36 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {listOpportunities.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-16 text-center text-slate-400 font-medium">
+                        Nenhuma oportunidade encontrada para os filtros selecionados.
+                      </td>
+                    </tr>
+                  ) : (
+                    listOpportunities.map((opp) => {
+                      const normStage = normalizeOppStage(opp.stage)
+                      const stageIdx = SALES_STAGES.findIndex((s) => s.id === normStage)
+                      const stageCfg = SALES_STAGES[stageIdx] || SALES_STAGES[0]
+                      const vehicle = getVehicleModelInfo(opp.vehicle?.model || opp.vehicle_model_year)
+                      const originBadge = getOriginBadge(opp.contact?.origin)
+                      const OriginIcon = originBadge.Icon
+                      const canAdvance = stageIdx >= 0 && stageIdx < SALES_STAGES.length - 2
+                      const isWonStage = normStage === 'venda_ganha'
+                      const pendingTasks = (opp.tasks || []).filter((t) => !t.completed)
+
+                      return (
+                        <tr
+                          key={opp.id}
+                          onClick={() => onSelectOpportunity?.(opp)}
+                          className="hover:bg-orange-50/40 transition-colors cursor-pointer group"
+                        >
+                          {/* Código */}
+                          <td className="py-3 px-4 align-middle">
+                            <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg text-[11px]">
+                              {formatOrderCode(opp.order_number)}
+                            </span>
+                          </td>
+
+                          {/* Cliente + Origem + Social */}
+                          <td className="py-3 px-3 align-middle">
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors text-[13px]">
+                                  {opp.contact?.full_name || 'Cliente sem nome'}
+                                </span>
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${originBadge.bgClasses}`}
+                                  title={getOriginTitle(opp.contact?.origin)}
+                                >
+                                  <OriginIcon className={`w-2.5 h-2.5 ${originBadge.iconColor}`} />
+                                  {originBadge.label}
+                                </span>
+                                {pendingTasks.length > 0 && (
+                                  <span
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200"
+                                    title={`${pendingTasks.length} tarefa(s) pendente(s)`}
+                                  >
+                                    <Clock className="w-2.5 h-2.5" />
+                                    {pendingTasks.length}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {renderSocialDock({
+                                  phone: opp.contact?.phone_e164,
+                                  instagram: opp.instagram_url || opp.contact?.instagram_url,
+                                  facebook: opp.facebook_url || opp.contact?.facebook_url,
+                                  website: opp.website_url || opp.contact?.website_url,
+                                  clientName: opp.contact?.full_name,
+                                  isCompact: true,
+                                })}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Veículo */}
+                          <td className="py-3 px-3 align-middle">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-white text-[11px] font-bold shadow-2xs">
+                              {renderVehicleIcon(vehicle.iconType)}
+                              <span>{vehicle.modelName}</span>
+                            </span>
+                          </td>
+
+                          {/* Etapa Interativa (Select + Avançar 1 clique) */}
+                          <td className="py-3 px-3 align-middle" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className="w-2.5 h-2.5 rounded-full shrink-0"
+                                style={{ backgroundColor: stageCfg.stripeColor }}
+                              />
+                              <select
+                                value={normStage}
+                                onChange={(e) => onMoveStage(opp.id, e.target.value as OpportunityStage)}
+                                aria-label="Alterar etapa da oportunidade"
+                                className="flex-1 min-w-[160px] bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-800 outline-none cursor-pointer transition-colors"
+                              >
+                                {SALES_STAGES.map((st) => (
+                                  <option key={st.id} value={st.id}>
+                                    {st.title}
+                                  </option>
+                                ))}
+                              </select>
+                              {canAdvance && (
+                                <button
+                                  type="button"
+                                  onClick={() => onMoveStage(opp.id, SALES_STAGES[stageIdx + 1].id)}
+                                  title={`Avançar para ${SALES_STAGES[stageIdx + 1].title}`}
+                                  className="p-1.5 rounded-lg bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white border border-orange-200/80 hover:border-[#EA580C] transition-colors cursor-pointer shrink-0"
+                                >
+                                  <ArrowRight className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Responsável */}
+                          <td className="py-3 px-3 align-middle">
+                            {renderResponsibleInfo(opp.assigned_to)}
+                          </td>
+
+                          {/* Valor */}
+                          <td className="py-3 px-3 align-middle text-right">
+                            <span className="inline-block font-mono font-bold text-[12px] text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg">
+                              {formatCurrency(opp.final_total || 0)}
+                            </span>
+                          </td>
+
+                          {/* Ações */}
+                          <td className="py-3 px-4 align-middle text-right" onClick={(e) => e.stopPropagation()}>
+                            <div className="inline-flex items-center justify-end gap-1.5">
+                              {isWonStage && onConvertToOrder && (
+                                <button
+                                  type="button"
+                                  onClick={() => onConvertToOrder(opp)}
+                                  title="Gerar Pedido"
+                                  className="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>Pedido</span>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => onSelectOpportunity?.(opp)}
+                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-[#EA580C] text-slate-700 hover:text-white text-[11px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                              >
+                                <span>Abrir</span>
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2A. FUNIL DE PEDIDOS — MODO KANBAN (Espelho fiel do Funil de Vendas com scroll interno por etapa) */}
+      {pipelineType === 'pedidos' && viewMode === 'kanban' && (
+        <div className="flex-1 flex gap-3 overflow-x-auto pb-2 kanban-scroll items-stretch min-h-0">
           {ORDER_STAGES.map((col, colIdx) => {
             const colOrders = filteredOrders.filter((o) => normalizeOrdStatus(o.status) === col.id)
             const colTotal = colOrders.reduce((sum, o) => sum + getOrderTotal(o), 0)
@@ -1054,7 +1383,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 onDragOver={(e) => handleDragOver(e, col.id)}
                 onDragLeave={() => handleDragLeave(col.id)}
                 onDrop={(e) => handleDropOrder(e, col.id)}
-                className={`w-[290px] flex-shrink-0 bg-slate-100/90 rounded-2xl border border-slate-200/90 flex flex-col h-full max-h-full shadow-2xs transition-all duration-200 overflow-hidden ${
+                className={`w-[290px] flex-shrink-0 bg-slate-100/90 rounded-2xl border border-slate-200/90 flex flex-col h-full max-h-full min-h-0 shadow-2xs transition-all duration-200 overflow-hidden ${
                   isDragTarget ? 'bg-slate-200/70 ring-2 ring-slate-300/80 shadow-inner' : ''
                 }`}
               >
@@ -1086,8 +1415,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                   </div>
                 </div>
 
-                {/* Cards Container de Pedidos (Espelho fiel do Card de Vendas) */}
-                <div className="p-2 space-y-2.5 overflow-y-auto flex-1 kanban-scroll">
+                {/* Cards Container de Pedidos com Scroll Vertical Interno por Etapa */}
+                <div className="p-2 space-y-2.5 overflow-y-auto flex-1 min-h-0 kanban-col-scroll">
                   {colOrders.length === 0 ? (
                     <div className="py-12 text-center text-xs text-slate-400 font-medium border border-dashed border-slate-200 rounded-xl m-0.5 flex items-center justify-center">
                       Nenhum card nesta etapa
@@ -1335,6 +1664,232 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* 2B. FUNIL DE PEDIDOS — MODO LISTA (Tabela com filtro por etapa e troca/avanço rápido de status) */}
+      {pipelineType === 'pedidos' && viewMode === 'list' && (
+        <div className="flex-1 flex flex-col min-h-0 space-y-2.5">
+          {/* Filtro rápido por Etapa de Pedido + Resumo Financeiro */}
+          <div className="bg-white rounded-2xl p-2 sm:px-3 border border-slate-200/90 shadow-2xs shrink-0 flex items-center justify-between gap-3 overflow-x-auto kanban-scroll">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setStageFilter('all')}
+                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  stageFilter === 'all'
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/80'
+                }`}
+              >
+                <span>Todos</span>
+                <span className={`font-mono text-[10px] px-1.5 rounded-full ${stageFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'}`}>
+                  {filteredOrders.length}
+                </span>
+              </button>
+
+              {ORDER_STAGES.map((st) => {
+                const count = filteredOrders.filter((o) => normalizeOrdStatus(o.status) === st.id).length
+                const isSelected = stageFilter === st.id
+                return (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => setStageFilter(st.id)}
+                    style={isSelected ? { backgroundColor: st.stripeColor, borderColor: st.stripeColor } : undefined}
+                    className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                      isSelected
+                        ? 'text-white shadow-2xs'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200/80'
+                    }`}
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-white' : ''}`}
+                      style={!isSelected ? { backgroundColor: st.stripeColor } : undefined}
+                    />
+                    <span className="whitespace-nowrap">{st.title}</span>
+                    <span className={`font-mono text-[10px] px-1.5 rounded-full ${isSelected ? 'bg-white/25 text-white' : 'bg-slate-200/70 text-slate-700'}`}>
+                      {count}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="hidden xl:flex items-center gap-2 shrink-0 pl-3 border-l border-slate-200 text-xs font-mono">
+              <span className="text-slate-400">Total exibido:</span>
+              <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                {formatCurrency(listOrders.reduce((sum, o) => sum + getOrderTotal(o), 0))}
+              </span>
+            </div>
+          </div>
+
+          {/* Tabela de Pedidos com Scroll Interno */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div className="overflow-auto flex-1 min-h-0 kanban-col-scroll">
+              <table className="w-full text-left border-collapse min-w-[960px]">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur border-b border-slate-200/90">
+                  <tr className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <th className="py-3 px-4 w-24">Pedido</th>
+                    <th className="py-3 px-3">Cliente & Canal</th>
+                    <th className="py-3 px-3">Veículo</th>
+                    <th className="py-3 px-3">Modalidade</th>
+                    <th className="py-3 px-3 w-64">Etapa do Pedido</th>
+                    <th className="py-3 px-3 w-32">Responsável</th>
+                    <th className="py-3 px-3 w-32 text-right">Valor</th>
+                    <th className="py-3 px-4 w-28 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {listOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-16 text-center text-slate-400 font-medium">
+                        Nenhum pedido encontrado para os filtros selecionados.
+                      </td>
+                    </tr>
+                  ) : (
+                    listOrders.map((ord) => {
+                      const linkedOpp = ord.opportunity || opportunities.find((o) => o.id === ord.opportunity_id || o.order_number === ord.order_number)
+                      const normStatus = normalizeOrdStatus(ord.status)
+                      const stageIdx = ORDER_STAGES.findIndex((s) => s.id === normStatus)
+                      const stageCfg = ORDER_STAGES[stageIdx] || ORDER_STAGES[0]
+                      const vehicle = getVehicleModelInfo(getOrderVehicleModel(ord))
+                      const ordTotal = getOrderTotal(ord)
+                      const originBadge = getOriginBadge(ord.contact?.origin || linkedOpp?.contact?.origin)
+                      const OriginIcon = originBadge.Icon
+                      const canAdvance = stageIdx >= 0 && stageIdx < ORDER_STAGES.length - 2
+                      const scheduleDate = ord.installation_date || ord.pickup_date
+                      const scheduleTime = ord.installation_time || ord.pickup_time
+
+                      return (
+                        <tr
+                          key={ord.id}
+                          onClick={() => openOrderDetails(ord)}
+                          className="hover:bg-orange-50/40 transition-colors cursor-pointer group"
+                        >
+                          {/* Código */}
+                          <td className="py-3 px-4 align-middle">
+                            <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg text-[11px]">
+                              {formatOrderCode(ord.order_number)}
+                            </span>
+                          </td>
+
+                          {/* Cliente + Origem + Social */}
+                          <td className="py-3 px-3 align-middle">
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors text-[13px]">
+                                  {ord.contact?.full_name || linkedOpp?.contact?.full_name || 'Cliente'}
+                                </span>
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${originBadge.bgClasses}`}
+                                  title={getOriginTitle(ord.contact?.origin || linkedOpp?.contact?.origin)}
+                                >
+                                  <OriginIcon className={`w-2.5 h-2.5 ${originBadge.iconColor}`} />
+                                  {originBadge.label}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {renderSocialDock({
+                                  phone: ord.contact?.phone_e164 || linkedOpp?.contact?.phone_e164,
+                                  instagram: ord.instagram_url || ord.contact?.instagram_url || linkedOpp?.instagram_url || linkedOpp?.contact?.instagram_url,
+                                  facebook: ord.facebook_url || ord.contact?.facebook_url || linkedOpp?.facebook_url || linkedOpp?.contact?.facebook_url,
+                                  website: ord.website_url || ord.contact?.website_url || linkedOpp?.website_url || linkedOpp?.contact?.website_url,
+                                  clientName: ord.contact?.full_name || linkedOpp?.contact?.full_name,
+                                  isCompact: true,
+                                })}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Veículo */}
+                          <td className="py-3 px-3 align-middle">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-white text-[11px] font-bold shadow-2xs">
+                              {renderVehicleIcon(vehicle.iconType)}
+                              <span>{vehicle.modelName}</span>
+                            </span>
+                          </td>
+
+                          {/* Modalidade + Agendamento */}
+                          <td className="py-3 px-3 align-middle">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-semibold text-slate-700 text-[11px]">
+                                {getFulfillmentLabel(ord.fulfillment_type)}
+                              </span>
+                              {scheduleDate && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-mono text-slate-500">
+                                  <Calendar className="w-3 h-3 text-[#EA580C]" />
+                                  {scheduleDate.split('-').reverse().join('/')}
+                                  {scheduleTime ? ` às ${scheduleTime}` : ''}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Etapa do Pedido (Select + Avançar 1 clique) */}
+                          <td className="py-3 px-3 align-middle" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className="w-2.5 h-2.5 rounded-full shrink-0"
+                                style={{ backgroundColor: stageCfg.stripeColor }}
+                              />
+                              <select
+                                value={normStatus}
+                                disabled={!onUpdateOrderStatus}
+                                onChange={(e) => onUpdateOrderStatus?.(ord.id, e.target.value as OrderStatus)}
+                                aria-label="Alterar etapa do pedido"
+                                className="flex-1 min-w-[160px] bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-800 outline-none cursor-pointer transition-colors disabled:opacity-60"
+                              >
+                                {ORDER_STAGES.map((st) => (
+                                  <option key={st.id} value={st.id}>
+                                    {st.title}
+                                  </option>
+                                ))}
+                              </select>
+                              {canAdvance && onUpdateOrderStatus && (
+                                <button
+                                  type="button"
+                                  onClick={() => onUpdateOrderStatus(ord.id, ORDER_STAGES[stageIdx + 1].id)}
+                                  title={`Avançar para ${ORDER_STAGES[stageIdx + 1].title}`}
+                                  className="p-1.5 rounded-lg bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white border border-orange-200/80 hover:border-[#EA580C] transition-colors cursor-pointer shrink-0"
+                                >
+                                  <ArrowRight className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Responsável */}
+                          <td className="py-3 px-3 align-middle">
+                            {renderResponsibleInfo(ord.assigned_to || linkedOpp?.assigned_to)}
+                          </td>
+
+                          {/* Valor */}
+                          <td className="py-3 px-3 align-middle text-right">
+                            <span className="inline-block font-mono font-bold text-[12px] text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg">
+                              {formatCurrency(ordTotal)}
+                            </span>
+                          </td>
+
+                          {/* Ações */}
+                          <td className="py-3 px-4 align-middle text-right" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() => openOrderDetails(ord)}
+                              className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-[#EA580C] text-slate-700 hover:text-white text-[11px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <span>Abrir</span>
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </div>

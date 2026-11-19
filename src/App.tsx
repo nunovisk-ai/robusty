@@ -202,6 +202,8 @@ export function App() {
     const updatedHistory = [historyEvent, ...(targetOpp.history || [])]
     const prevOpportunities = opportunities
     const prevOrders = orders
+    const prevEditingOpp = editingOpportunity
+    const updatedAtIso = new Date().toISOString()
 
     setOpportunities((prev) =>
       prev.map((o) =>
@@ -210,10 +212,21 @@ export function App() {
               ...o,
               stage: newStage,
               history: updatedHistory,
-              updated_at: new Date().toISOString(),
+              updated_at: updatedAtIso,
             }
           : o
       )
+    )
+
+    setEditingOpportunity((prev) =>
+      prev && prev.id === oppId
+        ? {
+            ...prev,
+            stage: newStage,
+            history: updatedHistory,
+            updated_at: updatedAtIso,
+          }
+        : prev
     )
 
     if (newStage === 'venda_perdida') {
@@ -233,6 +246,7 @@ export function App() {
     } catch (err) {
       setOpportunities(prevOpportunities)
       setOrders(prevOrders)
+      setEditingOpportunity(prevEditingOpp)
       showToast(
         'error',
         err instanceof Error ? err.message : 'Erro ao mover oportunidade no Supabase.'
@@ -371,7 +385,7 @@ export function App() {
         leadOrigin: data.leadOrigin,
         vehicleId: data.vehicleId,
         vehicleModel: data.vehicleModel,
-        stage: existingOpp?.stage || 'orcamento_enviado',
+        stage: data.stage || existingOpp?.stage || 'novo_lead',
         fulfillmentType: data.fulfillment,
         subtotal: data.budget?.subtotal ?? 0,
         freightValue: data.budget?.freightValue ?? 0,
@@ -655,6 +669,7 @@ export function App() {
                   currentUser={currentUser}
                   onSaveToKanban={handleSaveOpportunity}
                   onAutoSaveOpportunity={handleAutoSaveOpportunity}
+                  onChangeStage={handleMoveStage}
                   onGenerateOrder={handleGenerateOrderFromBudget}
                   onDeleteOpportunity={handleDeleteOpportunity}
                   onMarkLost={handleMarkOpportunityLost}

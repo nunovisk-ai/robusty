@@ -5,6 +5,7 @@ import type {
   PaymentMethod, 
   FulfillmentType, 
   Opportunity, 
+  OpportunityStage,
   LeadOrigin, 
   Order, 
   Appointment, 
@@ -38,6 +39,7 @@ import {
   Clock,
   Send,
   ArrowLeft,
+  ArrowRight,
   CheckCircle2,
   XCircle,
   Weight,
@@ -82,6 +84,32 @@ import {
 
 type BudgetFormTab = 'contact' | 'products' | 'fulfillment' | 'history' | 'attachments'
 
+interface PipelineStageOption {
+  id: OpportunityStage
+  title: string
+  color: string
+}
+
+const SALES_PIPELINE_STAGES: PipelineStageOption[] = [
+  { id: 'novo_lead', title: 'Novo lead', color: '#6366F1' },
+  { id: 'em_qualificacao', title: 'Em qualificação', color: '#0EA5E9' },
+  { id: 'aguardando_cotacao', title: 'Aguardando Cotação', color: '#2563EB' },
+  { id: 'orcamento_enviado', title: 'Orçamento enviado', color: '#EA580C' },
+  { id: 'em_negociacao', title: 'Em negociação', color: '#F59E0B' },
+  { id: 'aguardando_pagamento', title: 'Aguardando Pagamento', color: '#EAB308' },
+  { id: 'venda_ganha', title: 'Venda Ganha', color: '#10B981' },
+  { id: 'venda_perdida', title: 'Venda Perdida', color: '#EF4444' },
+]
+
+const normalizePipelineStage = (rawStage?: string): OpportunityStage => {
+  if (rawStage === 'aguardando_cotacao_frete' || rawStage === 'preparacao_orcamento') return 'aguardando_cotacao'
+  if (rawStage === 'aguardando_atendimento') return 'em_qualificacao'
+  if (rawStage && SALES_PIPELINE_STAGES.some((s) => s.id === rawStage)) {
+    return rawStage as OpportunityStage
+  }
+  return 'novo_lead'
+}
+
 interface BudgetBuilderViewProps {
   initialVehicleId?: string
   initialOpportunity?: Opportunity | null
@@ -92,6 +120,7 @@ interface BudgetBuilderViewProps {
   currentUser?: CurrentUser | null
   onSaveToKanban?: (opportunityData: any, options?: { stayOnPage?: boolean }) => Promise<Opportunity | null> | void
   onAutoSaveOpportunity?: (opportunityData: any) => Promise<Opportunity | null> | void
+  onChangeStage?: (oppId: string, newStage: OpportunityStage) => Promise<void> | void
   onGenerateOrder?: (opportunityData: any) => Promise<void> | void
   onDeleteOpportunity?: (oppId: string) => Promise<void> | void
   onMarkLost?: (oppId: string) => Promise<void> | void
@@ -121,6 +150,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   currentUser,
   onSaveToKanban,
   onAutoSaveOpportunity,
+  onChangeStage,
   onGenerateOrder,
   onDeleteOpportunity,
   onMarkLost,
@@ -143,6 +173,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [opportunityId, setOpportunityId] = useState<string | null>(() => initialOpportunity?.id || null)
   const [contactId, setContactId] = useState<string | null>(() => initialOpportunity?.contact_id || null)
   const [isSaving, setIsSaving] = useState(false)
+
+  // Etapa atual do Funil de Vendas (sincronizada com o Supabase)
+  const [stage, setStage] = useState<OpportunityStage>(() =>
+    normalizePipelineStage(initialOpportunity?.stage || 'novo_lead')
+  )
+  const [isUpdatingStage, setIsUpdatingStage] = useState(false)
+  const [stageFeedback, setStageFeedback] = useState<string | null>(null)
 
   // Responsável: Igor, Norlando ou Loja (por padrão vazio para nova oportunidade)
   const [assignedTo, setAssignedTo] = useState<'Igor' | 'Norlando' | 'Loja' | ''>(() => {
@@ -543,6 +580,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     tasks?: OpportunityTask[]
     history?: OpportunityHistoryEvent[]
     attachments?: AttachedDocument[]
+    stage?: OpportunityStage
   }) => {
     const mappedOrigin = (() => {
       switch (leadOrigin) {
@@ -560,6 +598,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       orderNumber,
       orderCode: formatOrderCode(orderNumber),
       assignedTo,
+      stage: overrides?.stage ?? stage,
       customerName: customerName || 'Novo Cliente',
       customerPhone,
       customerEmail,
@@ -607,6 +646,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     tasks?: OpportunityTask[]
     history?: OpportunityHistoryEvent[]
     attachments?: AttachedDocument[]
+    stage?: OpportunityStage
   }) => {
     const payload = buildOpportunityData(overrides)
     try {
@@ -623,6 +663,57 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       }
     } catch (err) {
       console.error('Erro no salvamento automático da oportunidade:', err)
+    }
+  }
+
+  // Alterar etapa do funil diretamente pela tela de orçamento (persiste imediatamente se já existir no banco)
+  const handleSelectStage = async (nextStage: OpportunityStage) => {
+    if (nextStage === stage || isUpdatingStage) return
+
+    const prevStage = stage
+    const oldLabel = SALES_PIPELINE_STAGES.find((s) => s.id === prevStage)?.title || prevStage
+    const newLabel = SALES_PIPELINE_STAGES.find((s) => s.id === nextStage)?.title || nextStage
+    const authorName = currentUser?.name || assignedTo || 'Equipe'
+
+    const stageEvent: OpportunityHistoryEvent = {
+      id: `hist-stage-${Date.now()}`,
+      opportunity_id: opportunityId || undefined,
+      type: 'stage_change',
+      description: `Movimentação de etapa: de "${oldLabel}" para "${newLabel}"`,
+      user: authorName,
+      created_at: new Date().toISOString(),
+    }
+
+    setStage(nextStage)
+    setHistory((prev) => [stageEvent, ...prev])
+
+    if (opportunityId && onChangeStage) {
+      setIsUpdatingStage(true)
+      try {
+        await onChangeStage(opportunityId, nextStage)
+        setStageFeedback(`Etapa alterada para "${newLabel}"`)
+        setTimeout(() => setStageFeedback(null), 2800)
+      } catch (err) {
+        console.error('Erro ao atualizar etapa da oportunidade:', err)
+        setStage(prevStage)
+      } finally {
+        setIsUpdatingStage(false)
+      }
+    } else {
+      setStageFeedback(`Etapa definida: "${newLabel}"`)
+      setTimeout(() => setStageFeedback(null), 2500)
+    }
+  }
+
+  const currentStageIndex = SALES_PIPELINE_STAGES.findIndex((s) => s.id === stage)
+  const nextSequentialStage =
+    currentStageIndex >= 0 && currentStageIndex < SALES_PIPELINE_STAGES.length - 2
+      ? SALES_PIPELINE_STAGES[currentStageIndex + 1]
+      : null
+
+  const handleAdvanceStage = () => {
+    if (nextSequentialStage) {
+      void handleSelectStage(nextSequentialStage.id)
     }
   }
 
@@ -1282,6 +1373,95 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
             </span>
           )}
         </button>
+      </div>
+
+      {/* Barra Interativa de Etapas do Funil (Permite visualizar e avançar o lead sem voltar ao Kanban) */}
+      <div className="bg-white p-3 sm:px-4 sm:py-3 rounded-2xl border border-slate-100 shadow-nexo space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Etapa do Funil
+            </span>
+            {(() => {
+              const activeStageCfg = SALES_PIPELINE_STAGES.find((s) => s.id === stage) || SALES_PIPELINE_STAGES[0]
+              return (
+                <span
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-white shadow-2xs"
+                  style={{ backgroundColor: activeStageCfg.color }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
+                  {activeStageCfg.title}
+                </span>
+              )
+            })()}
+            {isUpdatingStage && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400">
+                <Loader2 className="w-3 h-3 animate-spin text-[#EA580C]" />
+                Salvando...
+              </span>
+            )}
+            {stageFeedback && !isUpdatingStage && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                <Check className="w-3 h-3" />
+                {stageFeedback}
+              </span>
+            )}
+          </div>
+
+          {nextSequentialStage && (
+            <button
+              type="button"
+              disabled={isUpdatingStage}
+              onClick={handleAdvanceStage}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white border border-orange-200 hover:border-[#EA580C] text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+              title={`Avançar para ${nextSequentialStage.title}`}
+            >
+              <span>Avançar para {nextSequentialStage.title}</span>
+              <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-1.5">
+          {SALES_PIPELINE_STAGES.map((st, idx) => {
+            const isActive = st.id === stage
+            const isLost = st.id === 'venda_perdida'
+            const isCompleted =
+              stage !== 'venda_perdida' &&
+              !isLost &&
+              currentStageIndex > idx
+
+            return (
+              <button
+                key={st.id}
+                type="button"
+                disabled={isUpdatingStage}
+                onClick={() => void handleSelectStage(st.id)}
+                title={`Mover lead para: ${st.title}`}
+                style={isActive ? { backgroundColor: st.color, borderColor: st.color } : undefined}
+                className={`group relative flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-[11px] font-bold transition-all cursor-pointer text-left disabled:opacity-60 ${
+                  isActive
+                    ? 'text-white shadow-sm'
+                    : isCompleted
+                    ? 'bg-emerald-50/70 border-emerald-200/80 text-emerald-800 hover:bg-emerald-100/80'
+                    : isLost
+                    ? 'bg-rose-50/50 border-rose-200/70 text-rose-700 hover:bg-rose-100/70'
+                    : 'bg-slate-50/80 border-slate-200/80 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                {isCompleted ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                ) : (
+                  <span
+                    className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-white' : ''}`}
+                    style={!isActive ? { backgroundColor: st.color } : undefined}
+                  />
+                )}
+                <span className="truncate leading-tight">{st.title}</span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Main 2-Column Layout: Left = Active Tab Content | Right = Persistent Sticky Summary & Quick Actions */}
