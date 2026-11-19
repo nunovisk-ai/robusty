@@ -5,13 +5,11 @@ import { TopBar } from './components/TopBar'
 import { CatalogView } from './components/CatalogView'
 import { BudgetBuilderView } from './components/BudgetBuilderView'
 import { KanbanView } from './components/KanbanView'
-import { OrdersView } from './components/OrdersView'
 import { CalendarView } from './components/CalendarView'
 import { SettingsView } from './components/SettingsView'
 import { LoginView, type CurrentUser } from './components/LoginView'
 import {
   KanbanSkeleton,
-  OrdersSkeleton,
   CalendarSkeleton,
   BudgetSkeleton,
 } from './components/SkeletonScreens'
@@ -60,6 +58,7 @@ export function App() {
   })
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban')
+  const [returnTab, setReturnTab] = useState<ActiveTab>('kanban')
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [selectedVehicleForBudget, setSelectedVehicleForBudget] = useState<string | undefined>()
 
@@ -171,6 +170,7 @@ export function App() {
 
   // Open fresh Gerador de Orçamento (Nova Oportunidade)
   const handleOpenNewOpportunity = () => {
+    setReturnTab('kanban')
     setSelectedVehicleForBudget(undefined)
     setEditingOpportunity(null)
     setBudgetInstanceKey(Date.now())
@@ -179,6 +179,7 @@ export function App() {
 
   // Open existing Opportunity/Order in Gerador de Orçamento
   const handleSelectOpportunityToEdit = (opp: Opportunity) => {
+    setReturnTab(activeTab === 'budget' ? returnTab : activeTab)
     setEditingOpportunity(opp)
     setBudgetInstanceKey(Date.now())
     setActiveTab('budget')
@@ -429,7 +430,7 @@ export function App() {
         setEditingOpportunity(savedOpp)
       } else {
         setEditingOpportunity(null)
-        setActiveTab('kanban')
+        setActiveTab(returnTab)
         showToast('success', 'Oportunidade salva com sucesso no Supabase.')
       }
 
@@ -505,7 +506,7 @@ export function App() {
       setOrders(freshOrders)
       setAppointments(freshAppointments)
       setEditingOpportunity(null)
-      setActiveTab('kanban')
+      setActiveTab('orders')
       showToast('success', 'Pedido gerado e sincronizado com o Supabase.')
     } catch (err) {
       showToast(
@@ -523,7 +524,7 @@ export function App() {
       setOrders((prev) => prev.filter((ord) => ord.opportunity_id !== oppId))
       setAppointments((prev) => prev.filter((apt) => apt.opportunity_id !== oppId))
       setEditingOpportunity(null)
-      setActiveTab('kanban')
+      setActiveTab(returnTab)
       showToast('success', 'Orçamento excluído do Supabase.')
     } catch (err) {
       showToast(
@@ -538,7 +539,7 @@ export function App() {
     try {
       await handleMoveStage(oppId, 'venda_perdida')
       setEditingOpportunity(null)
-      setActiveTab('kanban')
+      setActiveTab(returnTab)
       showToast('success', 'Oportunidade marcada como Venda Perdida no Supabase.')
     } catch (err) {
       showToast(
@@ -585,7 +586,7 @@ export function App() {
       />
 
       {/* Main Area */}
-      <div className={`md:pl-64 flex-1 flex flex-col min-w-0 ${activeTab === 'kanban' ? 'h-screen overflow-hidden' : ''}`}>
+      <div className={`md:pl-64 flex-1 flex flex-col min-w-0 ${(activeTab === 'kanban' || activeTab === 'orders') ? 'h-screen overflow-hidden' : ''}`}>
         <TopBar
           activeTab={activeTab}
           onToggleMobile={() => setIsMobileSidebarOpen(true)}
@@ -635,11 +636,10 @@ export function App() {
           </div>
         )}
 
-        <main className={`flex-1 w-full ${activeTab === 'kanban' ? 'p-3 sm:px-6 sm:py-3 flex flex-col min-h-0 overflow-hidden max-w-full' : 'p-4 sm:p-6 sm:py-8 max-w-7xl mx-auto'}`}>
+        <main className={`flex-1 w-full ${(activeTab === 'kanban' || activeTab === 'orders') ? 'p-3 sm:px-6 sm:py-3 flex flex-col min-h-0 overflow-hidden max-w-full' : 'p-4 sm:p-6 sm:py-8 max-w-7xl mx-auto'}`}>
           {isLoadingCrm && activeTab !== 'catalog' && activeTab !== 'settings' ? (
             <>
-              {activeTab === 'kanban' && <KanbanSkeleton />}
-              {activeTab === 'orders' && <OrdersSkeleton />}
+              {(activeTab === 'kanban' || activeTab === 'orders') && <KanbanSkeleton />}
               {activeTab === 'calendar' && <CalendarSkeleton />}
               {activeTab === 'budget' && <BudgetSkeleton />}
             </>
@@ -647,6 +647,7 @@ export function App() {
             <>
               {activeTab === 'kanban' && (
                 <KanbanView
+                  mode="vendas"
                   opportunities={opportunities}
                   orders={orders}
                   onMoveStage={handleMoveStage}
@@ -673,41 +674,21 @@ export function App() {
                   onGenerateOrder={handleGenerateOrderFromBudget}
                   onDeleteOpportunity={handleDeleteOpportunity}
                   onMarkLost={handleMarkOpportunityLost}
-                  onClose={() => setActiveTab('kanban')}
+                  onClose={() => setActiveTab(returnTab)}
                 />
               )}
 
               {activeTab === 'catalog' && <CatalogView />}
 
               {activeTab === 'orders' && (
-                <OrdersView
+                <KanbanView
+                  mode="pedidos"
+                  opportunities={opportunities}
                   orders={orders}
+                  onMoveStage={handleMoveStage}
                   onUpdateOrderStatus={handleUpdateOrderStatus}
-                  onToggleInvoiceRequest={async (ordId) => {
-                    const targetOrder = orders.find((o) => o.id === ordId)
-                    if (!targetOrder) return
-                    const prevOrders = orders
-                    setOrders((prev) =>
-                      prev.map((o) =>
-                        o.id === ordId ? { ...o, invoice_status: 'solicitada_ao_igor' } : o
-                      )
-                    )
-                    try {
-                      await updateOrderStatusInSupabase(
-                        ordId,
-                        targetOrder.status,
-                        'solicitada_ao_igor',
-                        targetOrder.opportunity_id
-                      )
-                      showToast('success', 'Solicitação de NF salva no Supabase.')
-                    } catch (err) {
-                      setOrders(prevOrders)
-                      showToast(
-                        'error',
-                        err instanceof Error ? err.message : 'Erro ao atualizar NF no Supabase.'
-                      )
-                    }
-                  }}
+                  onConvertToOrder={handleConvertToOrder}
+                  onSelectOpportunity={handleSelectOpportunityToEdit}
                 />
               )}
 
@@ -725,7 +706,7 @@ export function App() {
           )}
         </main>
 
-        {activeTab !== 'kanban' && (
+        {activeTab !== 'kanban' && activeTab !== 'orders' && (
           <footer className="border-t border-slate-200/80 bg-white py-4 px-6 text-center text-xs text-slate-400">
             CRM Robusty © 2026 — Fabricação e Comercialização de Bagageiros Automotivos
           </footer>

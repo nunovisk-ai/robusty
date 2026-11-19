@@ -56,6 +56,7 @@ interface KanbanViewProps {
   onConvertToOrder?: (opp: Opportunity) => void
   onOpenNewBudget?: () => void
   onSelectOpportunity?: (opp: Opportunity) => void
+  mode?: 'vendas' | 'pedidos'
 }
 
 type PipelineType = 'vendas' | 'pedidos'
@@ -333,13 +334,19 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   onUpdateOrderStatus,
   onConvertToOrder,
   onOpenNewBudget,
-  onSelectOpportunity
+  onSelectOpportunity,
+  mode = 'vendas'
 }) => {
-  const [pipelineType, setPipelineType] = useState<PipelineType>('vendas')
+  const pipelineType: PipelineType = mode
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban')
   const [stageFilter, setStageFilter] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [density, setDensity] = useState<'detailed' | 'compact'>('detailed')
+
+  useEffect(() => {
+    setStageFilter('all')
+    setSearchTerm('')
+  }, [mode])
 
   // Filtros de Coluna no formato Excel para o Funil de Vendas
   const [salesColumnFilters, setSalesColumnFilters] = useState<{
@@ -1140,47 +1147,16 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 space-y-3">
-      {/* Top Header & Pipeline Mode Switcher (Sem badges contadoras conforme solicitado) */}
-      <div className="bg-white rounded-2xl p-2.5 sm:px-4 sm:py-2.5 border border-slate-200/90 shadow-2xs shrink-0 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        {/* Switcher entre os Funis: Funil de Vendas e Funil de Pedidos */}
+      {/* Top Header & Controles (Kanban / Lista, Densidade, Busca e Botão Novo Orçamento) */}
+      <div className="bg-white rounded-2xl p-2.5 sm:px-4 sm:py-2.5 border border-slate-200/90 shadow-2xs shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        {/* Lado Esquerdo: Alternador de Visualização: Kanban vs Lista */}
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => {
-              setPipelineType('vendas')
-              setStageFilter('all')
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer outline-none ${
-              pipelineType === 'vendas'
-                ? 'bg-[#EA580C] text-white shadow-sm ring-1 ring-orange-500/20'
-                : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/90'
-            }`}
-          >
-            <Filter className={`w-3.5 h-3.5 ${pipelineType === 'vendas' ? 'text-white' : 'text-slate-500'}`} />
-            <span>Funil de Vendas</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setPipelineType('pedidos')
-              setStageFilter('all')
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer outline-none ${
-              pipelineType === 'pedidos'
-                ? 'bg-[#EA580C] text-white shadow-sm ring-1 ring-orange-500/20'
-                : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/90'
-            }`}
-          >
-            <Truck className={`w-3.5 h-3.5 ${pipelineType === 'pedidos' ? 'text-white' : 'text-slate-500'}`} />
-            <span>Funil de Pedidos</span>
-          </button>
-
-          {/* Alternador de Visualização: Kanban vs Lista */}
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 shrink-0 ml-0 sm:ml-1">
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 shrink-0">
             <button
               type="button"
               onClick={() => setViewMode('kanban')}
               title="Visualização em Kanban (Colunas)"
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 viewMode === 'kanban'
                   ? 'bg-white text-[#EA580C] shadow-2xs'
                   : 'text-slate-500 hover:text-slate-800'
@@ -1193,7 +1169,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               type="button"
               onClick={() => setViewMode('list')}
               title="Visualização em Lista (Tabela)"
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 viewMode === 'list'
                   ? 'bg-white text-[#EA580C] shadow-2xs'
                   : 'text-slate-500 hover:text-slate-800'
@@ -1205,8 +1181,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
           </div>
         </div>
 
-        {/* Controles: Densidade (Kanban), Busca e Botão Novo Orçamento */}
-        <div className="flex items-center gap-2 flex-1 lg:max-w-lg justify-end flex-wrap">
+        {/* Lado Direito: Densidade (Kanban), Busca e Botão Nova Oportunidade (Apenas em Vendas) */}
+        <div className="flex items-center gap-2 flex-1 sm:max-w-lg justify-end flex-wrap">
           {/* Seletor de Densidade (Detalhado vs Compacto — apenas no modo Kanban) */}
           {viewMode === 'kanban' && (
             <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 shrink-0">
@@ -1261,7 +1237,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
             )}
           </div>
 
-          {onOpenNewBudget && (
+          {/* Botão Nova Oportunidade: exibido APENAS no Funil de Vendas conforme solicitado */}
+          {pipelineType === 'vendas' && onOpenNewBudget && (
             <button
               onClick={onOpenNewBudget}
               className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-[#EA580C] hover:bg-[#C2410C] text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-98 cursor-pointer shrink-0 outline-none"

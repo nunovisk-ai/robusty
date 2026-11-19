@@ -8,6 +8,7 @@ import {
   Settings,
   X,
   SlidersHorizontal,
+  Filter,
   Bot,
   LogOut
 } from 'lucide-react'
@@ -39,8 +40,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems = [
     {
       id: 'kanban' as ActiveTab,
-      label: 'Pipeline',
-      icon: <SlidersHorizontal className="w-5 h-5" />,
+      label: 'Funil de Vendas',
+      icon: <Filter className="w-5 h-5" />,
     },
     {
       id: 'catalog' as ActiveTab,
