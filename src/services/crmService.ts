@@ -71,6 +71,7 @@ function mapContactRow(raw: any): Contact | undefined {
     document_type: (raw.document_type || 'cpf') as DocumentType,
     document: raw.document || undefined,
     state_registration: raw.state_registration || undefined,
+    municipal_registration: raw.municipal_registration || undefined,
     trade_name: raw.trade_name || undefined,
     origin: (raw.origin || 'whatsapp_inbound') as LeadOrigin,
     notes: raw.notes || undefined,
@@ -184,6 +185,7 @@ function mapOpportunityRow(row: any): Opportunity {
     document_type: (row.document_type || contact?.document_type || 'cpf') as DocumentType,
     document: row.document || contact?.document || undefined,
     state_registration: row.state_registration || contact?.state_registration || undefined,
+    municipal_registration: row.municipal_registration || contact?.municipal_registration || undefined,
     trade_name: row.trade_name || contact?.trade_name || undefined,
     shipping_quote_number: row.shipping_quote_number || undefined,
     shipping_carrier_contact: row.shipping_carrier_contact || undefined,
@@ -191,6 +193,7 @@ function mapOpportunityRow(row: any): Opportunity {
     production_lead_time: row.production_lead_time || undefined,
     shipping_package_dimensions: row.shipping_package_dimensions || undefined,
     product_color: row.product_color || 'Preto Epóxi',
+    payment_subtype: row.payment_subtype || undefined,
     payment_splits: Array.isArray(row.payment_splits) ? row.payment_splits : [],
     address: extractPrimaryAddress(row.address, row.contact?.addresses),
     lost_reason: row.lost_reason || undefined,
@@ -224,6 +227,7 @@ function mapOrderRow(row: any): Order {
     document_type: (row.document_type || opportunity?.document_type || contact?.document_type || 'cpf') as DocumentType,
     document: row.document || opportunity?.document || contact?.document || undefined,
     state_registration: row.state_registration || opportunity?.state_registration || contact?.state_registration || undefined,
+    municipal_registration: row.municipal_registration || opportunity?.municipal_registration || contact?.municipal_registration || undefined,
     trade_name: row.trade_name || opportunity?.trade_name || contact?.trade_name || undefined,
     shipping_quote_number: row.shipping_quote_number || opportunity?.shipping_quote_number || undefined,
     shipping_carrier_contact: row.shipping_carrier_contact || opportunity?.shipping_carrier_contact || undefined,
@@ -231,6 +235,7 @@ function mapOrderRow(row: any): Order {
     production_lead_time: row.production_lead_time || opportunity?.production_lead_time || undefined,
     shipping_package_dimensions: row.shipping_package_dimensions || opportunity?.shipping_package_dimensions || undefined,
     product_color: row.product_color || opportunity?.product_color || 'Preto Epóxi',
+    payment_subtype: row.payment_subtype || opportunity?.payment_subtype || undefined,
     payment_splits: Array.isArray(row.payment_splits)
       ? row.payment_splits
       : opportunity?.payment_splits || [],
@@ -352,6 +357,7 @@ export interface SaveOpportunityPayload {
   documentType?: DocumentType
   document?: string
   stateRegistration?: string
+  municipalRegistration?: string
   tradeName?: string
   instagramUrl?: string
   facebookUrl?: string
@@ -368,6 +374,7 @@ export interface SaveOpportunityPayload {
   discountPercent: number
   finalTotal: number
   paymentMethod?: PaymentMethod
+  paymentSubtype?: string
   cardInstallments?: number
   paymentSplits?: PaymentSplit[]
   pickupDate?: string
@@ -403,6 +410,7 @@ async function upsertContact(payload: SaveOpportunityPayload): Promise<Contact> 
     document_type: payload.documentType || 'cpf',
     document: payload.document?.trim() || null,
     state_registration: payload.stateRegistration?.trim() || null,
+    municipal_registration: payload.municipalRegistration?.trim() || null,
     trade_name: payload.tradeName?.trim() || null,
     instagram_handle: payload.instagramUrl?.trim() || null,
     instagram_url: payload.instagramUrl?.trim() || null,
@@ -646,6 +654,7 @@ export async function saveOpportunityToSupabase(
     discount_percent: toNumber(payload.discountPercent),
     final_total: toNumber(payload.finalTotal),
     payment_method: payload.paymentMethod || null,
+    payment_subtype: payload.paymentSubtype || null,
     card_installments: payload.cardInstallments ?? 10,
     pickup_date: payload.pickupDate || null,
     pickup_time: payload.pickupTime || null,
@@ -662,6 +671,7 @@ export async function saveOpportunityToSupabase(
     document_type: payload.documentType || contact.document_type || 'cpf',
     document: payload.document?.trim() || contact.document || null,
     state_registration: payload.stateRegistration?.trim() || contact.state_registration || null,
+    municipal_registration: payload.municipalRegistration?.trim() || contact.municipal_registration || null,
     trade_name: payload.tradeName?.trim() || contact.trade_name || null,
     shipping_quote_number: payload.shippingQuoteNumber?.trim() || null,
     shipping_carrier_contact: payload.shippingCarrierContact?.trim() || null,
@@ -870,6 +880,7 @@ export async function upsertOrderInSupabase(opp: Opportunity): Promise<Order> {
     document_type: opp.document_type || opp.contact?.document_type || 'cpf',
     document: opp.document || opp.contact?.document || null,
     state_registration: opp.state_registration || opp.contact?.state_registration || null,
+    municipal_registration: opp.municipal_registration || opp.contact?.municipal_registration || null,
     trade_name: opp.trade_name || opp.contact?.trade_name || null,
     shipping_quote_number: opp.shipping_quote_number || null,
     shipping_carrier_contact: opp.shipping_carrier_contact || null,
@@ -877,6 +888,7 @@ export async function upsertOrderInSupabase(opp: Opportunity): Promise<Order> {
     production_lead_time: opp.production_lead_time || null,
     shipping_package_dimensions: opp.shipping_package_dimensions || null,
     product_color: opp.product_color || 'Preto Epóxi',
+    payment_subtype: opp.payment_subtype || null,
     payment_splits: opp.payment_splits || [],
     instagram_url: opp.instagram_url || opp.contact?.instagram_url || null,
     facebook_url: opp.facebook_url || opp.contact?.facebook_url || null,

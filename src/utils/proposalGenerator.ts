@@ -1,5 +1,5 @@
 import { ROBUSTY_LOGO_BASE64, MIXFER_LOGO_BASE64 } from '../assets/logoBase64'
-import { formatOrderCode, formatCurrency } from './formatters'
+import { formatOrderCode, formatCurrency, formatCPF, formatCNPJ, formatBRPhone } from './formatters'
 import type { PaymentSplit, PersonType, DocumentType } from '../types'
 
 export interface ProposalPayload {
@@ -11,6 +11,7 @@ export interface ProposalPayload {
   documentType?: DocumentType
   document?: string
   stateRegistration?: string
+  municipalRegistration?: string
   tradeName?: string
   vehicleModel: string
   items: Array<{
@@ -46,6 +47,7 @@ export interface ProposalPayload {
   installationDate?: string
   installationTime?: string
   paymentMethod?: string
+  paymentSubtype?: string
   cardInstallments?: number
   paymentSplits?: PaymentSplit[]
   shippingCarrierName?: string
@@ -54,6 +56,7 @@ export interface ProposalPayload {
   deliveryLeadTime?: string
   productionLeadTime?: string
   shippingPackageDimensions?: string
+  shippingTrackingCode?: string
   productColor?: string
   totalWeightKg?: number
   assignedTo?: string
@@ -66,303 +69,539 @@ export function generateProposalHtml(data: ProposalPayload): string {
   validUntil.setDate(validUntil.getDate() + 7)
   const validUntilStr = validUntil.toLocaleDateString('pt-BR')
 
-  // Valor à vista: 5% a 10% de desconto sobre produtos à vista + frete
-  const cashDiscount = data.budget.subtotal * 0.05
-  const valorAVista = Math.max(0, data.budget.subtotal - cashDiscount + data.budget.freightValue)
+  // Formatação de Documentos
+  const isPJ = data.personType === 'juridica'
+  const formattedDoc = data.document
+    ? isPJ
+      ? formatCNPJ(data.document)
+      : data.documentType === 'cpf'
+      ? formatCPF(data.document)
+      : data.document
+    : 'Não informado'
 
-  // Itens da Tabela com preenchimento para atingir pelo menos 8 linhas (como no modelo original)
-  const totalRowsCount = Math.max(8, data.items.length)
-  const rowsHtml: string[] = []
+  const documentLabel = isPJ ? 'CNPJ' : (data.documentType ? data.documentType.toUpperCase() : 'CPF')
 
-  for (let i = 0; i < totalRowsCount; i++) {
-    const it = data.items[i]
-    if (it) {
-      const unitVal = it.product.base_price_10x
-      const totalVal = unitVal * it.quantity
-      rowsHtml.push(`
-        <tr style="height: 26px;">
-          <td style="border: 1px solid #000; text-align: center; font-weight: bold; padding: 4px 6px;">${it.quantity}</td>
-          <td style="border: 1px solid #000; padding: 4px 8px; font-weight: 600;">
-            ${it.product.name} ${it.product.dimensions ? `(${it.product.dimensions})` : ''}
-          </td>
-          <td style="border: 1px solid #000; text-align: right; padding: 4px 8px; font-family: monospace;">${formatCurrency(unitVal)}</td>
-          <td style="border: 1px solid #000; text-align: right; font-weight: bold; padding: 4px 8px; font-family: monospace;">${formatCurrency(totalVal)}</td>
-        </tr>
-      `)
-    } else {
-      rowsHtml.push(`
-        <tr style="height: 24px;">
-          <td style="border: 1px solid #000; text-align: center; padding: 4px;">&nbsp;</td>
-          <td style="border: 1px solid #000; padding: 4px;">&nbsp;</td>
-          <td style="border: 1px solid #000; text-align: right; padding: 4px 8px; font-family: monospace; color: #94a3b8;">-</td>
-          <td style="border: 1px solid #000; text-align: right; padding: 4px 8px; font-family: monospace; color: #94a3b8;">R$ 0,00</td>
-        </tr>
-      `)
+  // Linhas de produtos
+  const itemsRows = data.items.map((i, index) => {
+    const unitPrice = i.product.base_price_10x
+    const lineTotal = unitPrice * i.quantity
+    const rowBg = index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'
+
+    return `
+      <tr class="${rowBg} border-b border-slate-100 hover:bg-slate-100/50 transition-colors">
+        <td class="py-3 px-4 text-center font-mono font-bold text-slate-500">${i.quantity}</td>
+        <td class="py-3 px-4">
+          <div class="font-bold text-slate-900">${i.product.name}</div>
+          ${i.product.dimensions ? `<div class="text-[11px] text-slate-500 font-mono">Medidas: ${i.product.dimensions}</div>` : ''}
+        </td>
+        <td class="py-3 px-4 text-center text-[11px] font-mono text-slate-600">
+          ${i.product.weight_kg ? `${i.product.weight_kg * i.quantity} kg (${i.product.weight_kg} kg/un)` : '—'}
+        </td>
+        <td class="py-3 px-4 text-right font-mono text-slate-700">${formatCurrency(unitPrice)}</td>
+        <td class="py-3 px-4 text-right font-mono font-bold text-slate-900">${formatCurrency(lineTotal)}</td>
+      </tr>
+    `
+  }).join('')
+
+  // Cor do Produto
+  const selectedColor = data.productColor || 'Preto Epóxi'
+
+  // Formas de Pagamento formatadas
+  const cardInstallmentsCount = data.cardInstallments && data.cardInstallments > 0 ? data.cardInstallments : 10
+  const cardInstallmentValue = Math.round((data.budget.finalTotal / cardInstallmentsCount) * 100) / 100
+
+  const cashSubtypeLabel = (() => {
+    switch (data.paymentSubtype) {
+      case 'debito': return 'Cartão de Débito'
+      case 'transferencia': return 'Transferência Bancária (TED/DOC)'
+      case 'dinheiro': return 'Dinheiro em Espécie'
+      default: return 'PIX à Vista'
     }
-  }
+  })()
 
-  // Seção de Formas de Pagamento
-  let paymentDescriptionHtml = ''
-  if (data.paymentSplits && data.paymentSplits.length > 0) {
-    paymentDescriptionHtml = `
-      <div style="margin-top: 4px; font-size: 11px; line-height: 1.4;">
-        <strong>Pagamento Dividido / Misto Autorizado:</strong><br/>
-        ${data.paymentSplits.map((sp, idx) => {
-          const methodLabel = sp.method === 'pix'
-            ? 'PIX (À vista)'
-            : sp.method === 'cartao_credito'
-            ? `Cartão de Crédito ${sp.installments ? `em ${sp.installments}x sem juros` : ''}`
-            : sp.method === 'boleto'
-            ? 'Boleto Bancário'
-            : sp.method === 'dinheiro'
-            ? 'Dinheiro / Espécie'
-            : 'Outro'
-          return `<span style="display: block;">• Parcela ${idx + 1}: <strong>${formatCurrency(sp.amount)}</strong> via ${methodLabel}</span>`
-        }).join('')}
-      </div>
-    `
-  } else {
-    paymentDescriptionHtml = `
-      <div style="margin-top: 2px; font-size: 11px;">
-        À vista com desconto no PIX/Depósito ou em até 10x sem juros no cartão de crédito.
-      </div>
-    `
-  }
-
-  // Detalhes do Transporte
-  const isEnvio = data.fulfillment === 'transportadora_envio'
-  const shippingSectionHtml = isEnvio
-    ? `
-      <div style="font-size: 11px; line-height: 1.5; color: #000;">
-        <div><strong>Transportadora:</strong> ${data.shippingCarrierName || 'A definir / Em cotação'} &nbsp;•&nbsp; <strong>Frete:</strong> ${formatCurrency(data.budget.freightValue)} &nbsp;•&nbsp; <strong>Cotação Nº:</strong> ${data.shippingQuoteNumber || 'Pendente'} &nbsp;•&nbsp; <strong>Contato:</strong> ${data.shippingCarrierContact || 'Central Transportadora'}</div>
-        <div><strong>Prazo de entrega:</strong> ${data.deliveryLeadTime || '3 a 5 dias úteis'} &nbsp;&nbsp;&nbsp;&nbsp; <strong>Prazo de produção:</strong> ${data.productionLeadTime || '7 a 10 dias úteis'}</div>
-        <div><strong>Dimensões do volume para transporte:</strong> ${data.shippingPackageDimensions || 'Volume desmontado com proteções contra impacto'}</div>
-      </div>
-    `
-    : `
-      <div style="font-size: 11px; line-height: 1.5; color: #000;">
-        <div><strong>Modalidade:</strong> Instalação na Matriz Robusty &nbsp;•&nbsp; <strong>Custo de Instalação:</strong> ${formatCurrency(data.budget.installationValue)}</div>
-        <div><strong>Agendamento:</strong> ${data.installationDate ? `${data.installationDate.split('-').reverse().join('/')} às ${data.installationTime || '14:00'}` : 'A agendar com a oficina'}</div>
-        <div><strong>Endereço de Montagem:</strong> Rua Dante Marteletti, Nº 122 - Jd. Maringá, São Paulo/SP</div>
-      </div>
-    `
-
-  const customerDisplayName = data.tradeName
-    ? `${data.customerName || 'Cliente'} (A/C: ${data.tradeName})`
-    : (data.customerName || 'Cliente')
-
-  const documentLabel = data.personType === 'juridica' ? 'CNPJ' : (data.documentType?.toUpperCase() || 'CPF/RG')
-  const formattedDoc = data.document || 'Não informado'
-  const stateReg = data.stateRegistration || 'ISENTO'
+  const hasSplitPayments = Boolean(data.paymentSplits && data.paymentSplits.length > 0)
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Orçamento ${formatOrderCode(data.orderNumber)} - Robusty & MixFer</title>
+  <title>Orçamento Comercial ${formatOrderCode(data.orderNumber)} — Robusty & MixFer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   <style>
-    * {
-      box-sizing: border-box;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
     body {
-      font-family: Arial, Helvetica, sans-serif;
-      color: #000000;
-      background-color: #f1f5f9;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
       margin: 0;
       padding: 0;
+      -webkit-font-smoothing: antialiased;
     }
-    .no-print {
-      display: flex;
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
     }
     @media print {
       body {
-        background-color: #ffffff;
+        background: #ffffff !important;
+        color: #000000 !important;
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
       }
       .no-print {
         display: none !important;
       }
-      .page-sheet {
+      .sheet-container {
         box-shadow: none !important;
-        margin: 0 !important;
-        padding: 6mm 10mm !important;
-        max-width: 100% !important;
         border: none !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+        margin: 0 !important;
       }
       @page {
+        margin: 8mm 10mm;
         size: A4 portrait;
-        margin: 8mm;
       }
-    }
-    .page-sheet {
-      max-width: 820px;
-      margin: 24px auto;
-      background: #ffffff;
-      padding: 24px 30px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
-      border-radius: 4px;
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
     }
   </style>
 </head>
-<body>
-  <!-- Top Action Bar (Oculta na Impressão/PDF) -->
-  <header class="no-print" style="position: sticky; top: 0; z-index: 50; background: #0f172a; color: #fff; padding: 12px 20px; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b;">
-    <div style="display: flex; align-items: center; gap: 12px;">
-      <span style="font-weight: 900; color: #ea580c; font-family: monospace; font-size: 14px;">${formatOrderCode(data.orderNumber)}</span>
-      <span style="font-size: 12px; color: #94a3b8;">| Orçamento Oficial Robusty & MixFer</span>
+<body class="min-h-screen pb-12">
+  <!-- Barra de Ações Superior (Oculta na Impressão) -->
+  <header class="no-print sticky top-0 z-50 bg-slate-900 text-white shadow-md border-b border-slate-800 px-4 py-3 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <img src="${ROBUSTY_LOGO_BASE64}" alt="Robusty" class="h-6 w-auto object-contain brightness-0 invert" />
+      <span class="text-xs font-mono font-bold text-orange-400">${formatOrderCode(data.orderNumber)}</span>
+      <span class="hidden sm:inline text-xs text-slate-300">| Orçamento Comercial Oficial</span>
     </div>
-    <div style="display: flex; align-items: center; gap: 10px;">
-      <button onclick="window.print()" style="background: #ea580c; color: #fff; font-weight: bold; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 6px;">
-        <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+
+    <div class="flex items-center gap-2">
+      <button onclick="window.print()" class="px-4 py-1.5 rounded-xl bg-[#EA580C] hover:bg-[#C2410C] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
         <span>Imprimir / Salvar em PDF</span>
       </button>
-      <button onclick="window.close()" style="background: #334155; color: #cbd5e1; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 12px;">
+
+      <button onclick="window.close()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-all cursor-pointer">
         Fechar
       </button>
     </div>
   </header>
 
-  <!-- Folha Oficial do Orçamento (A4 Exato) -->
-  <main class="page-sheet">
-    <!-- Cabeçalho Oficial: Robusty (Esquerda), Título (Centro) e MixFer (Direita) -->
-    <table style="width: 100%; border: none; margin-bottom: 4px;">
-      <tr>
-        <td style="width: 30%; text-align: left; vertical-align: middle;">
-          <img src="${ROBUSTY_LOGO_BASE64}" alt="Robusty Bagageiros" style="height: 48px; max-width: 180px; object-fit: contain;" />
-        </td>
-        <td style="width: 40%; text-align: center; vertical-align: middle;">
-          <h1 style="margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 2px; color: #000;">ORÇAMENTO</h1>
-        </td>
-        <td style="width: 30%; text-align: right; vertical-align: middle;">
-          <img src="${MIXFER_LOGO_BASE64}" alt="MixFer Soluções em Aço" style="height: 44px; max-width: 170px; object-fit: contain;" />
-        </td>
-      </tr>
-    </table>
+  <!-- Container Principal do Orçamento -->
+  <main class="max-w-4xl mx-auto mt-6 p-6 sm:p-10 bg-white rounded-3xl border border-slate-200/90 shadow-xl sheet-container space-y-5">
+    
+    <!-- Cabeçalho Oficial: Logos Robusty & MixFer -->
+    <div class="flex flex-col sm:flex-row items-center justify-between pb-5 border-b border-slate-200 gap-4">
+      <!-- Logo Robusty (Esquerda) -->
+      <div class="flex items-center gap-3">
+        <img
+          src="${ROBUSTY_LOGO_BASE64}"
+          alt="Robusty Bagageiros"
+          class="h-11 sm:h-12 w-auto object-contain shrink-0"
+        />
+      </div>
 
-    <!-- Endereço da Empresa e Contato -->
-    <div style="font-size: 11px; color: #000; margin-top: 2px; line-height: 1.35;">
-      <div>Rua Dante Marteletti, Nº 122 - Jd. Maringá, São Paulo/SP - CEP 03525-150</div>
-      <div>Tel.: (11)3774-4674 / (11)98703-7943</div>
-    </div>
+      <!-- Título Central & Identificação -->
+      <div class="text-center space-y-0.5">
+        <div class="text-xs font-bold tracking-widest text-[#EA580C] uppercase">
+          Proposta Comercial Oficial
+        </div>
+        <div class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-mono">
+          ORÇAMENTO ${formatOrderCode(data.orderNumber)}
+        </div>
+        <div class="text-[11px] text-slate-500 flex items-center justify-center gap-3 pt-0.5">
+          <span>Emissão: <strong class="text-slate-800">${todayStr}</strong></span>
+          <span>•</span>
+          <span>Validade: <strong class="text-slate-800">${validUntilStr}</strong> (7 dias)</span>
+          ${data.assignedTo ? `<span>•</span><span>Vendedor: <strong class="text-slate-800">${data.assignedTo}</strong></span>` : ''}
+        </div>
+      </div>
 
-    <!-- Linha Divisória Superior -->
-    <div style="border-bottom: 2px solid #000; margin-top: 6px; margin-bottom: 8px;"></div>
-
-    <!-- Tabela de Metadados: Pedido, Data e Validade -->
-    <table style="width: 100%; font-size: 11px; font-weight: bold; margin-bottom: 10px;">
-      <tr>
-        <td style="width: 30%; text-align: center;">
-          PEDIDO<br/>
-          <span style="font-weight: normal; font-size: 12px;">(${formatOrderCode(data.orderNumber)})</span>
-        </td>
-        <td style="width: 40%; text-align: center;">
-          DATA DO ORÇAMENTO<br/>
-          <span style="font-weight: normal; font-size: 12px;">(${todayStr})</span>
-        </td>
-        <td style="width: 30%; text-align: center;">
-          VALIDADE DO ORÇAMENTO<br/>
-          <span style="font-weight: normal; font-size: 12px;">(7 Dias Corridos)</span>
-        </td>
-      </tr>
-    </table>
-
-    <!-- Dados do Cliente e Vendedor (Formato Compacto Oficial) -->
-    <table style="width: 100%; font-size: 11px; line-height: 1.45; border: none; margin-bottom: 8px;">
-      <tr>
-        <td style="width: 65%;"><strong>DESTINATARIO:</strong> ${customerDisplayName}</td>
-        <td style="width: 35%;"><strong>VENDEDOR:</strong> ${data.assignedTo || 'Norlando'}</td>
-      </tr>
-      <tr>
-        <td><strong>END:</strong> ${data.address?.street ? `${data.address.street}, ${data.address.number || 'S/N'}${data.address.complement ? ` - ${data.address.complement}` : ''}` : 'A combinar'}</td>
-        <td><strong>BAIRRO:</strong> ${data.address?.neighborhood || '-'}</td>
-      </tr>
-      <tr>
-        <td><strong>CEP:</strong> ${data.address?.cep || '-'} &nbsp;&nbsp;&nbsp;&nbsp; <strong>CIDADE:</strong> ${data.address?.city || '-'}</td>
-        <td><strong>ESTADO:</strong> ${data.address?.state || '-'}</td>
-      </tr>
-      <tr>
-        <td><strong>TEL:</strong> ${data.customerPhone || '-'} &nbsp;&nbsp;&nbsp;&nbsp; <strong>${documentLabel}:</strong> ${formattedDoc}</td>
-        <td><strong>INSCRIÇÃO:</strong> ${stateReg}</td>
-      </tr>
-      <tr>
-        <td colspan="2"><strong>E-MAIL:</strong> ${data.customerEmail || '-'} &nbsp;&nbsp;&nbsp;&nbsp; <strong>VEÍCULO:</strong> ${data.vehicleModel || 'Utilitário'}</td>
-      </tr>
-    </table>
-
-    <!-- Tabela Oficial de Produtos (Amarela / Dourada com Borda Preta) -->
-    <table style="width: 100%; border: 2px solid #000; border-collapse: collapse; font-size: 11px; margin-top: 6px;">
-      <thead>
-        <tr style="background-color: #FFB800; color: #000; font-weight: 900; height: 32px;">
-          <th style="border: 2px solid #000; width: 8%; text-align: center; padding: 4px;">QTD</th>
-          <th style="border: 2px solid #000; width: 56%; text-align: center; padding: 4px;">DESCRIÇÃO DOS PRODUTOS</th>
-          <th style="border: 2px solid #000; width: 18%; text-align: center; padding: 4px;">VALOR UNIDADE</th>
-          <th style="border: 2px solid #000; width: 18%; text-align: center; padding: 4px;">VALOR TOTAL</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rowsHtml.join('')}
-      </tbody>
-    </table>
-
-    <!-- Resumo dos Totais (Caixas com Borda Preta Alinhadas à Direita) -->
-    <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
-      <table style="width: 36%; border-collapse: collapse; font-size: 12px; font-weight: bold;">
-        <tr style="border: 2px solid #000; height: 26px;">
-          <td style="padding: 4px 8px; border-right: 2px solid #000; width: 55%; background: #fafafa;">VALOR TOTAL</td>
-          <td style="padding: 4px 8px; text-align: right; font-family: monospace;">${formatCurrency(data.budget.finalTotal)}</td>
-        </tr>
-        <tr style="border: 2px solid #000; height: 26px;">
-          <td style="padding: 4px 8px; border-right: 2px solid #000; background: #fafafa;">VALOR À VISTA</td>
-          <td style="padding: 4px 8px; text-align: right; font-family: monospace; color: #000;">${formatCurrency(valorAVista)}</td>
-        </tr>
-        <tr style="border: 2px solid #000; height: 26px; border-top: 3px solid #000;">
-          <td style="padding: 4px 8px; border-right: 2px solid #000; background: #fafafa;">VALOR DO FRETE</td>
-          <td style="padding: 4px 8px; text-align: right; font-family: monospace;">${isEnvio ? formatCurrency(data.budget.freightValue) : '-'}</td>
-        </tr>
-      </table>
-    </div>
-
-    <!-- Detalhes do Transporte -->
-    <div style="margin-top: 10px;">
-      <div style="font-size: 12px; font-weight: bold; margin-bottom: 2px;">Detalhes do Transporte:</div>
-      ${shippingSectionHtml}
-    </div>
-
-    <!-- Formas de Pagamento e Conta para Depósito / PIX -->
-    <div style="margin-top: 8px;">
-      <div style="font-size: 12px; font-weight: bold;">Formas de Pagamento:</div>
-      ${paymentDescriptionHtml}
-
-      <div style="margin-top: 6px; font-size: 11px; line-height: 1.4;">
-        <strong>Conta para Depósito / PIX:</strong><br/>
-        Mixfer Ind. e Exp. Ltda. / CNPJ - 13.563.446/0001-76 (Chave Pix)<br/>
-        Banco Bradesco: Agencia 0298 Conta Corrente 217100-7
+      <!-- Logo MixFer (Direita) -->
+      <div class="flex items-center gap-3">
+        <img
+          src="${MIXFER_LOGO_BASE64}"
+          alt="MixFer Indústria"
+          class="h-10 sm:h-11 w-auto object-contain shrink-0"
+        />
       </div>
     </div>
 
-    <!-- Especificação da Cor do Bagageiro -->
-    <div style="margin-top: 8px; font-size: 12px; font-weight: 900; letter-spacing: 0.5px;">
-      *COR: ${(data.productColor || 'PRETO/BRANCO').toUpperCase()}*
+    <!-- Barra de Fábrica & Endereço Oficial -->
+    <div class="bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-2.5 text-center text-[11px] text-slate-600 space-y-0.5">
+      <div class="font-bold text-slate-800">
+        MIXFER INDÚSTRIA E EXPORTAÇÃO LTDA. • FÁBRICA ROBUSTY BAGAGEIROS AUTOMOTIVOS
+      </div>
+      <div>
+        Rua Dante Marteletti, Nº 122 - Jd. Maringá, São Paulo/SP - CEP 03525-150 • Fones: <strong>(11) 3774-4674</strong> / <strong>(11) 98703-7943</strong>
+      </div>
     </div>
 
-    <!-- Termos e Observações Oficiais com Borda Preta -->
-    <div style="margin-top: 8px; border: 2px solid #000; padding: 8px 10px; font-size: 10px; line-height: 1.4; color: #000;">
-      <div>• <strong>Garantia de 1 Ano:</strong> Todas as estruturas em aço possuem garantia total contra defeito de fabricação e fadiga de solda.</div>
-      <div>• <strong>Pintura Eletrostática a Pó Epóxi:</strong> Alta resistência a intempéries e corrosão automotiva.</div>
-      <div>• <strong>Fixação Segura:</strong> Fixado estritamente nas furações e calhas originais do veículo, sem necessidade de perfurar a lataria.</div>
-      ${data.notes ? `<div style="margin-top: 4px;">• <strong>Observações Específicas:</strong> ${data.notes}</div>` : ''}
+    <!-- Bloco 1: Dados do Cliente / Destinatário & Veículo de Aplicação -->
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+      
+      <!-- Card Cliente (7 Colunas) -->
+      <div class="md:col-span-7 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2.5 text-xs">
+        <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div class="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+            ${isPJ ? '1. Dados da Empresa (Pessoa Jurídica)' : '1. Dados do Cliente (Pessoa Física)'}
+          </div>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${isPJ ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-orange-50 text-orange-700 border border-orange-200'}">
+            ${isPJ ? 'Pessoa Jurídica' : 'Pessoa Física'}
+          </span>
+        </div>
+
+        <div>
+          <div class="text-[10px] text-slate-400 uppercase font-semibold">
+            ${isPJ ? 'Razão Social' : 'Nome Completo'}
+          </div>
+          <div class="text-sm font-bold text-slate-900 leading-tight">
+            ${data.customerName || 'Cliente'}
+          </div>
+        </div>
+
+        ${isPJ && data.tradeName ? `
+          <div>
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Nome do Representante / Contato</div>
+            <div class="text-xs font-semibold text-slate-800">${data.tradeName}</div>
+          </div>
+        ` : ''}
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 border-t border-slate-100">
+          <div>
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">${documentLabel}</div>
+            <div class="font-mono text-slate-800 font-bold">${formattedDoc}</div>
+          </div>
+
+          ${isPJ ? `
+            <div>
+              <div class="text-[10px] text-slate-400 uppercase font-semibold">Inscrição Estadual</div>
+              <div class="font-mono text-slate-800 font-semibold">${data.stateRegistration || 'ISENTO'}</div>
+            </div>
+            <div>
+              <div class="text-[10px] text-slate-400 uppercase font-semibold">Inscrição Municipal</div>
+              <div class="font-mono text-slate-800 font-semibold">${data.municipalRegistration || '—'}</div>
+            </div>
+          ` : `
+            <div>
+              <div class="text-[10px] text-slate-400 uppercase font-semibold">Tipo Documento</div>
+              <div class="uppercase text-slate-700 font-semibold">${data.documentType || 'CPF'}</div>
+            </div>
+          `}
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+          <div>
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Telefone do Responsável</div>
+            <div class="font-mono text-slate-800">${data.customerPhone ? formatBRPhone(data.customerPhone) : 'Não informado'}</div>
+          </div>
+          <div>
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">E-mail Comercial</div>
+            <div class="text-slate-800 truncate">${data.customerEmail || 'Não informado'}</div>
+          </div>
+        </div>
+
+        ${data.address?.street ? `
+          <div class="pt-1 border-t border-slate-100">
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Endereço de Entrega / Cadastro</div>
+            <div class="text-slate-700 text-[11px] leading-snug">
+              ${data.address.street}, Nº ${data.address.number || 'S/N'}${data.address.complement ? ` (${data.address.complement})` : ''} — ${data.address.neighborhood || ''}, ${data.address.city || ''}/${data.address.state || ''} • CEP: <span class="font-mono">${data.address.cep || ''}</span>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+
+      <!-- Card Veículo & Acabamento (5 Colunas) -->
+      <div class="md:col-span-5 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-3 text-xs flex flex-col justify-between">
+        <div>
+          <div class="text-[10px] uppercase font-bold tracking-wider text-slate-400 pb-2 border-b border-slate-100">
+            2. Veículo & Acabamento
+          </div>
+
+          <div class="pt-2">
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Veículo de Aplicação</div>
+            <div class="text-base font-bold text-slate-900 leading-tight">
+              ${data.vehicleModel || 'Utilitário'}
+            </div>
+            <div class="text-[11px] text-slate-500 mt-0.5">
+              Instalação nas furações e pontos originais de fábrica (sem perfurações).
+            </div>
+          </div>
+
+          <div class="pt-3">
+            <div class="text-[10px] text-slate-400 uppercase font-semibold mb-1">Acabamento & Pintura</div>
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 text-white font-bold text-xs">
+              <span class="w-2.5 h-2.5 rounded-full ${selectedColor.toLowerCase().includes('branco') ? 'bg-white' : selectedColor.toLowerCase().includes('cinza') ? 'bg-slate-400' : 'bg-[#EA580C]'}"></span>
+              <span>*COR: ${selectedColor.toUpperCase()}*</span>
+            </div>
+            <div class="text-[10px] text-slate-400 mt-1">Pintura Eletrostática a Pó Epóxi de Alta Resistência</div>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] space-y-1">
+          <div class="flex justify-between">
+            <span class="text-slate-500">Peso Total Estimado:</span>
+            <span class="font-mono font-bold text-slate-800">${data.totalWeightKg || 0} kg</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Estrutura:</span>
+            <span class="text-slate-800 font-semibold">Aço Carbono Reforçado</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bloco 2: Itens do Orçamento (Tabela Moderna Limpa) -->
+    <div class="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+      <div class="bg-slate-50/80 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">
+          3. Itens e Produtos do Orçamento (${data.items.length})
+        </h3>
+        <span class="text-[11px] font-mono text-slate-500">
+          Valores com tabela de fábrica
+        </span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="bg-slate-100/90 border-b border-slate-200 text-slate-700 font-bold uppercase text-[10px]">
+              <th class="py-2.5 px-4 text-center w-14">Qtd</th>
+              <th class="py-2.5 px-4">Descrição do Produto</th>
+              <th class="py-2.5 px-4 text-center w-28">Peso Estimado</th>
+              <th class="py-2.5 px-4 text-right w-28">Preço Unit.</th>
+              <th class="py-2.5 px-4 text-right w-28">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsRows}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Bloco 3: Detalhes de Logística, Transporte & Prazos -->
+    <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-3 text-xs">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">
+          4. Detalhes de Transporte & Logística
+        </h3>
+        <span class="text-xs font-bold text-[#EA580C]">
+          ${data.fulfillment === 'transportadora_envio' ? 'Transportadora (Envio)' : 'Instalação Física na Loja'}
+        </span>
+      </div>
+
+      ${data.fulfillment === 'transportadora_envio' ? `
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Transportadora</div>
+            <div class="font-bold text-slate-800 text-xs truncate">${data.shippingCarrierName || 'A definir / Despacho'}</div>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Cotação Frete Nº</div>
+            <div class="font-mono font-bold text-slate-800 text-xs">${data.shippingQuoteNumber || '—'}</div>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Prazo de Produção</div>
+            <div class="font-bold text-slate-800 text-xs">${data.productionLeadTime || '7 a 10 dias úteis'}</div>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Prazo de Entrega</div>
+            <div class="font-bold text-slate-800 text-xs">${data.deliveryLeadTime || '3 a 5 dias úteis'}</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Dimensões do Volume (C x L x A)</div>
+            <div class="font-mono text-slate-800 text-xs font-medium">${data.shippingPackageDimensions || 'Conforme especificação do veículo'}</div>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Contato da Transportadora</div>
+            <div class="text-slate-800 text-xs">${data.shippingCarrierContact || '—'}</div>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Código de Rastreio / NF</div>
+            <div class="font-mono text-slate-800 text-xs font-bold">${data.shippingTrackingCode || 'Emitido após despacho'}</div>
+          </div>
+        </div>
+      ` : `
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Data da Instalação</div>
+            <div class="font-bold text-slate-800 text-xs">${data.installationDate || 'A agendar com o vendedor'}</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Horário Agendado</div>
+            <div class="font-bold text-slate-800 text-xs">${data.installationTime || 'A definir'}</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Local da Loja / Fábrica</div>
+            <div class="text-slate-800 text-xs">Rua Dante Marteletti, 122 - Jd. Maringá, SP</div>
+          </div>
+        </div>
+      `}
+    </div>
+
+    <!-- Bloco 4: Formas de Pagamento & Resumo Financeiro -->
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+      
+      <!-- Detalhamento de Pagamento (7 Colunas) -->
+      <div class="md:col-span-7 bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-3 text-xs flex flex-col justify-between">
+        <div>
+          <div class="text-[10px] uppercase font-bold tracking-wider text-slate-400 pb-2 border-b border-slate-100 flex items-center justify-between">
+            <span>5. Condições de Pagamento</span>
+            <span class="font-bold text-[#EA580C]">${hasSplitPayments ? 'Pagamento Dividido / Misto' : 'Forma Única'}</span>
+          </div>
+
+          ${hasSplitPayments ? `
+            <div class="space-y-2 pt-2">
+              <div class="text-[11px] text-slate-600 font-medium">Desdobramento acordado para o pedido:</div>
+              <div class="space-y-1.5">
+                ${data.paymentSplits!.map((s, idx) => {
+                  const methodText = s.method === 'pix'
+                    ? 'PIX / À vista'
+                    : s.method === 'cartao_link_igor' || s.method === 'cartao_presencial' || s.method === 'cartao_credito'
+                    ? `Cartão de Crédito (${s.installments || 1}x de ${formatCurrency((s.amount || 0) / (s.installments || 1))})`
+                    : s.method === 'boleto'
+                    ? 'Boleto Bancário'
+                    : 'Dinheiro / Transferência'
+
+                  return `
+                    <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+                      <div>
+                        <div class="font-bold text-slate-900">${idx + 1}. ${methodText}</div>
+                        ${s.notes ? `<div class="text-[11px] text-slate-500 italic mt-0.5">${s.notes}</div>` : ''}
+                      </div>
+                      <div class="font-mono font-bold text-slate-900 text-xs">${formatCurrency(s.amount)}</div>
+                    </div>
+                  `
+                }).join('')}
+              </div>
+            </div>
+          ` : `
+            <div class="space-y-2 pt-2 text-slate-700">
+              ${data.paymentMethod === 'pix' ? `
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 font-medium leading-relaxed">
+                  <strong>Condição À Vista:</strong> Pagamento via <strong>${cashSubtypeLabel}</strong> com desconto especial aplicado na proposta.
+                </div>
+              ` : data.paymentMethod === 'boleto' ? `
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-medium leading-relaxed">
+                  <strong>Boleto Bancário:</strong> Emissão mediante aprovação cadastral e confirmação de pagamento.
+                </div>
+              ` : `
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 space-y-1">
+                  <div class="font-bold text-slate-900">Cartão de Crédito:</div>
+                  <div class="text-xs">
+                    Parcelamento em <strong>${cardInstallmentsCount}x de ${formatCurrency(cardInstallmentValue)} sem juros</strong>.
+                  </div>
+                  <div class="text-[11px] text-slate-500">Link de pagamento seguro ou presencial.</div>
+                </div>
+              `}
+            </div>
+          `}
+        </div>
+
+        <div class="text-[11px] text-slate-400 pt-2 border-t border-slate-100">
+          * Qualquer dúvida sobre outras condições comerciais, consulte nosso departamento comercial.
+        </div>
+      </div>
+
+      <!-- Totais & Resumo Financeiro (5 Colunas) -->
+      <div class="md:col-span-5 bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-2.5 text-xs">
+        <div class="text-[10px] uppercase font-bold tracking-wider text-slate-400 pb-1.5 border-b border-slate-200">
+          Resumo Financeiro
+        </div>
+
+        <div class="flex justify-between text-slate-600">
+          <span>Subtotal Produtos:</span>
+          <span class="font-mono font-semibold text-slate-800">${formatCurrency(data.budget.subtotal)}</span>
+        </div>
+
+        ${data.budget.discountValue > 0 ? `
+          <div class="flex justify-between text-emerald-700 font-semibold">
+            <span>Desconto Comercial (${data.budget.discountPercent}%):</span>
+            <span class="font-mono">-${formatCurrency(data.budget.discountValue)}</span>
+          </div>
+        ` : ''}
+
+        ${data.fulfillment === 'transportadora_envio' ? `
+          <div class="flex justify-between text-slate-600">
+            <span>Frete Transportadora:</span>
+            <span class="font-mono font-semibold text-slate-800">${formatCurrency(data.budget.freightValue)}</span>
+          </div>
+        ` : ''}
+
+        ${data.fulfillment === 'instalacao_loja' ? `
+          <div class="flex justify-between text-slate-600">
+            <span>Custo de Instalação:</span>
+            <span class="font-mono font-semibold text-slate-800">${formatCurrency(data.budget.installationValue)}</span>
+          </div>
+        ` : ''}
+
+        <div class="pt-3 border-t-2 border-slate-300 flex justify-between items-center text-slate-900">
+          <span class="text-xs font-extrabold uppercase">Valor Total:</span>
+          <span class="text-lg font-black text-[#EA580C] font-mono">${formatCurrency(data.budget.finalTotal)}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bloco 5: Dados Bancários Oficiais para Depósito / PIX -->
+    <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-2xl border border-slate-800 shadow-md space-y-2.5 text-xs">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-700">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-200">
+            6. Dados para Depósito Bancário & Chave PIX Oficial
+          </span>
+        </div>
+        <span class="text-[10px] text-slate-400 font-mono">Conta Jurídica Oficial MixFer</span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+        <div>
+          <div class="text-[10px] text-slate-400 uppercase font-semibold">Favorecido</div>
+          <div class="font-bold text-white text-xs">Mixfer Ind. e Exp. Ltda.</div>
+        </div>
+
+        <div>
+          <div class="text-[10px] text-slate-400 uppercase font-semibold">Chave PIX / CNPJ</div>
+          <div class="font-mono font-bold text-emerald-400 text-xs">13.563.446/0001-76</div>
+        </div>
+
+        <div>
+          <div class="text-[10px] text-slate-400 uppercase font-semibold">Banco Bradesco (237)</div>
+          <div class="font-mono font-bold text-white text-xs">Agência: 0298 • C/C: 217100-7</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bloco 6: Garantia Oficial & Instruções de Recebimento -->
+    <div class="p-4 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl flex items-start gap-3.5 text-xs text-emerald-950">
+      <div class="w-6 h-6 rounded-full bg-emerald-200 text-emerald-800 flex items-center justify-center font-bold text-sm shrink-0 mt-0.5">
+        ✓
+      </div>
+      <div class="space-y-1 leading-relaxed">
+        <div>
+          <strong>Garantia de 1 Ano Robusty:</strong> Todas as peças e suportes possuem garantia integral de 1 ano contra defeitos de fabricação e fadiga de solda.
+        </div>
+        <div class="text-[11px] text-emerald-800">
+          <strong>Atenção ao Recebimento na Transportadora:</strong> Favor conferir todas as embalagens no ato da entrega antes de assinar o canhoto. Em caso de avaria aparente, faça a ressalva no conhecimento de transporte (CT-e) imediatamente.
+        </div>
+      </div>
     </div>
 
     <!-- Rodapé -->
-    <div style="margin-top: 10px; text-align: center; font-size: 9px; color: #64748b;">
-      Robusty Bagageiros Automotivos & MixFer Soluções em Aço • Proposta Comercial Oficial • ${todayStr}
-    </div>
+    <footer class="pt-3 border-t border-slate-200 text-center text-[10px] text-slate-400 flex items-center justify-between">
+      <span>Robusty Bagageiros Automotivos • CRM Comercial & Operacional</span>
+      <span class="font-mono">Documento emitido eletronicamente</span>
+    </footer>
   </main>
 </body>
 </html>`

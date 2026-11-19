@@ -86,6 +86,7 @@ export interface Product {
 
 export type PersonType = 'fisica' | 'juridica'
 export type DocumentType = 'cpf' | 'rg' | 'cnh' | 'cnpj'
+export type CashPaymentSubtype = 'pix' | 'debito' | 'transferencia' | 'dinheiro'
 
 export interface PaymentSplit {
   id: string
@@ -109,6 +110,7 @@ export interface Contact {
   document_type?: DocumentType
   document?: string
   state_registration?: string
+  municipal_registration?: string
   trade_name?: string
   origin: LeadOrigin
   notes?: string
@@ -221,6 +223,7 @@ export interface Opportunity {
   document_type?: DocumentType
   document?: string
   state_registration?: string
+  municipal_registration?: string
   trade_name?: string
   shipping_quote_number?: string
   shipping_carrier_contact?: string
@@ -228,6 +231,7 @@ export interface Opportunity {
   production_lead_time?: string
   shipping_package_dimensions?: string
   product_color?: string
+  payment_subtype?: CashPaymentSubtype | string
   payment_splits?: PaymentSplit[]
   address?: Partial<Address>
   lost_reason?: string
@@ -255,6 +259,7 @@ export interface Order {
   document_type?: DocumentType
   document?: string
   state_registration?: string
+  municipal_registration?: string
   trade_name?: string
   shipping_quote_number?: string
   shipping_carrier_contact?: string
@@ -262,6 +267,7 @@ export interface Order {
   production_lead_time?: string
   shipping_package_dimensions?: string
   product_color?: string
+  payment_subtype?: CashPaymentSubtype | string
   payment_splits?: PaymentSplit[]
   fulfillment_type: FulfillmentType
   status: OrderStatus

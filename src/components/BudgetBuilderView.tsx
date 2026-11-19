@@ -15,10 +15,12 @@ import type {
   OpportunityTask,
   PersonType,
   DocumentType,
-  PaymentSplit
+  PaymentSplit,
+  CashPaymentSubtype
 } from '../types'
 import { fetchVehicles, fetchProducts, calculateBudget, getMaxDiscountForPaymentMethod } from '../services/catalogService'
 import { lookupCep } from '../services/cepService'
+import { lookupCnpj } from '../services/cnpjService'
 import { CustomDatePicker } from './CustomDatePicker'
 import { CustomTimePicker } from './CustomTimePicker'
 import { CustomAlertModal } from './CustomAlertModal'
@@ -214,32 +216,62 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   })
 
   // 1. Dados do Contato & Redes Sociais
-  const [customerName, setCustomerName] = useState(() => initialOpportunity?.contact?.full_name || '')
   const [customerPhone, setCustomerPhone] = useState(() => {
     const raw = initialOpportunity?.contact?.phone_e164 || ''
     return formatBRPhone(raw.replace('+55', ''))
   })
   const [customerEmail, setCustomerEmail] = useState(() => initialOpportunity?.customer_email || initialOpportunity?.contact?.email || '')
   
-  // Tipo de Pessoa (PF vs PJ) e Documentos com máscaras dinâmicas
+  // Tipo de Pessoa (PF vs PJ)
   const [personType, setPersonType] = useState<PersonType>(() => {
     return initialOpportunity?.person_type || initialOpportunity?.contact?.person_type || 'fisica'
   })
-  const [documentType, setDocumentType] = useState<DocumentType>(() => {
-    return initialOpportunity?.document_type || initialOpportunity?.contact?.document_type || 'cpf'
+
+  // 1.1 Campos exclusivos Pessoa Física (PF)
+  const [pfName, setPfName] = useState(() => {
+    const isPj = (initialOpportunity?.person_type || initialOpportunity?.contact?.person_type) === 'juridica'
+    return isPj ? '' : (initialOpportunity?.contact?.full_name || '')
   })
-  const [document, setDocument] = useState<string>(() => {
+  const [pfDocType, setPfDocType] = useState<'cpf' | 'rg' | 'cnh'>(() => {
+    const dType = initialOpportunity?.document_type || initialOpportunity?.contact?.document_type
+    if (dType === 'rg' || dType === 'cnh' || dType === 'cpf') return dType
+    return 'cpf'
+  })
+  const [pfDoc, setPfDoc] = useState(() => {
+    const isPj = (initialOpportunity?.person_type || initialOpportunity?.contact?.person_type) === 'juridica'
     const raw = initialOpportunity?.document || initialOpportunity?.contact?.document || ''
-    const pType = initialOpportunity?.person_type || initialOpportunity?.contact?.person_type || 'fisica'
-    const dType = initialOpportunity?.document_type || initialOpportunity?.contact?.document_type || (pType === 'juridica' ? 'cnpj' : 'cpf')
-    return raw ? formatDocumentBy(raw, dType) : ''
+    return isPj ? '' : (raw ? formatDocumentBy(raw, 'cpf') : '')
   })
-  const [stateRegistration, setStateRegistration] = useState<string>(() => {
-    return initialOpportunity?.state_registration || initialOpportunity?.contact?.state_registration || ''
+
+  // 1.2 Campos exclusivos Pessoa Jurídica (PJ)
+  const [pjCnpj, setPjCnpj] = useState(() => {
+    const isPj = (initialOpportunity?.person_type || initialOpportunity?.contact?.person_type) === 'juridica'
+    const raw = initialOpportunity?.document || initialOpportunity?.contact?.document || ''
+    return isPj ? (raw ? formatCNPJ(raw) : '') : ''
   })
-  const [tradeName, setTradeName] = useState<string>(() => {
+  const [pjCompanyName, setPjCompanyName] = useState(() => {
+    const isPj = (initialOpportunity?.person_type || initialOpportunity?.contact?.person_type) === 'juridica'
+    return isPj ? (initialOpportunity?.contact?.full_name || '') : ''
+  })
+  const [pjRepresentativeName, setPjRepresentativeName] = useState(() => {
     return initialOpportunity?.trade_name || initialOpportunity?.contact?.trade_name || ''
   })
+  const [pjStateRegistration, setPjStateRegistration] = useState(() => {
+    return initialOpportunity?.state_registration || initialOpportunity?.contact?.state_registration || ''
+  })
+  const [pjMunicipalRegistration, setPjMunicipalRegistration] = useState(() => {
+    return initialOpportunity?.municipal_registration || initialOpportunity?.contact?.municipal_registration || ''
+  })
+  const [loadingCnpj, setLoadingCnpj] = useState(false)
+  const [cnpjFeedback, setCnpjFeedback] = useState<string | null>(null)
+
+  // Valores derivados conforme o tipo de pessoa (PF vs PJ)
+  const customerName = personType === 'fisica' ? pfName : pjCompanyName
+  const document = personType === 'fisica' ? pfDoc : pjCnpj
+  const documentType = personType === 'fisica' ? pfDocType : 'cnpj'
+  const tradeName = personType === 'juridica' ? pjRepresentativeName : undefined
+  const stateRegistration = personType === 'juridica' ? pjStateRegistration : undefined
+  const municipalRegistration = personType === 'juridica' ? pjMunicipalRegistration : undefined
 
   const [instagramUrl, setInstagramUrl] = useState(() => 
     initialOpportunity?.instagram_url || 
@@ -333,6 +365,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   // "o sistema deve pedir primeiro a forma de pagamento antes de exibir as opções de desconto"
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>(() => {
     return initialOpportunity?.payment_method || ''
+  })
+  const [paymentSubtype, setPaymentSubtype] = useState<CashPaymentSubtype>(() => {
+    const raw = initialOpportunity?.payment_subtype
+    if (raw === 'debito' || raw === 'transferencia' || raw === 'dinheiro') return raw
+    return 'pix'
   })
   const [cardInstallments, setCardInstallments] = useState<number>(() => {
     return initialOpportunity?.card_installments || 10
@@ -567,6 +604,50 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     }
   }
 
+  // CNPJ Lookup via BrasilAPI / MinhaReceita
+  const handleCnpjSearch = async (cnpjToSearch?: string) => {
+    const raw = (cnpjToSearch || pjCnpj).replace(/\D/g, '')
+    if (raw.length !== 14) return
+    setLoadingCnpj(true)
+    setCnpjFeedback(null)
+    const res = await lookupCnpj(raw)
+    setLoadingCnpj(false)
+    if (res.error) {
+      setCnpjFeedback(res.error)
+    } else {
+      if (res.companyName) setPjCompanyName(res.companyName)
+      if (res.representativeName && !pjRepresentativeName) {
+        setPjRepresentativeName(res.representativeName)
+      }
+      if (res.phone && !customerPhone) {
+        setCustomerPhone(formatBRPhone(res.phone))
+      }
+      if (res.email && !customerEmail) {
+        setCustomerEmail(res.email)
+      }
+      if (res.cep && !cep) {
+        setCep(formatBRCep(res.cep))
+        if (res.street) setStreet(res.street)
+        if (res.number) setNumber(res.number)
+        if (res.complement) setComplement(res.complement)
+        if (res.neighborhood) setNeighborhood(res.neighborhood)
+        if (res.city) setCity(res.city)
+        if (res.state) setState(res.state)
+      }
+      setCnpjFeedback('Dados encontrados com sucesso!')
+      setTimeout(() => setCnpjFeedback(null), 4000)
+    }
+  }
+
+  const handleCnpjChange = (raw: string) => {
+    const formatted = formatCNPJ(raw)
+    setPjCnpj(formatted)
+    const digits = formatted.replace(/\D/g, '')
+    if (digits.length === 14) {
+      handleCnpjSearch(digits)
+    }
+  }
+
   const handleAddItem = (prod: Product) => {
     setItems((prev) => {
       const existing = prev.find((i) => i.product.id === prod.id)
@@ -605,6 +686,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       `*Responsável:* ${assignedTo}`,
       `Olá ${customerName ? customerName : 'Cliente'}! Segue sua proposta oficial:`,
       ...(document ? [`*${personType === 'juridica' ? 'CNPJ' : documentType.toUpperCase()}:* ${document}`] : []),
+      ...(personType === 'juridica' && tradeName ? [`*Representante:* ${tradeName}`] : []),
+      ...(personType === 'juridica' && stateRegistration ? [`*Inscrição Estadual (IE):* ${stateRegistration}`] : []),
+      ...(personType === 'juridica' && municipalRegistration ? [`*Inscrição Municipal (IM):* ${municipalRegistration}`] : []),
       ``,
       `*Veículo:* ${selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Utilitário'}`,
       `*Acabamento/Cor:* ${productColor}`,
@@ -636,17 +720,25 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         ? [
             `*Condição de Pagamento (Dividido):*`,
             ...paymentSplits.map((s, idx) => {
-              const methodLabel = s.method === 'pix' ? 'PIX / À vista' : s.method === 'cartao_link_igor' || s.method === 'cartao_presencial' ? `Cartão de Crédito (${s.installments || 1}x)` : s.method === 'boleto' ? 'Boleto Bancário' : 'Dinheiro / Transferência'
+              const methodLabel = s.method === 'pix' ? 'PIX / À vista' : s.method === 'cartao_link_igor' || s.method === 'cartao_presencial' ? `Cartão de Crédito (${s.installments || 1}x de ${formatCurrency(Math.round(((s.amount || 0) / Math.max(1, s.installments || 1)) * 100) / 100)})` : s.method === 'boleto' ? 'Boleto Bancário' : 'Dinheiro / Transferência'
               return `  ${idx + 1}. ${methodLabel}: ${formatCurrency(s.amount)}${s.notes ? ` (${s.notes})` : ''}`
             })
           ]
         : [
             `*Condição:* ${
               paymentMethod === 'pix'
-                ? 'À vista no PIX (com desconto)'
+                ? `À vista via ${
+                    paymentSubtype === 'pix'
+                      ? 'PIX'
+                      : paymentSubtype === 'debito'
+                      ? 'Cartão de Débito'
+                      : paymentSubtype === 'transferencia'
+                      ? 'Transferência Bancária'
+                      : 'Dinheiro'
+                  } (com desconto)`
                 : paymentMethod === 'boleto'
                 ? 'À vista no Boleto Bancário'
-                : `Cartão de Crédito em até ${cardInstallments}x de ${formatCurrency(budget.finalTotal / cardInstallments)}`
+                : `Cartão de Crédito em até ${cardInstallments}x de ${formatCurrency(Math.round((budget.finalTotal / Math.max(1, cardInstallments)) * 100) / 100)} sem juros`
             }`
           ]),
       ``,
@@ -694,6 +786,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       documentType: personType === 'fisica' ? documentType : 'cnpj',
       document,
       stateRegistration: personType === 'juridica' ? stateRegistration : undefined,
+      municipalRegistration: personType === 'juridica' ? municipalRegistration : undefined,
       tradeName: personType === 'juridica' ? tradeName : undefined,
       instagramUrl: instagramUrl.trim() || undefined,
       facebookUrl: facebookUrl.trim() || undefined,
@@ -730,6 +823,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       totalWeightKg: effectiveWeightKg,
       budget,
       paymentMethod: (paymentMethod as PaymentMethod) || 'pix',
+      paymentSubtype: paymentMethod === 'pix' ? paymentSubtype : undefined,
       discountPercent: budget.discountPercent,
       cardInstallments,
       paymentSplits: paymentMode === 'split' ? paymentSplits : (paymentSplits.length > 0 ? paymentSplits : undefined),
@@ -899,13 +993,14 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const buildProposalPayload = (): ProposalPayload => {
     return {
       orderNumber,
-      customerName,
+      customerName: customerName || 'Cliente',
       customerPhone,
       customerEmail,
       personType,
       documentType: personType === 'fisica' ? documentType : 'cnpj',
       document,
       stateRegistration: personType === 'juridica' ? stateRegistration : undefined,
+      municipalRegistration: personType === 'juridica' ? municipalRegistration : undefined,
       tradeName: personType === 'juridica' ? tradeName : undefined,
       vehicleModel: selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Utilitário',
       items,
@@ -925,6 +1020,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       installationDate,
       installationTime,
       paymentMethod: (paymentMethod as PaymentMethod) || 'pix',
+      paymentSubtype: paymentMethod === 'pix' ? paymentSubtype : undefined,
       cardInstallments,
       paymentSplits: paymentMode === 'split' ? paymentSplits : undefined,
       shippingCarrierName,
@@ -933,9 +1029,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       deliveryLeadTime,
       productionLeadTime,
       shippingPackageDimensions,
+      shippingTrackingCode,
       productColor,
       totalWeightKg: effectiveWeightKg,
       assignedTo: currentUser?.name || assignedTo,
+      notes: initialOpportunity?.notes || '',
     }
   }
 
@@ -1560,11 +1658,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
                     <button
                       type="button"
-                      onClick={() => {
-                        setPersonType('fisica')
-                        if (documentType === 'cnpj') setDocumentType('cpf')
-                        if (document) setDocument(formatCPF(document))
-                      }}
+                      onClick={() => setPersonType('fisica')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                         personType === 'fisica'
                           ? 'bg-white text-slate-900 shadow-xs'
@@ -1576,11 +1670,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        setPersonType('juridica')
-                        setDocumentType('cnpj')
-                        if (document) setDocument(formatCNPJ(document))
-                      }}
+                      onClick={() => setPersonType('juridica')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                         personType === 'juridica'
                           ? 'bg-white text-slate-900 shadow-xs'
@@ -1602,8 +1692,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       <input
                         type="text"
                         placeholder="Ex: Carlos Eduardo dos Santos"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
+                        value={pfName}
+                        onChange={(e) => setPfName(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
                       />
                     </div>
@@ -1618,11 +1708,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                               key={docOpt}
                               type="button"
                               onClick={() => {
-                                setDocumentType(docOpt)
-                                if (document) setDocument(formatDocumentBy(document, docOpt))
+                                setPfDocType(docOpt)
+                                if (pfDoc) setPfDoc(formatDocumentBy(pfDoc, docOpt))
                               }}
                               className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase cursor-pointer transition-all ${
-                                documentType === docOpt
+                                pfDocType === docOpt
                                   ? 'bg-[#EA580C] text-white'
                                   : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                               }`}
@@ -1635,21 +1725,21 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       <input
                         type="text"
                         placeholder={
-                          documentType === 'cpf'
+                          pfDocType === 'cpf'
                             ? '000.000.000-00'
-                            : documentType === 'rg'
+                            : pfDocType === 'rg'
                             ? '00.000.000-0'
                             : '00000000000 (11 dígitos)'
                         }
-                        value={document}
-                        onChange={(e) => setDocument(formatDocumentBy(e.target.value, documentType))}
+                        value={pfDoc}
+                        onChange={(e) => setPfDoc(formatDocumentBy(e.target.value, pfDocType))}
                         className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
                       />
                     </div>
 
-                    {/* WhatsApp */}
+                    {/* Telefone do Responsável */}
                     <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">WhatsApp:</label>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Telefone do Responsável:</label>
                       <input
                         type="text"
                         placeholder="(11) 99999-9999"
@@ -1673,77 +1763,115 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   </div>
                 ) : (
                   /* ================= CAMPOS PESSOA JURÍDICA ================= */
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    {/* Razão Social */}
+                  <div className="space-y-3.5">
+                    {/* Linha 1: CNPJ e Razão Social */}
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                      {/* CNPJ (5 cols) */}
+                      <div className="sm:col-span-5">
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[11px] font-bold text-slate-600">CNPJ:</label>
+                          {loadingCnpj && (
+                            <span className="text-[10px] text-[#EA580C] font-semibold flex items-center gap-1">
+                              <Loader2 className="w-3 h-3 animate-spin" /> Consultando...
+                            </span>
+                          )}
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="00.000.000/0000-00"
+                            value={pjCnpj}
+                            onChange={(e) => handleCnpjChange(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void handleCnpjSearch()}
+                            title="Buscar dados do CNPJ na Receita"
+                            disabled={loadingCnpj || pjCnpj.replace(/\D/g, '').length !== 14}
+                            className="absolute right-1.5 top-1.5 bottom-1.5 px-2 bg-slate-200 hover:bg-[#EA580C] hover:text-white text-slate-600 disabled:opacity-40 disabled:hover:bg-slate-200 disabled:hover:text-slate-600 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
+                          >
+                            <Search className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        {cnpjFeedback && (
+                          <div className={`text-[10px] mt-1 font-medium ${cnpjFeedback.includes('sucesso') || cnpjFeedback.includes('encontrados') ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {cnpjFeedback}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Razão Social (7 cols) */}
+                      <div className="sm:col-span-7">
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">Razão Social:</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Empresa de Transportes e Frotas Ltda."
+                          value={pjCompanyName}
+                          onChange={(e) => setPjCompanyName(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Linha 2: Inscrição Estadual (IE) e Inscrição Municipal (IM) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">Inscrição Estadual (IE):</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 123.456.789.012 ou ISENTO"
+                          value={pjStateRegistration}
+                          onChange={(e) => setPjStateRegistration(formatIE(e.target.value))}
+                          className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">Inscrição Municipal (IM):</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 987654321 ou ISENTO"
+                          value={pjMunicipalRegistration}
+                          onChange={(e) => setPjMunicipalRegistration(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Linha 3: Nome do Representante */}
                     <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Razão Social:</label>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Nome do Representante:</label>
                       <input
                         type="text"
-                        placeholder="Ex: Empresa de Transportes e Frotas Ltda."
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
+                        placeholder="Ex: Marcos Silva (Diretor / Procurador)"
+                        value={pjRepresentativeName}
+                        onChange={(e) => setPjRepresentativeName(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
                       />
                     </div>
 
-                    {/* Nome Fantasia / Contato Responsável */}
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Nome Fantasia / Contato:</label>
-                      <input
-                        type="text"
-                        placeholder="Ex: Frotas Brasil - A/C Sr. Marcos"
-                        value={tradeName}
-                        onChange={(e) => setTradeName(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
-                      />
-                    </div>
-
-                    {/* CNPJ */}
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">CNPJ:</label>
-                      <input
-                        type="text"
-                        placeholder="00.000.000/0000-00"
-                        value={document}
-                        onChange={(e) => setDocument(formatCNPJ(e.target.value))}
-                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
-                      />
-                    </div>
-
-                    {/* Inscrição Estadual (IE) */}
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Inscrição Estadual (IE):</label>
-                      <input
-                        type="text"
-                        placeholder="Ex: 123.456.789.012 ou ISENTO"
-                        value={stateRegistration}
-                        onChange={(e) => setStateRegistration(formatIE(e.target.value))}
-                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
-                      />
-                    </div>
-
-                    {/* WhatsApp */}
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Telefone Comercial / WhatsApp:</label>
-                      <input
-                        type="text"
-                        placeholder="(11) 99999-9999"
-                        value={customerPhone}
-                        onChange={(e) => setCustomerPhone(formatBRPhone(e.target.value))}
-                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
-                      />
-                    </div>
-
-                    {/* E-mail */}
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">E-mail Comercial / NFe:</label>
-                      <input
-                        type="email"
-                        placeholder="financeiro@empresa.com.br"
-                        value={customerEmail}
-                        onChange={(e) => setCustomerEmail(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
-                      />
+                    {/* Linha 4: Telefone do Responsável e E-mail Comercial */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">Telefone do Responsável:</label>
+                        <input
+                          type="text"
+                          placeholder="(11) 99999-9999"
+                          value={customerPhone}
+                          onChange={(e) => setCustomerPhone(formatBRPhone(e.target.value))}
+                          className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">E-mail Comercial:</label>
+                        <input
+                          type="email"
+                          placeholder="comercial@empresa.com.br"
+                          value={customerEmail}
+                          onChange={(e) => setCustomerEmail(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -3347,13 +3475,52 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     </button>
                   </div>
 
+                  {/* Se for À Vista (PIX): Escolha do Subtipo */}
+                  {paymentMethod === 'pix' && (
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-600 font-bold">Modalidade À Vista:</span>
+                        <span className="text-[10px] font-bold text-emerald-700 uppercase bg-emerald-100/70 px-2 py-0.5 rounded-full">
+                          {paymentSubtype === 'pix'
+                            ? 'PIX Instantâneo'
+                            : paymentSubtype === 'debito'
+                            ? 'Cartão de Débito'
+                            : paymentSubtype === 'transferencia'
+                            ? 'TED / Transferência'
+                            : 'Dinheiro em Espécie'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {[
+                          { id: 'pix', label: 'PIX' },
+                          { id: 'debito', label: 'Débito' },
+                          { id: 'transferencia', label: 'Transf.' },
+                          { id: 'dinheiro', label: 'Dinheiro' }
+                        ].map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setPaymentSubtype(opt.id as CashPaymentSubtype)}
+                            className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all border cursor-pointer text-center ${
+                              paymentSubtype === opt.id
+                                ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-2xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Se for Cartão: Seleção de Parcelas */}
                   {(paymentMethod === 'cartao_link_igor' || paymentMethod === 'cartao_presencial') && (
                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
                       <div className="flex items-center justify-between text-xs mb-1">
                         <span className="text-slate-600 font-bold">Parcelas no Cartão:</span>
                         <span className="font-mono text-slate-800 font-bold">
-                          {cardInstallments}x de {formatCurrency(budget.finalTotal / cardInstallments)}
+                          {Math.max(1, cardInstallments || 1)}x de {formatCurrency(Math.round((budget.finalTotal / Math.max(1, cardInstallments || 1)) * 100) / 100)} sem juros
                         </span>
                       </div>
                       <select
@@ -3363,7 +3530,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       >
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                           <option key={num} value={num}>
-                            {num}x sem juros ({formatCurrency(budget.finalTotal / num)})
+                            {num}x sem juros ({formatCurrency(Math.round((budget.finalTotal / num) * 100) / 100)})
                           </option>
                         ))}
                       </select>
@@ -3533,11 +3700,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                                 }}
                                 className="flex-1 bg-white border border-slate-200 rounded px-1.5 py-1 text-[11px] text-slate-800 font-mono focus:outline-none focus:border-[#EA580C]"
                               >
-                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                                  <option key={n} value={n}>
-                                    {n}x de {formatCurrency((split.amount || 0) / n)}
-                                  </option>
-                                ))}
+                                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                                    <option key={n} value={n}>
+                                      {n}x de {formatCurrency(Math.round(((split.amount || 0) / n) * 100) / 100)}
+                                    </option>
+                                  ))}
                               </select>
                             </div>
                           )}
