@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react'
 import { Sidebar, type ActiveTab } from './components/Sidebar'
 import { TopBar } from './components/TopBar'
-import { formatOrderCode } from './utils/formatters'
 import { CatalogView } from './components/CatalogView'
 import { BudgetBuilderView } from './components/BudgetBuilderView'
 import { KanbanView } from './components/KanbanView'
@@ -9,353 +9,39 @@ import { OrdersView } from './components/OrdersView'
 import { CalendarView } from './components/CalendarView'
 import { SettingsView } from './components/SettingsView'
 import { LoginView, type CurrentUser } from './components/LoginView'
-import type { 
-  Opportunity, 
-  OpportunityStage, 
-  Order, 
-  OrderStatus, 
-  Appointment, 
-  OpportunityComment,
+import type {
+  Opportunity,
+  OpportunityStage,
+  Order,
+  OrderStatus,
+  Appointment,
   OpportunityHistoryEvent,
-  OpportunityTask
 } from './types'
 import {
   fetchOpportunities,
   saveOpportunityToSupabase,
   updateOpportunityStage,
+  updateOpportunityTasks,
+  deleteOpportunityFromSupabase,
   fetchOrders,
-  createOrderInSupabase,
+  upsertOrderInSupabase,
   updateOrderStatusInSupabase,
   fetchAppointments,
   createAppointmentInSupabase,
 } from './services/crmService'
 
-// Helper para gerar datas relativas para mock inicial dinâmico
-const getRelDateStr = (days: number) => {
-  const d = new Date()
-  d.setDate(d.getDate() + days)
-  return d.toISOString().split('T')[0]
+const STAGE_LABELS: Record<string, string> = {
+  novo_lead: 'Novo lead',
+  lead_recebido: 'Lead Recebido',
+  contato_iniciado: 'Contato Iniciado',
+  aguardando_cotacao: 'Aguardando Cotação',
+  em_qualificacao: 'Em Qualificação',
+  orcamento_enviado: 'Orçamento Enviado',
+  em_negociacao: 'Em Negociação',
+  aguardando_pagamento: 'Aguardando Pagamento',
+  venda_ganha: 'Venda Ganha',
+  venda_perdida: 'Venda Perdida',
 }
-
-// Default fallback mock data with unique order numbers and assigned responsible
-const defaultOpportunities: Opportunity[] = [
-  {
-    id: 'opp-1',
-    order_number: 1040,
-    order_code: '#01040',
-    assigned_to: 'Norlando',
-    contact_id: 'c-1',
-    contact: {
-      id: 'c-1',
-      full_name: 'Mercado Central de Minas',
-      phone_e164: '+5531987654321',
-      instagram_url: '@mercadocentralminas',
-      website_url: 'mercadocentralminas.com.br',
-      origin: 'whatsapp_inbound',
-      created_at: new Date().toISOString(),
-    },
-    instagram_url: '@mercadocentralminas',
-    website_url: 'mercadocentralminas.com.br',
-    vehicle_model_year: 'Fiat Ducato Max Cargo 2023',
-    stage: 'aguardando_cotacao',
-    fulfillment_type: 'transportadora_envio',
-    subtotal_products: 4299.0,
-    freight_value: 280.0,
-    installation_value: 0,
-    discount_value: 0,
-    discount_percent: 0,
-    final_total: 4579.0,
-    total_weight_kg: 45,
-    pickup_date: getRelDateStr(0),
-    pickup_time: '10:00',
-    shipping_carrier_name: 'Braspress Cargas',
-    shipping_tracking_code: 'BP-98234-MG',
-    payment_method: 'pix',
-    tasks: [
-      {
-        id: 'task-1',
-        opportunity_id: 'opp-1',
-        order_number: 1040,
-        client_name: 'Mercado Central de Minas',
-        title: 'Cotar frete com a Braspress',
-        due_date: getRelDateStr(0),
-        due_time: '15:00',
-        assigned_to: 'Norlando',
-        completed: false,
-        created_at: new Date().toISOString()
-      }
-    ],
-    comments: [
-      {
-        id: 'comm-1',
-        opportunity_id: 'opp-1',
-        author: 'Norlando',
-        text: 'Cliente solicitou bagageiro reforçado para transporte diário de caixas de alimentos. Verificar disponibilidade do modelo EXTREME.',
-        created_at: new Date(Date.now() - 3600000 * 4).toISOString()
-      }
-    ],
-    history: [
-      {
-        id: 'hist-1',
-        opportunity_id: 'opp-1',
-        type: 'created',
-        description: 'Orçamento #01040 criado no CRM via WhatsApp Inbound',
-        user: 'Norlando',
-        created_at: new Date(Date.now() - 3600000 * 5).toISOString()
-      }
-    ],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'opp-2',
-    order_number: 1041,
-    order_code: '#01041',
-    assigned_to: 'Igor',
-    contact_id: 'c-2',
-    contact: {
-      id: 'c-2',
-      full_name: 'Roberto Frotas (Fiorino)',
-      phone_e164: '+5511977776655',
-      origin: 'instagram_direct',
-      created_at: new Date().toISOString(),
-    },
-    vehicle_model_year: 'Fiat Fiorino 2022',
-    stage: 'orcamento_enviado',
-    fulfillment_type: 'instalacao_loja',
-    subtotal_products: 2200.0,
-    freight_value: 0,
-    installation_value: 200.0,
-    discount_value: 110.0,
-    discount_percent: 5,
-    final_total: 2290.0,
-    total_weight_kg: 22,
-    installation_date: getRelDateStr(1),
-    installation_time: '14:00',
-    payment_method: 'boleto',
-    tasks: [
-      {
-        id: 'task-2',
-        opportunity_id: 'opp-2',
-        order_number: 1041,
-        client_name: 'Roberto Frotas (Fiorino)',
-        title: 'Follow-up do orçamento enviado',
-        due_date: getRelDateStr(0),
-        due_time: '16:30',
-        assigned_to: 'Igor',
-        completed: false,
-        created_at: new Date().toISOString()
-      }
-    ],
-    comments: [
-      {
-        id: 'comm-2',
-        opportunity_id: 'opp-2',
-        author: 'Igor',
-        text: 'Roberto tem interesse em fechar para 3 Fiorinos da frota se o desconto for mantido.',
-        created_at: new Date(Date.now() - 3600000 * 2).toISOString()
-      }
-    ],
-    history: [
-      {
-        id: 'hist-2',
-        opportunity_id: 'opp-2',
-        type: 'stage_change',
-        description: 'Movimentação de etapa: de "Lead Recebido" para "Orçamento Enviado"',
-        user: 'Igor',
-        created_at: new Date(Date.now() - 3600000 * 3).toISOString()
-      }
-    ],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'opp-3',
-    order_number: 1042,
-    order_code: '#01042',
-    assigned_to: 'Norlando',
-    contact_id: 'c-3',
-    contact: {
-      id: 'c-3',
-      full_name: 'Transportes Silva (Master)',
-      phone_e164: '+5511966665544',
-      origin: 'whatsapp_inbound',
-      created_at: new Date().toISOString(),
-    },
-    vehicle_model_year: 'Renault Master L3H2',
-    stage: 'venda_ganha',
-    fulfillment_type: 'transportadora_envio',
-    subtotal_products: 3680.0,
-    freight_value: 240.0,
-    installation_value: 0,
-    discount_value: 268.0,
-    discount_percent: 10,
-    final_total: 3652.0,
-    total_weight_kg: 48,
-    pickup_date: getRelDateStr(2),
-    pickup_time: '11:30',
-    shipping_carrier_name: 'Jadlog Express',
-    shipping_tracking_code: 'JAD-45671-SP',
-    payment_method: 'pix',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'opp-4',
-    order_number: 1043,
-    order_code: '#01043',
-    assigned_to: 'Loja',
-    contact_id: 'c-4',
-    contact: {
-      id: 'c-4',
-      full_name: 'Rogério Logística (Nova Kangoo)',
-      phone_e164: '+5511955554433',
-      origin: 'meta_lead_ads',
-      created_at: new Date().toISOString(),
-    },
-    vehicle_model_year: 'Renault Nova Kangoo 2024+',
-    stage: 'em_qualificacao',
-    fulfillment_type: 'transportadora_envio',
-    subtotal_products: 2280.0,
-    freight_value: 150.0,
-    installation_value: 0,
-    discount_value: 0,
-    discount_percent: 0,
-    final_total: 2430.0,
-    total_weight_kg: 26,
-    payment_method: 'cartao_link_igor',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'opp-5',
-    order_number: 1044,
-    order_code: '#01044',
-    assigned_to: 'Norlando',
-    contact_id: 'c-5',
-    contact: {
-      id: 'c-5',
-      full_name: 'Oficina do Beto (Express)',
-      phone_e164: '+5511944443322',
-      origin: 'loja_presencial',
-      created_at: new Date().toISOString(),
-    },
-    vehicle_model_year: 'Renault Express',
-    stage: 'em_negociacao',
-    fulfillment_type: 'instalacao_loja',
-    subtotal_products: 2100.0,
-    freight_value: 0,
-    installation_value: 200.0,
-    discount_value: 210.0,
-    discount_percent: 10,
-    final_total: 2090.0,
-    total_weight_kg: 24,
-    installation_date: getRelDateStr(3),
-    installation_time: '09:00',
-    payment_method: 'pix',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-]
-
-const defaultOrders: Order[] = [
-  {
-    id: 'ord-100',
-    order_number: 1040,
-    order_code: '#01040',
-    assigned_to: 'Norlando',
-    opportunity_id: 'opp-1',
-    contact_id: 'c-1',
-    contact: {
-      id: 'c-1',
-      full_name: 'Mercado Central de Minas',
-      phone_e164: '+5531987654321',
-      origin: 'whatsapp_inbound',
-      created_at: new Date().toISOString(),
-    },
-    fulfillment_type: 'transportadora_envio',
-    status: 'aguardando_coleta_instalacao',
-    payment_status: 'aprovado_pix',
-    invoice_required: true,
-    invoice_status: 'solicitada_ao_igor',
-    shipping_carrier_name: 'Braspress Cargas (Cotação Igor)',
-    shipping_tracking_code: 'BP-98234-MG',
-    total_weight_kg: 45,
-    pickup_date: getRelDateStr(0),
-    pickup_time: '10:00',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'ord-101',
-    order_number: 1041,
-    order_code: '#01041',
-    assigned_to: 'Igor',
-    opportunity_id: 'opp-2',
-    contact_id: 'c-2',
-    contact: {
-      id: 'c-2',
-      full_name: 'Roberto Frotas (Fiorino)',
-      phone_e164: '+5511977776655',
-      origin: 'instagram_direct',
-      created_at: new Date().toISOString(),
-    },
-    fulfillment_type: 'instalacao_loja',
-    status: 'em_preparacao',
-    payment_status: 'aprovado_boleto',
-    invoice_required: false,
-    invoice_status: 'nao_solicitada',
-    total_weight_kg: 22,
-    installation_date: getRelDateStr(1),
-    installation_time: '14:00',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'ord-102',
-    order_number: 1042,
-    order_code: '#01042',
-    assigned_to: 'Norlando',
-    opportunity_id: 'opp-3',
-    contact_id: 'c-3',
-    contact: {
-      id: 'c-3',
-      full_name: 'Transportes Silva (Master)',
-      phone_e164: '+5511966665544',
-      origin: 'whatsapp_inbound',
-      created_at: new Date().toISOString(),
-    },
-    fulfillment_type: 'transportadora_envio',
-    status: 'pedido_gerado',
-    payment_status: 'aprovado_pix',
-    invoice_required: true,
-    invoice_status: 'solicitada_ao_igor',
-    shipping_carrier_name: 'Jadlog Express',
-    shipping_tracking_code: 'JAD-45671-SP',
-    total_weight_kg: 48,
-    pickup_date: getRelDateStr(2),
-    pickup_time: '11:30',
-    created_at: new Date().toISOString(),
-  },
-]
-
-const defaultAppointments: Appointment[] = [
-  {
-    id: 'apt-1',
-    order_id: 'ord-101',
-    contact_id: 'c-2',
-    contact: {
-      id: 'c-2',
-      full_name: 'Roberto Frotas',
-      phone_e164: '+5511977776655',
-      origin: 'instagram_direct',
-      created_at: new Date().toISOString(),
-    },
-    vehicle_description: 'Fiat Fiorino — Bagageiro FX 100',
-    products_summary: 'Bagageiro FX 100 com fixação padrão',
-    scheduled_start: `${getRelDateStr(1)}T14:00:00`,
-    scheduled_end: `${getRelDateStr(1)}T15:30:00`,
-    status: 'agendado',
-  },
-]
 
 export function App() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(() => {
@@ -370,9 +56,79 @@ export function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban')
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [selectedVehicleForBudget, setSelectedVehicleForBudget] = useState<string | undefined>()
-  
+
   // State for the opportunity being viewed/edited in Gerador de Orçamento
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null)
+
+  // 100% Supabase-backed CRM state (zero mock data)
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [isLoadingCrm, setIsLoadingCrm] = useState(true)
+  const [crmLoadError, setCrmLoadError] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  const showToast = useCallback((type: 'success' | 'error', message: string) => {
+    setToast({ type, message })
+    window.setTimeout(() => {
+      setToast((prev) => (prev?.message === message ? null : prev))
+    }, 4500)
+  }, [])
+
+  const loadCrmData = useCallback(async () => {
+    setIsLoadingCrm(true)
+    setCrmLoadError(null)
+    try {
+      const [opps, ords, apts] = await Promise.all([
+        fetchOpportunities(),
+        fetchOrders(),
+        fetchAppointments(),
+      ])
+      setOpportunities(opps)
+      setOrders(ords)
+      setAppointments(apts)
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Não foi possível carregar os dados do Supabase.'
+      console.error('Falha ao sincronizar dados com Supabase:', err)
+      setCrmLoadError(message)
+    } finally {
+      setIsLoadingCrm(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    async function initialLoad() {
+      try {
+        const [opps, ords, apts] = await Promise.all([
+          fetchOpportunities(),
+          fetchOrders(),
+          fetchAppointments(),
+        ])
+        if (cancelled) return
+        setOpportunities(opps)
+        setOrders(ords)
+        setAppointments(apts)
+      } catch (err) {
+        if (cancelled) return
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Não foi possível carregar os dados do Supabase.'
+        console.error('Falha ao sincronizar dados com Supabase:', err)
+        setCrmLoadError(message)
+      } finally {
+        if (!cancelled) setIsLoadingCrm(false)
+      }
+    }
+    void initialLoad()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleLoginSuccess = (user: CurrentUser) => {
     setCurrentUser(user)
@@ -392,41 +148,7 @@ export function App() {
     }
   }
 
-  // Inbound Opportunities (Funil de Vendas)
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(defaultOpportunities)
-  // Operational Orders (Funil de Pedidos)
-  const [orders, setOrders] = useState<Order[]>(defaultOrders)
-  // Store Installation Appointments (Single Bay / 1 slot per time)
-  const [appointments, setAppointments] = useState<Appointment[]>(defaultAppointments)
-
-  // Load from Supabase on mount
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [opps, ords, apts] = await Promise.all([
-          fetchOpportunities(),
-          fetchOrders(),
-          fetchAppointments(),
-        ])
-
-        if (opps && opps.length > 0) {
-          setOpportunities(opps)
-        }
-        if (ords && ords.length > 0) {
-          setOrders(ords)
-        }
-        if (apts && apts.length > 0) {
-          setAppointments(apts)
-        }
-      } catch (err) {
-        console.error('Falha ao sincronizar dados com Supabase:', err)
-      }
-    }
-
-    loadData()
-  }, [])
-
-  // Next sequential order/opportunity number across all records
+  // Next sequential order/opportunity number across all records in Supabase
   const nextOpportunityNumber = useMemo(() => {
     const oppNums = opportunities
       .map((o) => o.order_number)
@@ -456,481 +178,369 @@ export function App() {
     setActiveTab('budget')
   }
 
-  // Move stage inside Funil de Vendas with bidirectional sync and automatic audit trail
+  // Move stage inside Funil de Vendas with bidirectional sync in Supabase
   const handleMoveStage = async (oppId: string, newStage: OpportunityStage) => {
-    const stageLabels: Record<string, string> = {
-      lead_recebido: 'Lead Recebido',
-      contato_iniciado: 'Contato Iniciado',
-      aguardando_cotacao: 'Aguardando Cotação',
-      em_qualificacao: 'Em Qualificação',
-      orcamento_enviado: 'Orçamento Enviado',
-      em_negociacao: 'Em Negociação',
-      venda_ganha: 'Venda Ganha',
-      venda_perdida: 'Venda Perdida'
-    }
+    const targetOpp = opportunities.find((o) => o.id === oppId)
+    if (!targetOpp) return
 
-    setOpportunities((prev) =>
-      prev.map((o) => {
-        if (o.id === oppId) {
-          const oldLabel = stageLabels[o.stage] || o.stage
-          const newLabel = stageLabels[newStage] || newStage
-          const historyEvent: OpportunityHistoryEvent = {
-            id: `hist-stage-${Date.now()}`,
-            opportunity_id: oppId,
-            type: 'stage_change',
-            description: `Movimentação de etapa: de "${oldLabel}" para "${newLabel}"`,
-            user: o.assigned_to || 'Equipe',
-            created_at: new Date().toISOString()
-          }
-          return {
-            ...o,
-            stage: newStage,
-            history: [historyEvent, ...(o.history || [])],
-            updated_at: new Date().toISOString()
-          }
-        }
-        return o
-      })
-    )
-
-    // Mirror to orders if moving to venda_perdida
-    if (newStage === 'venda_perdida') {
-      setOrders((prev) =>
-        prev.map((ord) => (ord.opportunity_id === oppId ? { ...ord, status: 'pedido_cancelado' } : ord))
-      )
-    }
-
-    await updateOpportunityStage(oppId, newStage)
-  }
-
-  // 1-Click task toggle for TopBar & Kanban
-  const handleToggleTask = (oppId: string, taskId: string) => {
-    setOpportunities((prev) =>
-      prev.map((opp) => {
-        if (opp.id === oppId && opp.tasks) {
-          const updatedTasks = opp.tasks.map((t) => {
-            if (t.id === taskId) {
-              const nextCompleted = !t.completed
-              return {
-                ...t,
-                completed: nextCompleted,
-                completed_at: nextCompleted ? new Date().toISOString() : undefined
-              }
-            }
-            return t
-          })
-          return { ...opp, tasks: updatedTasks, updated_at: new Date().toISOString() }
-        }
-        return opp
-      })
-    )
-  }
-
-  // Move status inside Funil de Pedidos with bidirectional sync
-  const handleUpdateOrderStatus = async (ordId: string, nextSt: OrderStatus) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === ordId ? { ...o, status: nextSt } : o))
-    )
-
-    // Mirror to opportunities
-    const targetOrder = orders.find((o) => o.id === ordId)
-    if (targetOrder) {
-      if (nextSt === 'pedido_cancelado') {
-        setOpportunities((prev) =>
-          prev.map((opp) =>
-            opp.id === targetOrder.opportunity_id || opp.order_number === targetOrder.order_number
-              ? { ...opp, stage: 'venda_perdida', updated_at: new Date().toISOString() }
-              : opp
-          )
-        )
-      } else if (nextSt === 'pedido_concluido') {
-        setOpportunities((prev) =>
-          prev.map((opp) =>
-            opp.id === targetOrder.opportunity_id || opp.order_number === targetOrder.order_number
-              ? { ...opp, stage: 'venda_ganha', updated_at: new Date().toISOString() }
-              : opp
-          )
-        )
-      }
-    }
-
-    await updateOrderStatusInSupabase(ordId, nextSt)
-  }
-
-  // Convert Opportunity to Order directly
-  const handleConvertToOrder = async (opp: Opportunity) => {
-    const nextOrderNumber = opp.order_number || nextOpportunityNumber
-    
-    // Mark opportunity as won
-    setOpportunities((prev) =>
-      prev.map((o) => (o.id === opp.id ? { ...o, stage: 'venda_ganha', updated_at: new Date().toISOString() } : o))
-    )
-
-    const newOrder: Order = {
-      id: `ord-${Date.now()}`,
-      order_number: nextOrderNumber,
-      order_code: opp.order_code || formatOrderCode(nextOrderNumber),
-      assigned_to: opp.assigned_to || 'Igor',
-      opportunity_id: opp.id,
-      opportunity: { ...opp, stage: 'venda_ganha' },
-      contact_id: opp.contact_id,
-      contact: opp.contact,
-      customer_email: opp.customer_email,
-      instagram_url: opp.instagram_url || opp.contact?.instagram_url,
-      facebook_url: opp.facebook_url || opp.contact?.facebook_url,
-      website_url: opp.website_url || opp.contact?.website_url,
-      fulfillment_type: opp.fulfillment_type || 'transportadora_envio',
-      status: 'pedido_gerado',
-      payment_status: 'aprovado_confirmado',
-      invoice_required: opp.fulfillment_type === 'transportadora_envio',
-      invoice_status: opp.fulfillment_type === 'transportadora_envio' ? 'solicitada_ao_igor' : 'nao_solicitada',
-      shipping_carrier_name: opp.fulfillment_type === 'transportadora_envio' ? 'Transportadora Pendente' : undefined,
-      pickup_date: opp.pickup_date,
-      pickup_time: opp.pickup_time,
-      installation_date: opp.installation_date,
-      installation_time: opp.installation_time,
-      total_weight_kg: opp.total_weight_kg,
+    const oldLabel = STAGE_LABELS[targetOpp.stage] || targetOpp.stage
+    const newLabel = STAGE_LABELS[newStage] || newStage
+    const historyEvent: OpportunityHistoryEvent = {
+      id: `hist-stage-${Date.now()}`,
+      opportunity_id: oppId,
+      type: 'stage_change',
+      description: `Movimentação de etapa: de "${oldLabel}" para "${newLabel}"`,
+      user: currentUser?.name || targetOpp.assigned_to || 'Equipe',
       created_at: new Date().toISOString(),
     }
+    const updatedHistory = [historyEvent, ...(targetOpp.history || [])]
+    const prevOpportunities = opportunities
+    const prevOrders = orders
 
-    setOrders((prev) => [newOrder, ...prev.filter((o) => o.opportunity_id !== opp.id && o.order_number !== nextOrderNumber)])
-    setActiveTab('kanban')
-
-    // Persist to Supabase if valid UUID
-    if (opp.id.includes('-') && opp.id.length > 20) {
-      const created = await createOrderInSupabase(opp)
-      if (created) {
-        setOrders((prev) => [created, ...prev.filter((o) => o.id !== newOrder.id)])
-      }
-    }
-  }
-
-  // Auto-save: atualiza o perfil do lead/oportunidade imediatamente sem redirecionar para fora
-  const handleAutoSaveOpportunity = async (data: any) => {
-    await handleSaveOpportunity(data, { stayOnPage: true })
-  }
-
-  // 1. Salvar: cria ou atualiza card no Funil de Vendas e reflete no Funil de Pedidos
-  const handleSaveOpportunity = async (data: any, options?: { stayOnPage?: boolean }) => {
-    const isEditing = opportunities.some((o) => o.id === data.id)
-    const existingOpp = opportunities.find((o) => o.id === data.id)
-
-    const updatedOpp: Opportunity = {
-      id: data.id,
-      order_number: data.orderNumber,
-      order_code: data.orderCode,
-      assigned_to: data.assignedTo,
-      contact_id: existingOpp?.contact_id || `c-${Date.now()}`,
-      contact: {
-        id: existingOpp?.contact_id || `c-${Date.now()}`,
-        full_name: data.customerName || 'Novo Cliente',
-        phone_e164: data.customerPhone || '+5511900000000',
-        email: data.customerEmail,
-        instagram_url: data.instagramUrl,
-        facebook_url: data.facebookUrl,
-        website_url: data.websiteUrl,
-        origin: data.leadOrigin,
-        created_at: existingOpp?.contact?.created_at || new Date().toISOString(),
-      },
-      instagram_url: data.instagramUrl,
-      facebook_url: data.facebookUrl,
-      website_url: data.websiteUrl,
-      vehicle_id: data.vehicleId,
-      vehicle: data.vehicle,
-      vehicle_model_year: data.vehicleModel,
-      stage: existingOpp?.stage || 'orcamento_enviado',
-      fulfillment_type: data.fulfillment,
-      subtotal_products: data.budget.subtotal,
-      freight_value: data.budget.freightValue,
-      installation_value: data.budget.installationValue,
-      discount_value: data.budget.discountValue,
-      discount_percent: data.budget.discountPercent,
-      final_total: data.budget.finalTotal,
-      payment_method: data.paymentMethod,
-      card_installments: data.cardInstallments,
-      pickup_date: data.pickupDate,
-      pickup_time: data.pickupTime,
-      installation_date: data.installationDate,
-      installation_time: data.installationTime,
-      shipping_carrier_name: data.shippingCarrierName,
-      shipping_tracking_code: data.shippingTrackingCode,
-      total_weight_kg: data.totalWeightKg,
-      customer_email: data.customerEmail,
-      address: data.address,
-      items: (data.items || []).filter((i: any) => i && i.product).map((i: any) => ({
-        id: `item-${i.product.id}`,
-        opportunity_id: data.id,
-        product_id: i.product.id,
-        product: i.product,
-        quantity: i.quantity,
-        unit_price: i.product.base_price_10x,
-        discount_applied: 0,
-        total_price: i.product.base_price_10x * i.quantity,
-      })),
-      attachments: data.attachments ?? existingOpp?.attachments ?? [],
-      comments: data.comments ?? existingOpp?.comments ?? [],
-      history: data.history ?? existingOpp?.history ?? [],
-      tasks: data.tasks ?? existingOpp?.tasks ?? [],
-      created_at: existingOpp?.created_at || new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-
-    if (isEditing) {
-      setOpportunities((prev) => prev.map((o) => (o.id === data.id ? updatedOpp : o)))
-    } else {
-      setOpportunities((prev) => [updatedOpp, ...prev])
-    }
-
-    // ESPELHAMENTO PERFEITO: Atualiza imediatamente o pedido correspondente no Funil de Pedidos
-    setOrders((prev) =>
-      prev.map((ord) => {
-        if (ord.opportunity_id === data.id || ord.order_number === data.orderNumber) {
-          return {
-            ...ord,
-            order_number: data.orderNumber,
-            assigned_to: data.assignedTo,
-            opportunity: updatedOpp,
-            contact: updatedOpp.contact,
-            customer_email: data.customerEmail,
-            instagram_url: data.instagramUrl,
-            facebook_url: data.facebookUrl,
-            website_url: data.websiteUrl,
-            fulfillment_type: data.fulfillment,
-            pickup_date: data.pickupDate,
-            pickup_time: data.pickupTime,
-            installation_date: data.installationDate,
-            installation_time: data.installationTime,
-            shipping_carrier_name: data.shippingCarrierName || ord.shipping_carrier_name,
-            shipping_tracking_code: data.shippingTrackingCode || ord.shipping_tracking_code,
-            total_weight_kg: data.totalWeightKg,
-            attachments: data.attachments ?? existingOpp?.attachments ?? [],
-            comments: data.comments ?? existingOpp?.comments ?? [],
-            history: data.history ?? existingOpp?.history ?? [],
-            tasks: data.tasks ?? existingOpp?.tasks ?? [],
-          }
-        }
-        return ord
-      })
-    )
-
-    // Se autoGenerateOrder for true, integra imediatamente ao funil de pedidos
-    if (data.autoGenerateOrder) {
-      handleGenerateOrderFromBudget(data)
-      return
-    }
-
-    // Persistir no Supabase em segundo plano (não bloqueia UI)
-    saveOpportunityToSupabase({
-      customerName: data.customerName,
-      customerPhone: data.customerPhone || '',
-      vehicleModel: data.vehicleModel,
-      vehicleId: data.vehicleId,
-      fulfillmentType: data.fulfillment,
-      subtotal: data.budget?.subtotal ?? 0,
-      freightValue: data.budget?.freightValue ?? 0,
-      installationValue: data.budget?.installationValue ?? 0,
-      discountValue: data.budget?.discountValue ?? 0,
-      discountPercent: data.budget?.discountPercent ?? 0,
-      finalTotal: data.budget?.finalTotal ?? 0,
-      paymentMethod: data.paymentMethod,
-      cep: data.address?.cep,
-      street: data.address?.street,
-      number: data.address?.number,
-      neighborhood: data.address?.neighborhood,
-      city: data.address?.city,
-      state: data.address?.state,
-    }).catch((err) => console.warn('Supabase sync skipped:', err))
-
-    if (options?.stayOnPage) {
-      setEditingOpportunity(updatedOpp)
-    } else {
-      setEditingOpportunity(null)
-      setActiveTab('kanban')
-    }
-  }
-
-  // 2. Gerar Pedido: integra o card diretamente com o Funil de Pedidos
-  const handleGenerateOrderFromBudget = async (data: any) => {
-    const isEditing = opportunities.some((o) => o.id === data.id)
-    const existingOpp = opportunities.find((o) => o.id === data.id)
-
-    const updatedOpp: Opportunity = {
-      id: data.id,
-      order_number: data.orderNumber,
-      order_code: data.orderCode,
-      assigned_to: data.assignedTo,
-      contact_id: existingOpp?.contact_id || `c-${Date.now()}`,
-      contact: {
-        id: existingOpp?.contact_id || `c-${Date.now()}`,
-        full_name: data.customerName || 'Novo Cliente',
-        phone_e164: data.customerPhone || '+5511900000000',
-        email: data.customerEmail,
-        instagram_url: data.instagramUrl,
-        facebook_url: data.facebookUrl,
-        website_url: data.websiteUrl,
-        origin: data.leadOrigin,
-        created_at: existingOpp?.contact?.created_at || new Date().toISOString(),
-      },
-      instagram_url: data.instagramUrl,
-      facebook_url: data.facebookUrl,
-      website_url: data.websiteUrl,
-      vehicle_id: data.vehicleId,
-      vehicle: data.vehicle,
-      vehicle_model_year: data.vehicleModel,
-      stage: 'venda_ganha', // Oportunidade convertida em venda ganha
-      fulfillment_type: data.fulfillment,
-      subtotal_products: data.budget.subtotal,
-      freight_value: data.budget.freightValue,
-      installation_value: data.budget.installationValue,
-      discount_value: data.budget.discountValue,
-      discount_percent: data.budget.discountPercent,
-      final_total: data.budget.finalTotal,
-      payment_method: data.paymentMethod,
-      card_installments: data.cardInstallments,
-      pickup_date: data.pickupDate,
-      pickup_time: data.pickupTime,
-      installation_date: data.installationDate,
-      installation_time: data.installationTime,
-      shipping_carrier_name: data.shippingCarrierName,
-      shipping_tracking_code: data.shippingTrackingCode,
-      total_weight_kg: data.totalWeightKg,
-      customer_email: data.customerEmail,
-      address: data.address,
-      items: (data.items || []).filter((i: any) => i && i.product).map((i: any) => ({
-        id: `item-${i.product.id}`,
-        opportunity_id: data.id,
-        product_id: i.product.id,
-        product: i.product,
-        quantity: i.quantity,
-        unit_price: i.product.base_price_10x,
-        discount_applied: 0,
-        total_price: i.product.base_price_10x * i.quantity,
-      })),
-      attachments: data.attachments ?? existingOpp?.attachments ?? [],
-      comments: data.comments ?? existingOpp?.comments ?? [],
-      history: data.history ?? existingOpp?.history ?? [],
-      tasks: data.tasks ?? existingOpp?.tasks ?? [],
-      created_at: existingOpp?.created_at || new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-
-    if (isEditing) {
-      setOpportunities((prev) => prev.map((o) => (o.id === data.id ? updatedOpp : o)))
-    } else {
-      setOpportunities((prev) => [updatedOpp, ...prev])
-    }
-
-    // Criar ou atualizar pedido no Funil de Pedidos com status 'pedido_gerado'
-    const existingOrderIndex = orders.findIndex(
-      (ord) => ord.opportunity_id === data.id || ord.order_number === data.orderNumber
-    )
-
-    if (existingOrderIndex >= 0) {
-      setOrders((prev) =>
-        prev.map((ord, idx) => {
-          if (idx === existingOrderIndex) {
-            return {
-              ...ord,
-              order_number: data.orderNumber,
-              order_code: data.orderCode,
-              assigned_to: data.assignedTo,
-              status: 'pedido_gerado',
-              opportunity: updatedOpp,
-              contact: updatedOpp.contact,
-              customer_email: data.customerEmail,
-              instagram_url: data.instagramUrl,
-              facebook_url: data.facebookUrl,
-              website_url: data.websiteUrl,
-              fulfillment_type: data.fulfillment,
-              pickup_date: data.pickupDate,
-              pickup_time: data.pickupTime,
-              installation_date: data.installationDate,
-              installation_time: data.installationTime,
-              shipping_carrier_name: data.shippingCarrierName || ord.shipping_carrier_name,
-              shipping_tracking_code: data.shippingTrackingCode || ord.shipping_tracking_code,
-              total_weight_kg: data.totalWeightKg,
-              attachments: data.attachments || existingOpp?.attachments || [],
-              comments: data.comments || existingOpp?.comments || [],
-              history: data.history || existingOpp?.history || [],
-              tasks: data.tasks || existingOpp?.tasks || [],
+    setOpportunities((prev) =>
+      prev.map((o) =>
+        o.id === oppId
+          ? {
+              ...o,
+              stage: newStage,
+              history: updatedHistory,
+              updated_at: new Date().toISOString(),
             }
-          }
-          return ord
-        })
+          : o
       )
-    } else {
-      const newOrder: Order = {
-        id: `ord-${Date.now()}`,
-        order_number: data.orderNumber,
-        order_code: data.orderCode,
-        assigned_to: data.assignedTo || 'Igor',
-        opportunity_id: data.id,
-        opportunity: updatedOpp,
-        contact_id: updatedOpp.contact_id,
-        contact: updatedOpp.contact,
-        customer_email: data.customerEmail,
-        instagram_url: data.instagramUrl,
-        facebook_url: data.facebookUrl,
-        website_url: data.websiteUrl,
-        fulfillment_type: data.fulfillment,
-        status: 'pedido_gerado',
-        payment_status: 'aprovado_confirmado',
-        invoice_required: data.fulfillment === 'transportadora_envio',
-        invoice_status: data.fulfillment === 'transportadora_envio' ? 'solicitada_ao_igor' : 'nao_solicitada',
-        shipping_carrier_name: data.shippingCarrierName || (data.fulfillment === 'transportadora_envio' ? 'Transportadora Pendente' : undefined),
-        shipping_tracking_code: data.shippingTrackingCode,
-        pickup_date: data.pickupDate,
-        pickup_time: data.pickupTime,
-        installation_date: data.installationDate,
-        installation_time: data.installationTime,
-        total_weight_kg: data.totalWeightKg,
+    )
+
+    if (newStage === 'venda_perdida') {
+      setOrders((prev) =>
+        prev.map((ord) =>
+          ord.opportunity_id === oppId ? { ...ord, status: 'pedido_cancelado' } : ord
+        )
+      )
+    }
+
+    try {
+      await updateOpportunityStage(oppId, newStage, updatedHistory)
+      if (newStage === 'venda_perdida') {
+        const freshAppointments = await fetchAppointments()
+        setAppointments(freshAppointments)
+      }
+    } catch (err) {
+      setOpportunities(prevOpportunities)
+      setOrders(prevOrders)
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Erro ao mover oportunidade no Supabase.'
+      )
+    }
+  }
+
+  // 1-Click task toggle for TopBar & Kanban (persisted in Supabase)
+  const handleToggleTask = async (oppId: string, taskId: string) => {
+    const targetOpp = opportunities.find((o) => o.id === oppId)
+    if (!targetOpp || !targetOpp.tasks) return
+
+    const updatedTasks = targetOpp.tasks.map((t) => {
+      if (t.id === taskId) {
+        const nextCompleted = !t.completed
+        return {
+          ...t,
+          completed: nextCompleted,
+          completed_at: nextCompleted ? new Date().toISOString() : undefined,
+        }
+      }
+      return t
+    })
+
+    const prevOpportunities = opportunities
+    setOpportunities((prev) =>
+      prev.map((opp) =>
+        opp.id === oppId
+          ? { ...opp, tasks: updatedTasks, updated_at: new Date().toISOString() }
+          : opp
+      )
+    )
+
+    try {
+      await updateOpportunityTasks(oppId, updatedTasks)
+    } catch (err) {
+      setOpportunities(prevOpportunities)
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Erro ao atualizar tarefa no Supabase.'
+      )
+    }
+  }
+
+  // Move status inside Funil de Pedidos with bidirectional sync in Supabase
+  const handleUpdateOrderStatus = async (ordId: string, nextSt: OrderStatus) => {
+    const targetOrder = orders.find((o) => o.id === ordId)
+    if (!targetOrder) return
+
+    const prevOrders = orders
+    const prevOpportunities = opportunities
+
+    setOrders((prev) => prev.map((o) => (o.id === ordId ? { ...o, status: nextSt } : o)))
+
+    if (nextSt === 'pedido_cancelado') {
+      setOpportunities((prev) =>
+        prev.map((opp) =>
+          opp.id === targetOrder.opportunity_id || opp.order_number === targetOrder.order_number
+            ? { ...opp, stage: 'venda_perdida', updated_at: new Date().toISOString() }
+            : opp
+        )
+      )
+    } else if (nextSt === 'pedido_concluido') {
+      setOpportunities((prev) =>
+        prev.map((opp) =>
+          opp.id === targetOrder.opportunity_id || opp.order_number === targetOrder.order_number
+            ? { ...opp, stage: 'venda_ganha', updated_at: new Date().toISOString() }
+            : opp
+        )
+      )
+    }
+
+    try {
+      await updateOrderStatusInSupabase(ordId, nextSt, undefined, targetOrder.opportunity_id)
+      if (nextSt === 'pedido_cancelado' || nextSt === 'pedido_concluido') {
+        const freshAppointments = await fetchAppointments()
+        setAppointments(freshAppointments)
+      }
+    } catch (err) {
+      setOrders(prevOrders)
+      setOpportunities(prevOpportunities)
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Erro ao atualizar status do pedido no Supabase.'
+      )
+    }
+  }
+
+  // Convert Opportunity to Order directly in Supabase
+  const handleConvertToOrder = async (opp: Opportunity) => {
+    try {
+      await updateOpportunityStage(opp.id, 'venda_ganha')
+      const createdOrder = await upsertOrderInSupabase({ ...opp, stage: 'venda_ganha' })
+      const [freshOpps, freshOrds, freshApts] = await Promise.all([
+        fetchOpportunities(),
+        fetchOrders(),
+        fetchAppointments(),
+      ])
+      setOpportunities(freshOpps)
+      setOrders(freshOrds)
+      setAppointments(freshApts)
+      setActiveTab('kanban')
+      showToast('success', `Pedido ${createdOrder.order_code || `#${createdOrder.order_number}`} gerado no Supabase.`)
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Erro ao gerar pedido no Supabase.'
+      )
+    }
+  }
+
+  // 1. Salvar: cria ou atualiza oportunidade no Supabase e sincroniza pedidos/agendamentos
+  const handleSaveOpportunity = async (
+    data: any,
+    options?: { stayOnPage?: boolean }
+  ): Promise<Opportunity | null> => {
+    if (data.autoGenerateOrder) {
+      await handleGenerateOrderFromBudget(data)
+      return null
+    }
+
+    const existingOpp = data.id ? opportunities.find((o) => o.id === data.id) : undefined
+
+    try {
+      const savedOpp = await saveOpportunityToSupabase({
+        id: data.id || null,
+        contactId: data.contactId || existingOpp?.contact_id || null,
+        orderNumber: data.orderNumber,
+        assignedTo: data.assignedTo,
+        customerName: data.customerName,
+        customerPhone: data.customerPhone || '',
+        customerEmail: data.customerEmail,
+        instagramUrl: data.instagramUrl,
+        facebookUrl: data.facebookUrl,
+        websiteUrl: data.websiteUrl,
+        leadOrigin: data.leadOrigin,
+        vehicleId: data.vehicleId,
+        vehicleModel: data.vehicleModel,
+        stage: existingOpp?.stage || 'orcamento_enviado',
+        fulfillmentType: data.fulfillment,
+        subtotal: data.budget?.subtotal ?? 0,
+        freightValue: data.budget?.freightValue ?? 0,
+        installationValue: data.budget?.installationValue ?? 0,
+        discountValue: data.budget?.discountValue ?? 0,
+        discountPercent: data.budget?.discountPercent ?? 0,
+        finalTotal: data.budget?.finalTotal ?? 0,
+        paymentMethod: data.paymentMethod,
+        cardInstallments: data.cardInstallments,
+        pickupDate: data.pickupDate,
+        pickupTime: data.pickupTime,
+        installationDate: data.installationDate,
+        installationTime: data.installationTime,
+        shippingCarrierName: data.shippingCarrierName,
+        shippingTrackingCode: data.shippingTrackingCode,
+        totalWeightKg: data.totalWeightKg,
+        address: data.address,
+        items: data.items,
         attachments: data.attachments ?? existingOpp?.attachments ?? [],
         comments: data.comments ?? existingOpp?.comments ?? [],
         history: data.history ?? existingOpp?.history ?? [],
         tasks: data.tasks ?? existingOpp?.tasks ?? [],
-        created_at: new Date().toISOString(),
+        notes: existingOpp?.notes,
+      })
+
+      setOpportunities((prev) => {
+        const exists = prev.some((o) => o.id === savedOpp.id)
+        return exists
+          ? prev.map((o) => (o.id === savedOpp.id ? savedOpp : o))
+          : [savedOpp, ...prev]
+      })
+
+      const [freshOrders, freshAppointments] = await Promise.all([
+        fetchOrders(),
+        fetchAppointments(),
+      ])
+      setOrders(freshOrders)
+      setAppointments(freshAppointments)
+
+      if (options?.stayOnPage) {
+        setEditingOpportunity(savedOpp)
+      } else {
+        setEditingOpportunity(null)
+        setActiveTab('kanban')
+        showToast('success', 'Oportunidade salva com sucesso no Supabase.')
       }
-      setOrders((prev) => [newOrder, ...prev])
+
+      return savedOpp
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Erro ao salvar oportunidade no Supabase.'
+      )
+      return null
     }
-
-    setEditingOpportunity(null)
-    setActiveTab('kanban')
   }
 
-  // 3. Apagar Orçamento
-  const handleDeleteOpportunity = (oppId: string) => {
-    setOpportunities((prev) => prev.filter((o) => o.id !== oppId))
-    setOrders((prev) => prev.filter((ord) => ord.opportunity_id !== oppId))
-    setEditingOpportunity(null)
-    setActiveTab('kanban')
+  // Auto-save: atualiza o perfil do lead/oportunidade imediatamente no Supabase sem sair da tela
+  const handleAutoSaveOpportunity = async (data: any): Promise<Opportunity | null> => {
+    return handleSaveOpportunity(data, { stayOnPage: true })
   }
 
-  // 4. Marcar Oportunidade Não Concluída (Venda Perdida)
-  const handleMarkOpportunityLost = (oppId: string) => {
-    setOpportunities((prev) =>
-      prev.map((o) => (o.id === oppId ? { ...o, stage: 'venda_perdida', updated_at: new Date().toISOString() } : o))
-    )
-    setOrders((prev) =>
-      prev.map((ord) => (ord.opportunity_id === oppId ? { ...ord, status: 'pedido_cancelado' } : ord))
-    )
-    setEditingOpportunity(null)
-    setActiveTab('kanban')
+  // 2. Gerar Pedido: salva oportunidade como venda ganha e cria/atualiza pedido no Supabase
+  const handleGenerateOrderFromBudget = async (data: any) => {
+    const existingOpp = data.id ? opportunities.find((o) => o.id === data.id) : undefined
+
+    try {
+      const savedOpp = await saveOpportunityToSupabase({
+        id: data.id || null,
+        contactId: data.contactId || existingOpp?.contact_id || null,
+        orderNumber: data.orderNumber,
+        assignedTo: data.assignedTo,
+        customerName: data.customerName,
+        customerPhone: data.customerPhone || '',
+        customerEmail: data.customerEmail,
+        instagramUrl: data.instagramUrl,
+        facebookUrl: data.facebookUrl,
+        websiteUrl: data.websiteUrl,
+        leadOrigin: data.leadOrigin,
+        vehicleId: data.vehicleId,
+        vehicleModel: data.vehicleModel,
+        stage: 'venda_ganha',
+        fulfillmentType: data.fulfillment,
+        subtotal: data.budget?.subtotal ?? 0,
+        freightValue: data.budget?.freightValue ?? 0,
+        installationValue: data.budget?.installationValue ?? 0,
+        discountValue: data.budget?.discountValue ?? 0,
+        discountPercent: data.budget?.discountPercent ?? 0,
+        finalTotal: data.budget?.finalTotal ?? 0,
+        paymentMethod: data.paymentMethod,
+        cardInstallments: data.cardInstallments,
+        pickupDate: data.pickupDate,
+        pickupTime: data.pickupTime,
+        installationDate: data.installationDate,
+        installationTime: data.installationTime,
+        shippingCarrierName: data.shippingCarrierName,
+        shippingTrackingCode: data.shippingTrackingCode,
+        totalWeightKg: data.totalWeightKg,
+        address: data.address,
+        items: data.items,
+        attachments: data.attachments ?? existingOpp?.attachments ?? [],
+        comments: data.comments ?? existingOpp?.comments ?? [],
+        history: data.history ?? existingOpp?.history ?? [],
+        tasks: data.tasks ?? existingOpp?.tasks ?? [],
+        notes: existingOpp?.notes,
+      })
+
+      await upsertOrderInSupabase(savedOpp)
+
+      const [freshOpps, freshOrders, freshAppointments] = await Promise.all([
+        fetchOpportunities(),
+        fetchOrders(),
+        fetchAppointments(),
+      ])
+
+      setOpportunities(freshOpps)
+      setOrders(freshOrders)
+      setAppointments(freshAppointments)
+      setEditingOpportunity(null)
+      setActiveTab('kanban')
+      showToast('success', 'Pedido gerado e sincronizado com o Supabase.')
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Erro ao gerar pedido no Supabase.'
+      )
+    }
+  }
+
+  // 3. Apagar Orçamento (remove do Supabase)
+  const handleDeleteOpportunity = async (oppId: string) => {
+    try {
+      await deleteOpportunityFromSupabase(oppId)
+      setOpportunities((prev) => prev.filter((o) => o.id !== oppId))
+      setOrders((prev) => prev.filter((ord) => ord.opportunity_id !== oppId))
+      setAppointments((prev) => prev.filter((apt) => apt.opportunity_id !== oppId))
+      setEditingOpportunity(null)
+      setActiveTab('kanban')
+      showToast('success', 'Orçamento excluído do Supabase.')
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Erro ao excluir orçamento no Supabase.'
+      )
+    }
+  }
+
+  // 4. Marcar Oportunidade Não Concluída (Venda Perdida no Supabase)
+  const handleMarkOpportunityLost = async (oppId: string) => {
+    try {
+      await handleMoveStage(oppId, 'venda_perdida')
+      setEditingOpportunity(null)
+      setActiveTab('kanban')
+      showToast('success', 'Oportunidade marcada como Venda Perdida no Supabase.')
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Erro ao atualizar oportunidade no Supabase.'
+      )
+    }
   }
 
   const handleAddAppointment = async (aptData: Omit<Appointment, 'id'>) => {
-    const tempApt: Appointment = {
-      ...aptData,
-      id: `apt-${Date.now()}`,
-    }
-    setAppointments((prev) => [...prev, tempApt])
-
-    if (aptData.contact_id && aptData.contact_id.length > 20) {
+    try {
       const created = await createAppointmentInSupabase(aptData)
-      if (created) {
-        setAppointments((prev) => [...prev.filter((a) => a.id !== tempApt.id), created])
-      }
+      setAppointments((prev) => [...prev, created])
+      showToast('success', 'Agendamento salvo no Supabase.')
+      return true
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Erro ao salvar agendamento no Supabase.'
+      )
+      return false
     }
-    return true
   }
 
   if (!currentUser) {
@@ -967,69 +577,130 @@ export function App() {
           onToggleTask={handleToggleTask}
         />
 
+        {/* Toast Notification */}
+        {toast && (
+          <div className="fixed bottom-5 right-5 z-50 max-w-md animate-fade-in">
+            <div
+              className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-lg border text-xs font-bold ${
+                toast.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                  : 'bg-rose-50 border-rose-200 text-rose-900'
+              }`}
+            >
+              {toast.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              )}
+              <span>{toast.message}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Supabase Error Banner */}
+        {crmLoadError && activeTab !== 'catalog' && activeTab !== 'settings' && (
+          <div className="mx-4 sm:mx-6 mt-3 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 flex flex-wrap items-center justify-between gap-3 text-xs text-rose-900">
+            <div className="flex items-center gap-2 font-semibold">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{crmLoadError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadCrmData()}
+              className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold flex items-center gap-1.5 cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Tentar novamente</span>
+            </button>
+          </div>
+        )}
+
         <main className={`flex-1 w-full ${activeTab === 'kanban' ? 'p-3 sm:px-6 sm:py-3 flex flex-col min-h-0 overflow-hidden max-w-full' : 'p-4 sm:p-6 sm:py-8 max-w-7xl mx-auto'}`}>
-          {activeTab === 'kanban' && (
-            <KanbanView
-              opportunities={opportunities}
-              orders={orders}
-              onMoveStage={handleMoveStage}
-              onUpdateOrderStatus={handleUpdateOrderStatus}
-              onConvertToOrder={handleConvertToOrder}
-              onOpenNewBudget={handleOpenNewOpportunity}
-              onSelectOpportunity={handleSelectOpportunityToEdit}
-            />
-          )}
+          {isLoadingCrm && activeTab !== 'catalog' && activeTab !== 'settings' ? (
+            <div className="flex-1 flex items-center justify-center py-20">
+              <div className="flex items-center gap-3 text-xs font-bold text-slate-500 bg-white px-5 py-3.5 rounded-2xl border border-slate-100 shadow-nexo">
+                <RefreshCw className="w-4 h-4 text-[#EA580C] animate-spin" />
+                <span>Carregando dados do Supabase...</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              {activeTab === 'kanban' && (
+                <KanbanView
+                  opportunities={opportunities}
+                  orders={orders}
+                  onMoveStage={handleMoveStage}
+                  onUpdateOrderStatus={handleUpdateOrderStatus}
+                  onConvertToOrder={handleConvertToOrder}
+                  onOpenNewBudget={handleOpenNewOpportunity}
+                  onSelectOpportunity={handleSelectOpportunityToEdit}
+                />
+              )}
 
-          {activeTab === 'budget' && (
-            <BudgetBuilderView
-              key={budgetInstanceKey}
-              initialVehicleId={selectedVehicleForBudget}
-              initialOpportunity={editingOpportunity}
-              existingOrderNumber={nextOpportunityNumber}
-              existingOrders={orders}
-              existingOpportunities={opportunities}
-              existingAppointments={appointments}
-              currentUser={currentUser}
-              onSaveToKanban={handleSaveOpportunity}
-              onAutoSaveOpportunity={handleAutoSaveOpportunity}
-              onGenerateOrder={handleGenerateOrderFromBudget}
-              onDeleteOpportunity={handleDeleteOpportunity}
-              onMarkLost={handleMarkOpportunityLost}
-              onClose={() => setActiveTab('kanban')}
-            />
-          )}
+              {activeTab === 'budget' && (
+                <BudgetBuilderView
+                  key={budgetInstanceKey}
+                  initialVehicleId={selectedVehicleForBudget}
+                  initialOpportunity={editingOpportunity}
+                  existingOrderNumber={nextOpportunityNumber}
+                  existingOrders={orders}
+                  existingOpportunities={opportunities}
+                  existingAppointments={appointments}
+                  currentUser={currentUser}
+                  onSaveToKanban={handleSaveOpportunity}
+                  onAutoSaveOpportunity={handleAutoSaveOpportunity}
+                  onGenerateOrder={handleGenerateOrderFromBudget}
+                  onDeleteOpportunity={handleDeleteOpportunity}
+                  onMarkLost={handleMarkOpportunityLost}
+                  onClose={() => setActiveTab('kanban')}
+                />
+              )}
 
-          {activeTab === 'catalog' && <CatalogView />}
+              {activeTab === 'catalog' && <CatalogView />}
 
-          {activeTab === 'orders' && (
-            <OrdersView
-              orders={orders}
-              onUpdateOrderStatus={handleUpdateOrderStatus}
-              onToggleInvoiceRequest={async (ordId) => {
-                const targetOrder = orders.find((o) => o.id === ordId)
-                if (targetOrder) {
-                  setOrders((prev) =>
-                    prev.map((o) =>
-                      o.id === ordId ? { ...o, invoice_status: 'solicitada_ao_igor' } : o
+              {activeTab === 'orders' && (
+                <OrdersView
+                  orders={orders}
+                  onUpdateOrderStatus={handleUpdateOrderStatus}
+                  onToggleInvoiceRequest={async (ordId) => {
+                    const targetOrder = orders.find((o) => o.id === ordId)
+                    if (!targetOrder) return
+                    const prevOrders = orders
+                    setOrders((prev) =>
+                      prev.map((o) =>
+                        o.id === ordId ? { ...o, invoice_status: 'solicitada_ao_igor' } : o
+                      )
                     )
-                  )
-                  await updateOrderStatusInSupabase(ordId, targetOrder.status, 'solicitada_ao_igor')
-                }
-              }}
-            />
-          )}
+                    try {
+                      await updateOrderStatusInSupabase(
+                        ordId,
+                        targetOrder.status,
+                        'solicitada_ao_igor',
+                        targetOrder.opportunity_id
+                      )
+                      showToast('success', 'Solicitação de NF salva no Supabase.')
+                    } catch (err) {
+                      setOrders(prevOrders)
+                      showToast(
+                        'error',
+                        err instanceof Error ? err.message : 'Erro ao atualizar NF no Supabase.'
+                      )
+                    }
+                  }}
+                />
+              )}
 
-          {activeTab === 'calendar' && (
-            <CalendarView
-              orders={orders}
-              opportunities={opportunities}
-              appointments={appointments}
-              onAddAppointment={handleAddAppointment}
-            />
-          )}
+              {activeTab === 'calendar' && (
+                <CalendarView
+                  orders={orders}
+                  opportunities={opportunities}
+                  appointments={appointments}
+                  onAddAppointment={handleAddAppointment}
+                />
+              )}
 
-          {activeTab === 'settings' && (
-            <SettingsView />
+              {activeTab === 'settings' && <SettingsView />}
+            </>
           )}
         </main>
 

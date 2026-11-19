@@ -251,6 +251,8 @@ export interface Order {
 export interface Appointment {
   id: string
   order_id?: string
+  opportunity_id?: string
+  event_type?: 'instalacao' | 'coleta'
   contact_id: string
   contact?: Contact
   installer_user_id?: string

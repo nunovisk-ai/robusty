@@ -86,11 +86,11 @@ interface BudgetBuilderViewProps {
   existingOpportunities?: Opportunity[]
   existingAppointments?: Appointment[]
   currentUser?: CurrentUser | null
-  onSaveToKanban?: (opportunityData: any, options?: { stayOnPage?: boolean }) => void
-  onAutoSaveOpportunity?: (opportunityData: any) => void
-  onGenerateOrder?: (opportunityData: any) => void
-  onDeleteOpportunity?: (oppId: string) => void
-  onMarkLost?: (oppId: string) => void
+  onSaveToKanban?: (opportunityData: any, options?: { stayOnPage?: boolean }) => Promise<Opportunity | null> | void
+  onAutoSaveOpportunity?: (opportunityData: any) => Promise<Opportunity | null> | void
+  onGenerateOrder?: (opportunityData: any) => Promise<void> | void
+  onDeleteOpportunity?: (oppId: string) => Promise<void> | void
+  onMarkLost?: (oppId: string) => Promise<void> | void
   onClose?: () => void
 }
 
@@ -129,14 +129,16 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   )
   
   // Número do Pedido / Identificador Único
-  const [orderNumber] = useState<number>(() => {
+  const [orderNumber, setOrderNumber] = useState<number>(() => {
     if (initialOpportunity?.order_number) return initialOpportunity.order_number
     if (existingOrderNumber) return existingOrderNumber
     return 1
   })
 
-  // ID Estável da Oportunidade (garante que múltiplos auto-salvamentos de comentários/tarefas atualizem o mesmo card)
-  const [opportunityId] = useState<string>(() => initialOpportunity?.id || `opp-${Date.now()}`)
+  // IDs reais no Supabase (null até o primeiro salvamento no banco)
+  const [opportunityId, setOpportunityId] = useState<string | null>(() => initialOpportunity?.id || null)
+  const [contactId, setContactId] = useState<string | null>(() => initialOpportunity?.contact_id || null)
+  const [isSaving, setIsSaving] = useState(false)
 
   // Responsável: Igor, Norlando ou Loja (por padrão vazio para nova oportunidade)
   const [assignedTo, setAssignedTo] = useState<'Igor' | 'Norlando' | 'Loja' | ''>(() => {
@@ -271,7 +273,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     return [
       {
         id: `hist-init-${Date.now()}`,
-        opportunity_id: opportunityId,
+        opportunity_id: opportunityId || undefined,
         type: 'created',
         description: `Orçamento ${formatOrderCode(orderNumber)} criado no CRM`,
         user: assignedTo,
@@ -322,9 +324,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
   const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId)
 
-  // Verifica se a oportunidade já está salva no CRM (original ou via auto-save)
+  // Verifica se a oportunidade já está salva no Supabase (original ou via auto-save)
   const isOpportunitySaved = useMemo(() => {
-    return Boolean(initialOpportunity || existingOpportunities.some((o) => o.id === opportunityId))
+    return Boolean(opportunityId && (initialOpportunity || existingOpportunities.some((o) => o.id === opportunityId)))
   }, [initialOpportunity, existingOpportunities, opportunityId])
 
   // Compatible products for vehicle (se nenhum veículo estiver selecionado, exibe todos os produtos)
@@ -541,6 +543,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
     return {
       id: opportunityId,
+      contactId,
       orderNumber,
       orderCode: formatOrderCode(orderNumber),
       assignedTo,
@@ -585,18 +588,28 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     }
   }
 
-  // Persistência Imediata no Perfil do Lead (Kanban e Store) sem sair da tela
-  const autoSaveOpportunity = (overrides?: {
+  // Persistência Imediata no Perfil do Lead (Supabase + Kanban) sem sair da tela
+  const autoSaveOpportunity = async (overrides?: {
     comments?: OpportunityComment[]
     tasks?: OpportunityTask[]
     history?: OpportunityHistoryEvent[]
     attachments?: AttachedDocument[]
   }) => {
     const payload = buildOpportunityData(overrides)
-    if (onAutoSaveOpportunity) {
-      onAutoSaveOpportunity(payload)
-    } else if (onSaveToKanban) {
-      onSaveToKanban(payload, { stayOnPage: true })
+    try {
+      const saved = onAutoSaveOpportunity
+        ? await onAutoSaveOpportunity(payload)
+        : onSaveToKanban
+        ? await onSaveToKanban(payload, { stayOnPage: true })
+        : null
+
+      if (saved) {
+        setOpportunityId(saved.id)
+        if (saved.contact_id) setContactId(saved.contact_id)
+        if (saved.order_number) setOrderNumber(saved.order_number)
+      }
+    } catch (err) {
+      console.error('Erro no salvamento automático da oportunidade:', err)
     }
   }
 
@@ -736,7 +749,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
     const historyEvent: OpportunityHistoryEvent = {
       id: `hist-prop-${Date.now()}`,
-      opportunity_id: opportunityId,
+      opportunity_id: opportunityId || undefined,
       type: 'note',
       description: `Gerou e anexou a proposta comercial oficial (${formatOrderCode(orderNumber)})`,
       user: authorName,
@@ -794,7 +807,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
       newHistoryEvents.push({
         id: `hist-attach-${Date.now()}-${index}`,
-        opportunity_id: opportunityId,
+        opportunity_id: opportunityId || undefined,
         type: 'note',
         description: `Anexou o arquivo "${file.name}"`,
         user: authorName,
@@ -879,7 +892,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     const authorName = currentUser?.name || assignedTo || 'Usuário'
     const comment: OpportunityComment = {
       id: `comm-${Date.now()}`,
-      opportunity_id: opportunityId,
+      opportunity_id: opportunityId || undefined,
       author: authorName,
       text: newCommentText.trim(),
       created_at: new Date().toISOString()
@@ -899,7 +912,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     const authorName = currentUser?.name || assignedTo || 'Usuário'
     const task: OpportunityTask = {
       id: `task-${Date.now()}`,
-      opportunity_id: opportunityId,
+      opportunity_id: opportunityId || undefined,
       order_number: orderNumber,
       client_name: customerName || 'Cliente',
       title: newTaskTitle.trim(),
@@ -918,7 +931,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
     const historyEvent: OpportunityHistoryEvent = {
       id: `hist-task-${Date.now()}`,
-      opportunity_id: opportunityId,
+      opportunity_id: opportunityId || undefined,
       type: 'note',
       description: `Criou a tarefa: "${task.title}"${task.assigned_to ? ` para ${task.assigned_to}` : ''}`,
       user: authorName,
@@ -955,7 +968,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     if (toggledTaskTitle) {
       const historyEvent: OpportunityHistoryEvent = {
         id: `hist-task-toggle-${Date.now()}`,
-        opportunity_id: opportunityId,
+        opportunity_id: opportunityId || undefined,
         type: 'note',
         description: isNowCompleted ? `Concluiu a tarefa: "${toggledTaskTitle}"` : `Reabriu a tarefa: "${toggledTaskTitle}"`,
         user: currentUser?.name || assignedTo || 'Usuário',
@@ -977,7 +990,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     if (targetTask) {
       const historyEvent: OpportunityHistoryEvent = {
         id: `hist-task-del-${Date.now()}`,
-        opportunity_id: opportunityId,
+        opportunity_id: opportunityId || undefined,
         type: 'note',
         description: `Excluiu a tarefa: "${targetTask.title}"`,
         user: currentUser?.name || assignedTo || 'Usuário',
@@ -1049,58 +1062,77 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     setConflictModalOpen(false)
   }
 
-  const executeSave = () => {
-    const data = buildOpportunityData()
-    if (onSaveToKanban) {
-      onSaveToKanban(data)
+  const executeSave = async () => {
+    if (isSaving) return
+    setIsSaving(true)
+    try {
+      const data = buildOpportunityData()
+      if (onSaveToKanban) {
+        const saved = await onSaveToKanban(data)
+        if (saved) {
+          setOpportunityId(saved.id)
+          if (saved.contact_id) setContactId(saved.contact_id)
+          if (saved.order_number) setOrderNumber(saved.order_number)
+        }
+      }
+      setSavedSuccess(true)
+      setTimeout(() => setSavedSuccess(false), 3000)
+    } finally {
+      setIsSaving(false)
     }
-    setSavedSuccess(true)
-    setTimeout(() => setSavedSuccess(false), 3000)
   }
 
-  const executeGenerateOrder = () => {
-    const data = buildOpportunityData()
-    if (onGenerateOrder) {
-      onGenerateOrder(data)
-    } else if (onSaveToKanban) {
-      onSaveToKanban({ ...data, autoGenerateOrder: true })
+  const executeGenerateOrder = async () => {
+    if (isSaving) return
+    setIsSaving(true)
+    try {
+      const data = buildOpportunityData()
+      if (onGenerateOrder) {
+        await onGenerateOrder(data)
+      } else if (onSaveToKanban) {
+        await onSaveToKanban({ ...data, autoGenerateOrder: true })
+      }
+      setOrderGeneratedSuccess(true)
+      setTimeout(() => setOrderGeneratedSuccess(false), 3000)
+    } finally {
+      setIsSaving(false)
     }
-    setOrderGeneratedSuccess(true)
-    setTimeout(() => setOrderGeneratedSuccess(false), 3000)
   }
 
   // 1. Salvar: cria/atualiza o card no Funil de Vendas com checagem de conflito
   const handleSave = () => {
+    if (isSaving) return
     if (installationConflict) {
       setPendingAction('save')
       setConflictModalOpen(true)
       return
     }
-    executeSave()
+    void executeSave()
   }
 
   // 2. Gerar Pedido: integra o card diretamente com o Funil de Pedidos com checagem de conflito
   const handleGenerateOrderAction = () => {
+    if (isSaving) return
     if (installationConflict) {
       setPendingAction('order')
       setConflictModalOpen(true)
       return
     }
-    executeGenerateOrder()
+    void executeGenerateOrder()
   }
 
   // 3. Apagar Orçamento
-  const handleDelete = () => {
-    if (onDeleteOpportunity) {
-      onDeleteOpportunity(opportunityId)
+  const handleDelete = async () => {
+    if (opportunityId && onDeleteOpportunity) {
+      await onDeleteOpportunity(opportunityId)
     }
     setDeleteModalOpen(false)
   }
 
   // 4. Marcar Oportunidade Perdida / Venda Não Concluída
-  const handleMarkLost = () => {
-    if (onMarkLost) {
-      onMarkLost(opportunityId)
+  const handleMarkLost = async () => {
+    if (opportunityId && onMarkLost) {
+      await onMarkLost(opportunityId)
     }
     setLostModalOpen(false)
   }
@@ -2836,19 +2868,21 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="py-3 px-3 rounded-xl text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] text-white shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+                  disabled={isSaving}
+                  className="py-3 px-3 rounded-xl text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
                 >
-                  <Save className="w-4 h-4 shrink-0" />
-                  <span>Salvar</span>
+                  {isSaving ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Save className="w-4 h-4 shrink-0" />}
+                  <span>{isSaving ? 'Salvando...' : 'Salvar'}</span>
                 </button>
 
                 {/* Botão Gerar Pedido (Integra diretamente com o Funil de Pedidos) */}
                 <button
                   type="button"
                   onClick={handleGenerateOrderAction}
-                  className="py-3 px-3 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+                  disabled={isSaving}
+                  className="py-3 px-3 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
                 >
-                  <Truck className="w-4 h-4 shrink-0" />
+                  {isSaving ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Truck className="w-4 h-4 shrink-0" />}
                   <span>Gerar Pedido</span>
                 </button>
               </div>

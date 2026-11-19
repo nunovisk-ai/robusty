@@ -146,14 +146,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     const list: CalendarEvent[] = []
     const seenOrderKeys = new Set<string>()
 
-    // 1. Integrar dos Pedidos (Orders)
+    const seenOpportunityIds = new Set<string>()
+    const seenOrderIds = new Set<string>()
+
+    // 1. Integrar dos Pedidos (Orders) vindos do Supabase
     orders.forEach((ord) => {
-      const opp = ord.opportunity
+      if (ord.status === 'pedido_cancelado') return
+      const opp = ord.opportunity || opportunities.find((o) => o.id === ord.opportunity_id)
       const vehicleRaw = opp?.vehicle_model_year || opp?.vehicle?.model || 'Utilitário'
       const { modelName } = cleanVehicleName(vehicleRaw)
       const productsSummary = opp?.items?.length
-        ? opp.items.map((it) => `${it.quantity}x ${it.product?.name || 'Bagageiro'}`).join(', ')
-        : 'Bagageiro Robusty com acessórios'
+        ? opp.items.map((it) => `${it.quantity}x ${it.product?.name || 'Produto'}`).join(', ')
+        : 'Itens não especificados'
 
       // Se tiver agendamento de Coleta (Transportadora)
       if (ord.pickup_date) {
@@ -164,7 +168,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           time: ord.pickup_time || '10:00',
           orderNumber: ord.order_number,
           orderCode: ord.order_code || formatOrderCode(ord.order_number),
-          clientName: ord.contact?.full_name || opp?.contact?.full_name || 'Cliente Robusty',
+          clientName: ord.contact?.full_name || opp?.contact?.full_name || 'Cliente',
           clientPhone: ord.contact?.phone_e164 || opp?.contact?.phone_e164,
           clientEmail: ord.customer_email || ord.contact?.email || opp?.contact?.email,
           origin: ord.contact?.origin || opp?.contact?.origin,
@@ -178,6 +182,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           sourceType: 'order',
           notes: ord.internal_notes || opp?.notes
         })
+        seenOrderIds.add(ord.id)
       }
 
       // Se tiver agendamento de Instalação (Loja)
@@ -189,7 +194,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           time: ord.installation_time || '14:00',
           orderNumber: ord.order_number,
           orderCode: ord.order_code || formatOrderCode(ord.order_number),
-          clientName: ord.contact?.full_name || opp?.contact?.full_name || 'Cliente Robusty',
+          clientName: ord.contact?.full_name || opp?.contact?.full_name || 'Cliente',
           clientPhone: ord.contact?.phone_e164 || opp?.contact?.phone_e164,
           clientEmail: ord.customer_email || ord.contact?.email || opp?.contact?.email,
           origin: ord.contact?.origin || opp?.contact?.origin,
@@ -200,22 +205,29 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           sourceType: 'order',
           notes: ord.internal_notes || opp?.notes
         })
+        seenOrderIds.add(ord.id)
       }
 
-      if (ord.opportunity_id) seenOrderKeys.add(ord.opportunity_id)
+      if (ord.opportunity_id) {
+        seenOrderKeys.add(ord.opportunity_id)
+        if (ord.pickup_date || ord.installation_date) {
+          seenOpportunityIds.add(ord.opportunity_id)
+        }
+      }
       if (ord.order_number) seenOrderKeys.add(String(ord.order_number))
     })
 
-    // 2. Integrar de Oportunidades salvas no Funil que ainda não viraram pedidos no OrdersView
+    // 2. Integrar de Oportunidades salvas no Funil que ainda não viraram pedidos
     opportunities.forEach((opp) => {
+      if (opp.stage === 'venda_perdida') return
       if (seenOrderKeys.has(opp.id) || (opp.order_number && seenOrderKeys.has(String(opp.order_number)))) {
         return // Já integrado através do Order
       }
 
       const { modelName } = cleanVehicleName(opp.vehicle_model_year || opp.vehicle?.model)
       const productsSummary = opp.items?.length
-        ? opp.items.map((it) => `${it.quantity}x ${it.product?.name || 'Bagageiro'}`).join(', ')
-        : 'Bagageiro Robusty com fixação'
+        ? opp.items.map((it) => `${it.quantity}x ${it.product?.name || 'Produto'}`).join(', ')
+        : 'Itens não especificados'
 
       // Se tiver agendamento de Coleta
       if (opp.pickup_date) {
@@ -226,7 +238,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           time: opp.pickup_time || '10:00',
           orderNumber: opp.order_number,
           orderCode: opp.order_code || formatOrderCode(opp.order_number),
-          clientName: opp.contact?.full_name || 'Cliente Oportunidade',
+          clientName: opp.contact?.full_name || 'Cliente',
           clientPhone: opp.contact?.phone_e164,
           clientEmail: opp.customer_email || opp.contact?.email,
           origin: opp.contact?.origin,
@@ -240,6 +252,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           sourceType: 'opportunity',
           notes: opp.notes
         })
+        seenOpportunityIds.add(opp.id)
       }
 
       // Se tiver agendamento de Instalação
@@ -251,7 +264,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           time: opp.installation_time || '14:00',
           orderNumber: opp.order_number,
           orderCode: opp.order_code || formatOrderCode(opp.order_number),
-          clientName: opp.contact?.full_name || 'Cliente Oportunidade',
+          clientName: opp.contact?.full_name || 'Cliente',
           clientPhone: opp.contact?.phone_e164,
           clientEmail: opp.customer_email || opp.contact?.email,
           origin: opp.contact?.origin,
@@ -262,13 +275,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           sourceType: 'opportunity',
           notes: opp.notes
         })
+        seenOpportunityIds.add(opp.id)
       }
     })
 
-    // 3. Integrar compromissos manuais de Appointment
+    // 3. Integrar compromissos da tabela appointments do Supabase que ainda não apareceram via order/opportunity
     appointments.forEach((apt) => {
-      const matchOrder = orders.find((o) => o.id === apt.order_id)
-      if (matchOrder) return // já integrado
+      if (apt.status === 'cancelado') return
+      if (apt.order_id && seenOrderIds.has(apt.order_id)) return
+      if (apt.opportunity_id && seenOpportunityIds.has(apt.opportunity_id)) return
 
       const datePart = apt.scheduled_start.split('T')[0]
       const timePart = apt.scheduled_start.split('T')[1]?.slice(0, 5) || '09:30'
@@ -276,7 +291,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
       list.push({
         id: `apt-${apt.id}`,
-        type: 'instalacao',
+        type: apt.event_type === 'coleta' ? 'coleta' : 'instalacao',
         date: datePart,
         time: timePart,
         clientName: apt.contact?.full_name || 'Agendamento Direto',
@@ -284,7 +299,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         clientEmail: apt.contact?.email,
         origin: apt.contact?.origin || 'loja_presencial',
         vehicleModel: modelName,
-        itemsSummary: apt.products_summary || 'Instalação de Bagageiro',
+        itemsSummary: apt.products_summary || 'Itens não especificados',
         status: apt.status,
         sourceType: 'appointment',
         notes: apt.notes

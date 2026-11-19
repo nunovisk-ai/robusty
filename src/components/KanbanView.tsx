@@ -176,13 +176,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 
   // Obter valor monetário do pedido
   const getOrderTotal = (ord: Order): number => {
-    if (ord.opportunity?.final_total) return ord.opportunity.final_total
+    if (ord.opportunity?.final_total !== undefined) return ord.opportunity.final_total
     const matched = opportunities.find((o) => o.id === ord.opportunity_id)
-    if (matched?.final_total) return matched.final_total
-    if (ord.order_number === 1040) return 4579.0
-    if (ord.order_number === 1041) return 2290.0
-    if (ord.order_number === 1042) return 2090.0
-    return 3296.50
+    if (matched?.final_total !== undefined) return matched.final_total
+    return 0
   }
 
   // Obter modelo do veículo do pedido para o card espelho
@@ -192,11 +189,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     const matched = opportunities.find((o) => o.id === ord.opportunity_id)
     if (matched?.vehicle?.model) return matched.vehicle.model
     if (matched?.vehicle_model_year) return matched.vehicle_model_year
-    if (ord.contact?.full_name?.includes('(')) {
-      const parts = ord.contact.full_name.split('(')
-      if (parts[1]) return parts[1].replace(')', '').trim()
-    }
-    return 'Jumpy'
+    return 'Utilitário'
   }
 
   // Extrai o modelo do carro (ex.: Kombi, Jumpy, Ducato, Master, Fiorino) e NUNCA a marca (ex.: VW, Fiat)
