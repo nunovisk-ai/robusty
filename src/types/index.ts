@@ -80,6 +80,7 @@ export interface Product {
   max_discount_price_10pct: number
   installation_cost: number
   description?: string
+  payment_conditions_notes?: string
   image_urls?: string[]
   is_active: boolean
 }
