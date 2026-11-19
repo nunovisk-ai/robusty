@@ -111,6 +111,7 @@ export interface Contact {
   document?: string
   state_registration?: string
   municipal_registration?: string
+  commercial_phone?: string
   trade_name?: string
   origin: LeadOrigin
   notes?: string
@@ -224,6 +225,7 @@ export interface Opportunity {
   document?: string
   state_registration?: string
   municipal_registration?: string
+  commercial_phone?: string
   trade_name?: string
   shipping_quote_number?: string
   shipping_carrier_contact?: string
@@ -260,6 +262,7 @@ export interface Order {
   document?: string
   state_registration?: string
   municipal_registration?: string
+  commercial_phone?: string
   trade_name?: string
   shipping_quote_number?: string
   shipping_carrier_contact?: string

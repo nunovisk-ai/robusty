@@ -6,6 +6,7 @@ export interface ProposalPayload {
   orderNumber: number
   customerName: string
   customerPhone: string
+  commercialPhone?: string
   customerEmail?: string
   personType?: PersonType
   documentType?: DocumentType
@@ -263,7 +264,7 @@ export function generateProposalHtml(data: ProposalPayload): string {
 
         ${isPJ && data.tradeName ? `
           <div>
-            <div class="text-[10px] text-slate-400 uppercase font-semibold">Nome do Representante / Contato</div>
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Nome do Responsável</div>
             <div class="text-xs font-semibold text-slate-800">${data.tradeName}</div>
           </div>
         ` : ''}
@@ -291,13 +292,19 @@ export function generateProposalHtml(data: ProposalPayload): string {
           `}
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+        <div class="grid grid-cols-1 ${isPJ && data.commercialPhone ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-2 pt-1 border-t border-slate-100">
+          ${isPJ && data.commercialPhone ? `
+            <div>
+              <div class="text-[10px] text-slate-400 uppercase font-semibold">Telefone Comercial</div>
+              <div class="font-mono text-slate-800">${formatBRPhone(data.commercialPhone)}</div>
+            </div>
+          ` : ''}
           <div>
-            <div class="text-[10px] text-slate-400 uppercase font-semibold">Telefone do Responsável</div>
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">${isPJ ? 'WhatsApp (Responsável)' : 'WhatsApp'}</div>
             <div class="font-mono text-slate-800">${data.customerPhone ? formatBRPhone(data.customerPhone) : 'Não informado'}</div>
           </div>
           <div>
-            <div class="text-[10px] text-slate-400 uppercase font-semibold">E-mail Comercial</div>
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">E-mail</div>
             <div class="text-slate-800 truncate">${data.customerEmail || 'Não informado'}</div>
           </div>
         </div>

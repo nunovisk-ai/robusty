@@ -72,6 +72,7 @@ function mapContactRow(raw: any): Contact | undefined {
     document: raw.document || undefined,
     state_registration: raw.state_registration || undefined,
     municipal_registration: raw.municipal_registration || undefined,
+    commercial_phone: raw.commercial_phone || undefined,
     trade_name: raw.trade_name || undefined,
     origin: (raw.origin || 'whatsapp_inbound') as LeadOrigin,
     notes: raw.notes || undefined,
@@ -186,6 +187,7 @@ function mapOpportunityRow(row: any): Opportunity {
     document: row.document || contact?.document || undefined,
     state_registration: row.state_registration || contact?.state_registration || undefined,
     municipal_registration: row.municipal_registration || contact?.municipal_registration || undefined,
+    commercial_phone: row.commercial_phone || contact?.commercial_phone || undefined,
     trade_name: row.trade_name || contact?.trade_name || undefined,
     shipping_quote_number: row.shipping_quote_number || undefined,
     shipping_carrier_contact: row.shipping_carrier_contact || undefined,
@@ -228,6 +230,7 @@ function mapOrderRow(row: any): Order {
     document: row.document || opportunity?.document || contact?.document || undefined,
     state_registration: row.state_registration || opportunity?.state_registration || contact?.state_registration || undefined,
     municipal_registration: row.municipal_registration || opportunity?.municipal_registration || contact?.municipal_registration || undefined,
+    commercial_phone: row.commercial_phone || opportunity?.commercial_phone || contact?.commercial_phone || undefined,
     trade_name: row.trade_name || opportunity?.trade_name || contact?.trade_name || undefined,
     shipping_quote_number: row.shipping_quote_number || opportunity?.shipping_quote_number || undefined,
     shipping_carrier_contact: row.shipping_carrier_contact || opportunity?.shipping_carrier_contact || undefined,
@@ -352,6 +355,7 @@ export interface SaveOpportunityPayload {
   assignedTo?: 'Igor' | 'Norlando' | 'Loja' | ''
   customerName: string
   customerPhone?: string
+  commercialPhone?: string
   customerEmail?: string
   personType?: PersonType
   documentType?: DocumentType
@@ -399,6 +403,28 @@ export interface SaveOpportunityPayload {
   notes?: string
 }
 
+async function executeWithSchemaFallback<T = any>(
+  operation: (fields: Record<string, any>) => PromiseLike<{ data: T | null; error: any }>,
+  initialFields: Record<string, any>
+): Promise<{ data: T | null; error: any }> {
+  let fields = { ...initialFields }
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const res = await operation(fields)
+    if (!res.error) return res as { data: T | null; error: any }
+
+    const errorMsg = res.error?.message || ''
+    const match = errorMsg.match(/Could not find the '([^']+)' column/)
+    if (match && match[1] && match[1] in fields) {
+      console.warn(`[Supabase Schema Fallback] Coluna '${match[1]}' ausente no schema cache, omitindo do payload.`)
+      delete fields[match[1]]
+      continue
+    }
+    return res as { data: T | null; error: any }
+  }
+  const finalRes = await operation(fields)
+  return finalRes as { data: T | null; error: any }
+}
+
 async function upsertContact(payload: SaveOpportunityPayload): Promise<Contact> {
   const phoneE164 = normalizePhoneE164(payload.customerPhone)
   const now = new Date().toISOString()
@@ -411,6 +437,7 @@ async function upsertContact(payload: SaveOpportunityPayload): Promise<Contact> 
     document: payload.document?.trim() || null,
     state_registration: payload.stateRegistration?.trim() || null,
     municipal_registration: payload.municipalRegistration?.trim() || null,
+    commercial_phone: payload.commercialPhone?.trim() || null,
     trade_name: payload.tradeName?.trim() || null,
     instagram_handle: payload.instagramUrl?.trim() || null,
     instagram_url: payload.instagramUrl?.trim() || null,
@@ -434,12 +461,16 @@ async function upsertContact(payload: SaveOpportunityPayload): Promise<Contact> 
 
       if (conflict?.id) {
         // Re-link to existing contact with that phone and update its profile
-        const { data: merged, error: mergeError } = await supabase
-          .from('contacts')
-          .update(contactFields)
-          .eq('id', conflict.id)
-          .select()
-          .single()
+        const { data: merged, error: mergeError } = await executeWithSchemaFallback(
+          (fields) =>
+            supabase
+              .from('contacts')
+              .update(fields)
+              .eq('id', conflict.id)
+              .select()
+              .single(),
+          contactFields
+        )
 
         if (mergeError || !merged) {
           throw new Error(`Erro ao atualizar contato: ${mergeError?.message || 'falha desconhecida'}`)
@@ -450,15 +481,19 @@ async function upsertContact(payload: SaveOpportunityPayload): Promise<Contact> 
       canUpdatePhone = true
     }
 
-    const { data: updated, error: updateError } = await supabase
-      .from('contacts')
-      .update({
+    const { data: updated, error: updateError } = await executeWithSchemaFallback(
+      (fields) =>
+        supabase
+          .from('contacts')
+          .update(fields)
+          .eq('id', payload.contactId)
+          .select()
+          .single(),
+      {
         ...contactFields,
         ...(canUpdatePhone ? { phone_e164: phoneE164 } : {}),
-      })
-      .eq('id', payload.contactId)
-      .select()
-      .single()
+      }
+    )
 
     if (!updateError && updated) {
       return mapContactRow(updated)!
@@ -467,17 +502,18 @@ async function upsertContact(payload: SaveOpportunityPayload): Promise<Contact> 
 
   // If phone is provided, upsert on phone_e164
   if (phoneE164) {
-    const { data: upserted, error: upsertError } = await supabase
-      .from('contacts')
-      .upsert(
-        {
-          ...contactFields,
-          phone_e164: phoneE164,
-        },
-        { onConflict: 'phone_e164' }
-      )
-      .select()
-      .single()
+    const { data: upserted, error: upsertError } = await executeWithSchemaFallback(
+      (fields) =>
+        supabase
+          .from('contacts')
+          .upsert(fields, { onConflict: 'phone_e164' })
+          .select()
+          .single(),
+      {
+        ...contactFields,
+        phone_e164: phoneE164,
+      }
+    )
 
     if (upsertError || !upserted) {
       throw new Error(`Erro ao salvar contato no Supabase: ${upsertError?.message || 'falha desconhecida'}`)
@@ -486,14 +522,18 @@ async function upsertContact(payload: SaveOpportunityPayload): Promise<Contact> 
   }
 
   // No phone provided yet: insert new contact with phone_e164 = null
-  const { data: inserted, error: insertError } = await supabase
-    .from('contacts')
-    .insert({
+  const { data: inserted, error: insertError } = await executeWithSchemaFallback(
+    (fields) =>
+      supabase
+        .from('contacts')
+        .insert(fields)
+        .select()
+        .single(),
+    {
       ...contactFields,
       phone_e164: null,
-    })
-    .select()
-    .single()
+    }
+  )
 
   if (insertError || !inserted) {
     throw new Error(`Erro ao criar contato no Supabase: ${insertError?.message || 'falha desconhecida'}`)
@@ -672,6 +712,7 @@ export async function saveOpportunityToSupabase(
     document: payload.document?.trim() || contact.document || null,
     state_registration: payload.stateRegistration?.trim() || contact.state_registration || null,
     municipal_registration: payload.municipalRegistration?.trim() || contact.municipal_registration || null,
+    commercial_phone: payload.commercialPhone?.trim() || contact.commercial_phone || null,
     trade_name: payload.tradeName?.trim() || contact.trade_name || null,
     shipping_quote_number: payload.shippingQuoteNumber?.trim() || null,
     shipping_carrier_contact: payload.shippingCarrierContact?.trim() || null,
@@ -692,23 +733,31 @@ export async function saveOpportunityToSupabase(
   let opportunityId: string
 
   if (isValidUuid(payload.id)) {
-    const { data, error } = await supabase
-      .from('opportunities')
-      .update(oppDbRow)
-      .eq('id', payload.id)
-      .select('id')
-      .single()
+    const { data, error } = await executeWithSchemaFallback<{ id: string }>(
+      (fields) =>
+        supabase
+          .from('opportunities')
+          .update(fields)
+          .eq('id', payload.id)
+          .select('id')
+          .single(),
+      oppDbRow
+    )
 
     if (error || !data) {
       throw new Error(`Erro ao atualizar oportunidade no Supabase: ${error?.message || 'falha desconhecida'}`)
     }
     opportunityId = data.id
   } else {
-    const { data, error } = await supabase
-      .from('opportunities')
-      .insert(oppDbRow)
-      .select('id')
-      .single()
+    const { data, error } = await executeWithSchemaFallback<{ id: string }>(
+      (fields) =>
+        supabase
+          .from('opportunities')
+          .insert(fields)
+          .select('id')
+          .single(),
+      oppDbRow
+    )
 
     if (error || !data) {
       throw new Error(`Erro ao criar oportunidade no Supabase: ${error?.message || 'falha desconhecida'}`)
@@ -881,6 +930,7 @@ export async function upsertOrderInSupabase(opp: Opportunity): Promise<Order> {
     document: opp.document || opp.contact?.document || null,
     state_registration: opp.state_registration || opp.contact?.state_registration || null,
     municipal_registration: opp.municipal_registration || opp.contact?.municipal_registration || null,
+    commercial_phone: opp.commercial_phone || opp.contact?.commercial_phone || null,
     trade_name: opp.trade_name || opp.contact?.trade_name || null,
     shipping_quote_number: opp.shipping_quote_number || null,
     shipping_carrier_contact: opp.shipping_carrier_contact || null,
@@ -922,12 +972,16 @@ export async function upsertOrderInSupabase(opp: Opportunity): Promise<Order> {
   let orderId: string
 
   if (existing?.id) {
-    const { data, error } = await supabase
-      .from('orders')
-      .update(baseOrderFields)
-      .eq('id', existing.id)
-      .select('id')
-      .single()
+    const { data, error } = await executeWithSchemaFallback<{ id: string }>(
+      (fields) =>
+        supabase
+          .from('orders')
+          .update(fields)
+          .eq('id', existing.id)
+          .select('id')
+          .single(),
+      baseOrderFields
+    )
 
     if (error || !data) {
       throw new Error(`Erro ao atualizar pedido no Supabase: ${error?.message || 'falha desconhecida'}`)
@@ -942,11 +996,15 @@ export async function upsertOrderInSupabase(opp: Opportunity): Promise<Order> {
       insertPayload.order_number = opp.order_number
     }
 
-    const { data, error } = await supabase
-      .from('orders')
-      .insert(insertPayload)
-      .select('id, order_number')
-      .single()
+    const { data, error } = await executeWithSchemaFallback<{ id: string; order_number?: number }>(
+      (fields) =>
+        supabase
+          .from('orders')
+          .insert(fields)
+          .select('id, order_number')
+          .single(),
+      insertPayload
+    )
 
     if (error || !data) {
       throw new Error(`Erro ao criar pedido no Supabase: ${error?.message || 'falha desconhecida'}`)

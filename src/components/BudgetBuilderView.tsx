@@ -262,6 +262,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [pjMunicipalRegistration, setPjMunicipalRegistration] = useState(() => {
     return initialOpportunity?.municipal_registration || initialOpportunity?.contact?.municipal_registration || ''
   })
+  const [commercialPhone, setCommercialPhone] = useState(() => {
+    return initialOpportunity?.commercial_phone || (initialOpportunity?.contact as any)?.commercial_phone || ''
+  })
   const [loadingCnpj, setLoadingCnpj] = useState(false)
   const [cnpjFeedback, setCnpjFeedback] = useState<string | null>(null)
 
@@ -604,7 +607,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     }
   }
 
-  // CNPJ Lookup via BrasilAPI / MinhaReceita
+  // CNPJ Lookup via BrasilAPI / MinhaReceita (traz apenas a Razão Social conforme solicitação)
   const handleCnpjSearch = async (cnpjToSearch?: string) => {
     const raw = (cnpjToSearch || pjCnpj).replace(/\D/g, '')
     if (raw.length !== 14) return
@@ -616,25 +619,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       setCnpjFeedback(res.error)
     } else {
       if (res.companyName) setPjCompanyName(res.companyName)
-      if (res.representativeName && !pjRepresentativeName) {
-        setPjRepresentativeName(res.representativeName)
-      }
-      if (res.phone && !customerPhone) {
-        setCustomerPhone(formatBRPhone(res.phone))
-      }
-      if (res.email && !customerEmail) {
-        setCustomerEmail(res.email)
-      }
-      if (res.cep && !cep) {
-        setCep(formatBRCep(res.cep))
-        if (res.street) setStreet(res.street)
-        if (res.number) setNumber(res.number)
-        if (res.complement) setComplement(res.complement)
-        if (res.neighborhood) setNeighborhood(res.neighborhood)
-        if (res.city) setCity(res.city)
-        if (res.state) setState(res.state)
-      }
-      setCnpjFeedback('Dados encontrados com sucesso!')
+      setCnpjFeedback('Razão social localizada com sucesso!')
       setTimeout(() => setCnpjFeedback(null), 4000)
     }
   }
@@ -686,9 +671,12 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       `*Responsável:* ${assignedTo}`,
       `Olá ${customerName ? customerName : 'Cliente'}! Segue sua proposta oficial:`,
       ...(document ? [`*${personType === 'juridica' ? 'CNPJ' : documentType.toUpperCase()}:* ${document}`] : []),
-      ...(personType === 'juridica' && tradeName ? [`*Representante:* ${tradeName}`] : []),
+      ...(personType === 'juridica' && tradeName ? [`*Responsável:* ${tradeName}`] : []),
       ...(personType === 'juridica' && stateRegistration ? [`*Inscrição Estadual (IE):* ${stateRegistration}`] : []),
       ...(personType === 'juridica' && municipalRegistration ? [`*Inscrição Municipal (IM):* ${municipalRegistration}`] : []),
+      ...(personType === 'juridica' && commercialPhone ? [`*Telefone Comercial:* ${commercialPhone}`] : []),
+      ...(customerPhone ? [`*WhatsApp:* ${customerPhone}`] : []),
+      ...(customerEmail ? [`*E-mail:* ${customerEmail}`] : []),
       ``,
       `*Veículo:* ${selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Utilitário'}`,
       `*Acabamento/Cor:* ${productColor}`,
@@ -781,6 +769,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       stage: overrides?.stage ?? stage,
       customerName: customerName || 'Novo Cliente',
       customerPhone,
+      commercialPhone: personType === 'juridica' ? commercialPhone : undefined,
       customerEmail,
       personType,
       documentType: personType === 'fisica' ? documentType : 'cnpj',
@@ -995,6 +984,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       orderNumber,
       customerName: customerName || 'Cliente',
       customerPhone,
+      commercialPhone: personType === 'juridica' ? commercialPhone : undefined,
       customerEmail,
       personType,
       documentType: personType === 'fisica' ? documentType : 'cnpj',
@@ -1737,9 +1727,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       />
                     </div>
 
-                    {/* Telefone do Responsável */}
+                    {/* WhatsApp */}
                     <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Telefone do Responsável:</label>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">WhatsApp:</label>
                       <input
                         type="text"
                         placeholder="(11) 99999-9999"
@@ -1763,114 +1753,144 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   </div>
                 ) : (
                   /* ================= CAMPOS PESSOA JURÍDICA ================= */
-                  <div className="space-y-3.5">
-                    {/* Linha 1: CNPJ e Razão Social */}
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                      {/* CNPJ (5 cols) */}
-                      <div className="sm:col-span-5">
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-[11px] font-bold text-slate-600">CNPJ:</label>
-                          {loadingCnpj && (
-                            <span className="text-[10px] text-[#EA580C] font-semibold flex items-center gap-1">
-                              <Loader2 className="w-3 h-3 animate-spin" /> Consultando...
-                            </span>
+                  <div className="space-y-4">
+                    {/* Bloco 1: Dados da Empresa */}
+                    <div className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/70 space-y-3">
+                      <div className="flex items-center gap-2 pb-2 border-b border-slate-200/60">
+                        <Building2 className="w-4 h-4 text-[#EA580C]" />
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                          Dados da Empresa
+                        </h4>
+                      </div>
+
+                      {/* Linha 1: CNPJ e Razão Social */}
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                        {/* CNPJ (5 cols) */}
+                        <div className="sm:col-span-5">
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[11px] font-bold text-slate-600">CNPJ:</label>
+                            {loadingCnpj && (
+                              <span className="text-[10px] text-[#EA580C] font-semibold flex items-center gap-1">
+                                <Loader2 className="w-3 h-3 animate-spin" /> Consultando...
+                              </span>
+                            )}
+                          </div>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              placeholder="00.000.000/0000-00"
+                              value={pjCnpj}
+                              onChange={(e) => handleCnpjChange(e.target.value)}
+                              className="w-full bg-white border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium pr-10"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void handleCnpjSearch()}
+                              title="Buscar Razão Social do CNPJ na Receita"
+                              disabled={loadingCnpj || pjCnpj.replace(/\D/g, '').length !== 14}
+                              className="absolute right-1.5 top-1.5 bottom-1.5 px-2 bg-slate-100 hover:bg-[#EA580C] hover:text-white text-slate-600 disabled:opacity-40 disabled:hover:bg-slate-100 disabled:hover:text-slate-600 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
+                            >
+                              <Search className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          {cnpjFeedback && (
+                            <div className={`text-[10px] mt-1 font-medium ${cnpjFeedback.includes('sucesso') || cnpjFeedback.includes('localizada') ? 'text-emerald-600' : 'text-amber-600'}`}>
+                              {cnpjFeedback}
+                            </div>
                           )}
                         </div>
-                        <div className="relative">
+
+                        {/* Razão Social (7 cols) */}
+                        <div className="sm:col-span-7">
+                          <label className="text-[11px] font-bold text-slate-600 block mb-1">Razão Social:</label>
                           <input
                             type="text"
-                            placeholder="00.000.000/0000-00"
-                            value={pjCnpj}
-                            onChange={(e) => handleCnpjChange(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium pr-10"
+                            placeholder="Ex: Empresa de Transportes e Frotas Ltda."
+                            value={pjCompanyName}
+                            onChange={(e) => setPjCompanyName(e.target.value)}
+                            className="w-full bg-white border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
                           />
-                          <button
-                            type="button"
-                            onClick={() => void handleCnpjSearch()}
-                            title="Buscar dados do CNPJ na Receita"
-                            disabled={loadingCnpj || pjCnpj.replace(/\D/g, '').length !== 14}
-                            className="absolute right-1.5 top-1.5 bottom-1.5 px-2 bg-slate-200 hover:bg-[#EA580C] hover:text-white text-slate-600 disabled:opacity-40 disabled:hover:bg-slate-200 disabled:hover:text-slate-600 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
-                          >
-                            <Search className="w-3.5 h-3.5" />
-                          </button>
                         </div>
-                        {cnpjFeedback && (
-                          <div className={`text-[10px] mt-1 font-medium ${cnpjFeedback.includes('sucesso') || cnpjFeedback.includes('encontrados') ? 'text-emerald-600' : 'text-amber-600'}`}>
-                            {cnpjFeedback}
-                          </div>
-                        )}
                       </div>
 
-                      {/* Razão Social (7 cols) */}
-                      <div className="sm:col-span-7">
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">Razão Social:</label>
-                        <input
-                          type="text"
-                          placeholder="Ex: Empresa de Transportes e Frotas Ltda."
-                          value={pjCompanyName}
-                          onChange={(e) => setPjCompanyName(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
-                        />
+                      {/* Linha 2: Inscrição Estadual (IE), Inscrição Municipal (IM) e Telefone Comercial */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-600 block mb-1">Inscrição Estadual (IE):</label>
+                          <input
+                            type="text"
+                            placeholder="Ex: 123.456.789.012 ou ISENTO"
+                            value={pjStateRegistration}
+                            onChange={(e) => setPjStateRegistration(formatIE(e.target.value))}
+                            className="w-full bg-white border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-600 block mb-1">Inscrição Municipal (IM):</label>
+                          <input
+                            type="text"
+                            placeholder="Ex: 987654321 ou ISENTO"
+                            value={pjMunicipalRegistration}
+                            onChange={(e) => setPjMunicipalRegistration(e.target.value)}
+                            className="w-full bg-white border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-600 block mb-1">Telefone Comercial:</label>
+                          <input
+                            type="text"
+                            placeholder="(11) 3333-3333"
+                            value={commercialPhone}
+                            onChange={(e) => setCommercialPhone(formatBRPhone(e.target.value))}
+                            className="w-full bg-white border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    {/* Linha 2: Inscrição Estadual (IE) e Inscrição Municipal (IM) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">Inscrição Estadual (IE):</label>
-                        <input
-                          type="text"
-                          placeholder="Ex: 123.456.789.012 ou ISENTO"
-                          value={pjStateRegistration}
-                          onChange={(e) => setPjStateRegistration(formatIE(e.target.value))}
-                          className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
-                        />
+                    {/* Bloco 2: Dados do Responsável */}
+                    <div className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/70 space-y-3">
+                      <div className="flex items-center gap-2 pb-2 border-b border-slate-200/60">
+                        <User className="w-4 h-4 text-[#EA580C]" />
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                          Dados do Responsável
+                        </h4>
                       </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">Inscrição Municipal (IM):</label>
-                        <input
-                          type="text"
-                          placeholder="Ex: 987654321 ou ISENTO"
-                          value={pjMunicipalRegistration}
-                          onChange={(e) => setPjMunicipalRegistration(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
-                        />
-                      </div>
-                    </div>
 
-                    {/* Linha 3: Nome do Representante */}
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Nome do Representante:</label>
-                      <input
-                        type="text"
-                        placeholder="Ex: Marcos Silva (Diretor / Procurador)"
-                        value={pjRepresentativeName}
-                        onChange={(e) => setPjRepresentativeName(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
-                      />
-                    </div>
-
-                    {/* Linha 4: Telefone do Responsável e E-mail Comercial */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Linha 1: Nome do Responsável */}
                       <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">Telefone do Responsável:</label>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">Nome do Responsável:</label>
                         <input
                           type="text"
-                          placeholder="(11) 99999-9999"
-                          value={customerPhone}
-                          onChange={(e) => setCustomerPhone(formatBRPhone(e.target.value))}
-                          className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
+                          placeholder="Ex: Marcos Silva (Diretor / Comprador)"
+                          value={pjRepresentativeName}
+                          onChange={(e) => setPjRepresentativeName(e.target.value)}
+                          className="w-full bg-white border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
                         />
                       </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">E-mail Comercial:</label>
-                        <input
-                          type="email"
-                          placeholder="comercial@empresa.com.br"
-                          value={customerEmail}
-                          onChange={(e) => setCustomerEmail(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
-                        />
+
+                      {/* Linha 2: WhatsApp e E-mail */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-600 block mb-1">WhatsApp:</label>
+                          <input
+                            type="text"
+                            placeholder="(11) 99999-9999"
+                            value={customerPhone}
+                            onChange={(e) => setCustomerPhone(formatBRPhone(e.target.value))}
+                            className="w-full bg-white border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-600 block mb-1">E-mail:</label>
+                          <input
+                            type="email"
+                            placeholder="contato@empresa.com.br"
+                            value={customerEmail}
+                            onChange={(e) => setCustomerEmail(e.target.value)}
+                            className="w-full bg-white border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -3385,23 +3405,25 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
             {/* Condição de Pagamento (Suporte a Forma Única ou Múltiplas Formas / Pagamento Dividido) */}
             <div className="pt-3 border-t border-slate-100 mb-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                  Condição de Pagamento:
-                </label>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-[#EA580C]" />
+                  <span>Condição de Pagamento</span>
+                </h3>
                 
-                {/* Toggle Modo Único vs Dividido */}
-                <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-lg">
+                {/* Toggle Modo Único vs Dividido (mesmo padrão visual e ícones do switch PF/PJ) */}
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
                   <button
                     type="button"
                     onClick={() => setPaymentMode('single')}
-                    className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                       paymentMode === 'single'
-                        ? 'bg-white text-slate-900 shadow-2xs'
+                        ? 'bg-white text-slate-900 shadow-xs'
                         : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    Forma Única
+                    <CreditCard className="w-3.5 h-3.5 text-[#EA580C]" />
+                    <span>Forma Única</span>
                   </button>
                   <button
                     type="button"
@@ -3419,13 +3441,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                         ])
                       }
                     }}
-                    className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                       paymentMode === 'split'
-                        ? 'bg-white text-[#EA580C] shadow-2xs font-extrabold'
+                        ? 'bg-white text-slate-900 shadow-xs'
                         : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    <Split className="w-3 h-3" />
+                    <Split className="w-3.5 h-3.5 text-[#EA580C]" />
                     <span>Dividido / Misto</span>
                   </button>
                 </div>
