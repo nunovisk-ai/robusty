@@ -11,8 +11,6 @@ import {
   ArrowRight,
   CheckCircle2,
   X,
-  LayoutGrid,
-  List,
   Columns3,
   Table2,
   ChevronRight,
@@ -341,7 +339,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban')
   const [stageFilter, setStageFilter] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
-  const [density, setDensity] = useState<'detailed' | 'compact'>('detailed')
+  const density: 'detailed' | 'compact' = 'compact'
 
   useEffect(() => {
     setStageFilter('all')
@@ -1181,42 +1179,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
           </div>
         </div>
 
-        {/* Lado Direito: Densidade (Kanban), Busca e Botão Nova Oportunidade (Apenas em Vendas) */}
-        <div className="flex items-center gap-2 flex-1 sm:max-w-lg justify-end flex-wrap">
-          {/* Seletor de Densidade (Detalhado vs Compacto — apenas no modo Kanban) */}
-          {viewMode === 'kanban' && (
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 shrink-0">
-              <button
-                type="button"
-                onClick={() => setDensity('detailed')}
-                title="Exibição Detalhada dos Cards"
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                  density === 'detailed'
-                    ? 'bg-white text-slate-800 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline text-[11px]">Detalhado</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setDensity('compact')}
-                title="Exibição Compacta (Alta Densidade)"
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                  density === 'compact'
-                    ? 'bg-white text-slate-800 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <List className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline text-[11px]">Compacto</span>
-              </button>
-            </div>
-          )}
-
+        {/* Lado Direito: Busca e Botão Nova Oportunidade (Apenas em Vendas) - alinhados inline sem quebra */}
+        <div className="flex items-center gap-2 justify-end">
           {/* Busca em Tempo Real com Botão Limpar */}
-          <div className="relative flex-1 min-w-[170px] max-w-xs">
+          <div className="relative w-48 sm:w-64 md:w-80">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -1241,7 +1207,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
           {pipelineType === 'vendas' && onOpenNewBudget && (
             <button
               onClick={onOpenNewBudget}
-              className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-[#EA580C] hover:bg-[#C2410C] text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-98 cursor-pointer shrink-0 outline-none"
+              className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-[#EA580C] hover:bg-[#C2410C] text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-98 cursor-pointer shrink-0 outline-none whitespace-nowrap"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
               <span className="hidden sm:inline">Nova Oportunidade</span>

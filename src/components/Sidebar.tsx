@@ -44,14 +44,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <Filter className="w-5 h-5" />,
     },
     {
-      id: 'catalog' as ActiveTab,
-      label: 'Catálogo de Produtos',
-      icon: <Package className="w-5 h-5" />,
-    },
-    {
       id: 'orders' as ActiveTab,
       label: 'Pedidos & Coleta',
       icon: <Truck className="w-5 h-5" />,
+    },
+    {
+      id: 'catalog' as ActiveTab,
+      label: 'Catálogo de Produtos',
+      icon: <Package className="w-5 h-5" />,
     },
     {
       id: 'calendar' as ActiveTab,

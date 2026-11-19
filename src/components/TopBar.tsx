@@ -243,8 +243,8 @@ export const TopBar: React.FC<TopBarProps> = ({
           )}
         </div>
 
-        {/* Botão Nova Oportunidade (Exibido nas outras abas; oculto no Kanban, Orçamento e Catálogo) */}
-        {activeTab !== 'kanban' && activeTab !== 'budget' && activeTab !== 'catalog' && (
+        {/* Botão Nova Oportunidade (Exibido nas outras abas; oculto no Kanban, Pedidos & Coleta, Orçamento e Catálogo) */}
+        {activeTab !== 'kanban' && activeTab !== 'orders' && activeTab !== 'budget' && activeTab !== 'catalog' && (
           <button
             onClick={onNewLeadClick}
             className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-[#EA580C] hover:bg-[#c2410c] text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-all cursor-pointer"
