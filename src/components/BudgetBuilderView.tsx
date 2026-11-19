@@ -1472,7 +1472,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
         {/* Responsável Pill Selector: Igor, Norlando ou Loja */}
         <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-full border border-slate-200">
-          <span className="text-[11px] font-bold text-slate-500 pl-2 pr-1">Responsável:</span>
+          <span className="text-xs font-bold text-slate-500 pl-2 pr-1">Responsável:</span>
           {(['Norlando', 'Igor', 'Loja'] as const).map((resp) => {
             const isSelected = assignedTo === resp
             return (
@@ -1494,113 +1494,144 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         </div>
       </div>
 
-      {/* Segmented 5-Tab Navigation: 1. Contato & Redes | 2. Veículo & Produtos | 3. Modalidade & Entrega/Coleta | 4. Documentos & NFs | 5. Histórico & Tarefas */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-nexo">
-        <button
-          type="button"
-          onClick={() => setActiveFormTab('contact')}
-          className={`flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeFormTab === 'contact'
-              ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-          }`}
-        >
-          <User className="w-4 h-4 shrink-0" />
-          <span className="truncate">1. Contato & Redes</span>
-        </button>
+      {/* Navegação por Abas do Orçamento (Seções do Formulário) */}
+      <div className="bg-white p-1.5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
+          <button
+            type="button"
+            onClick={() => setActiveFormTab('contact')}
+            className={`flex items-center justify-center sm:justify-start gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+              activeFormTab === 'contact'
+                ? 'bg-orange-50 text-[#EA580C] border-orange-200 shadow-xs'
+                : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-transparent'
+            }`}
+          >
+            <User className={`w-4 h-4 shrink-0 ${activeFormTab === 'contact' ? 'text-[#EA580C]' : 'text-slate-400'}`} />
+            <span className="truncate">1. Contato & Redes</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveFormTab('products')}
-          className={`flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeFormTab === 'products'
-              ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-          }`}
-        >
-          <Car className="w-4 h-4 shrink-0" />
-          <span className="truncate">2. Veículo & Produtos</span>
-          {items.length > 0 && (
-            <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              activeFormTab === 'products' ? 'bg-white/20 text-white' : 'bg-orange-50 text-[#EA580C]'
-            }`}>
-              {items.length}
-            </span>
-          )}
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveFormTab('products')}
+            className={`flex items-center justify-center sm:justify-start gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+              activeFormTab === 'products'
+                ? 'bg-orange-50 text-[#EA580C] border-orange-200 shadow-xs'
+                : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-transparent'
+            }`}
+          >
+            <Car className={`w-4 h-4 shrink-0 ${activeFormTab === 'products' ? 'text-[#EA580C]' : 'text-slate-400'}`} />
+            <span className="truncate">2. Veículo & Produtos</span>
+            {items.length > 0 && (
+              <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${
+                activeFormTab === 'products' ? 'bg-[#EA580C] text-white' : 'bg-orange-50 text-[#EA580C] border border-orange-100'
+              }`}>
+                {items.length}
+              </span>
+            )}
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveFormTab('fulfillment')}
-          className={`flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeFormTab === 'fulfillment'
-              ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-          }`}
-        >
-          <Truck className="w-4 h-4 shrink-0" />
-          <span className="truncate">3. Modalidade & Entrega</span>
-          {installationConflict && (
-            <span className="ml-auto w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Conflito de horário detectado" />
-          )}
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveFormTab('fulfillment')}
+            className={`flex items-center justify-center sm:justify-start gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+              activeFormTab === 'fulfillment'
+                ? 'bg-orange-50 text-[#EA580C] border-orange-200 shadow-xs'
+                : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-transparent'
+            }`}
+          >
+            <Truck className={`w-4 h-4 shrink-0 ${activeFormTab === 'fulfillment' ? 'text-[#EA580C]' : 'text-slate-400'}`} />
+            <span className="truncate">3. Modalidade & Entrega</span>
+            {installationConflict && (
+              <span className="ml-auto w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Conflito de horário detectado" />
+            )}
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveFormTab('history')}
-          className={`flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeFormTab === 'history'
-              ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-          }`}
-        >
-          <History className="w-4 h-4 shrink-0" />
-          <span className="truncate">4. Observações & Tarefas</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveFormTab('history')}
+            className={`flex items-center justify-center sm:justify-start gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+              activeFormTab === 'history'
+                ? 'bg-orange-50 text-[#EA580C] border-orange-200 shadow-xs'
+                : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-transparent'
+            }`}
+          >
+            <History className={`w-4 h-4 shrink-0 ${activeFormTab === 'history' ? 'text-[#EA580C]' : 'text-slate-400'}`} />
+            <span className="truncate">4. Observações & Tarefas</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveFormTab('attachments')}
-          className={`flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeFormTab === 'attachments'
-              ? 'bg-[#EA580C] text-white shadow-sm shadow-orange-500/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-          }`}
-        >
-          <Paperclip className="w-4 h-4 shrink-0" />
-          <span className="truncate">5. Anexos</span>
-          {attachments.length > 0 && (
-            <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              activeFormTab === 'attachments' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-            }`}>
-              {attachments.length}
-            </span>
-          )}
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveFormTab('attachments')}
+            className={`flex items-center justify-center sm:justify-start gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+              activeFormTab === 'attachments'
+                ? 'bg-orange-50 text-[#EA580C] border-orange-200 shadow-xs'
+                : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-transparent'
+            }`}
+          >
+            <Paperclip className={`w-4 h-4 shrink-0 ${activeFormTab === 'attachments' ? 'text-[#EA580C]' : 'text-slate-400'}`} />
+            <span className="truncate">5. Anexos</span>
+            {attachments.length > 0 && (
+              <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${
+                activeFormTab === 'attachments' ? 'bg-[#EA580C] text-white' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {attachments.length}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Barra Interativa de Etapas do Funil */}
-      <div className="bg-white p-3 sm:px-4 sm:py-3 rounded-2xl border border-slate-100 shadow-nexo space-y-2">
-        {(isUpdatingStage || stageFeedback) && (
-          <div className="flex items-center gap-2 justify-end text-xs">
-            {isUpdatingStage && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400">
-                <Loader2 className="w-3 h-3 animate-spin text-[#EA580C]" />
-                Salvando etapa...
-              </span>
-            )}
-            {stageFeedback && !isUpdatingStage && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                <Check className="w-3 h-3" />
-                {stageFeedback}
-              </span>
-            )}
+      {/* Barra de Progresso do Funil de Vendas (Pipeline Chevrons com Setas de Avanço) */}
+      <div className="bg-white p-3 sm:px-4 sm:py-3.5 rounded-2xl border border-slate-100 shadow-nexo space-y-2.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Etapa do Funil:
+            </span>
+            <span
+              className="text-xs font-bold px-2.5 py-0.5 rounded-full"
+              style={{
+                color: SALES_PIPELINE_STAGES.find((s) => s.id === stage)?.color || '#6366F1',
+                backgroundColor: `${SALES_PIPELINE_STAGES.find((s) => s.id === stage)?.color || '#6366F1'}18`,
+              }}
+            >
+              {SALES_PIPELINE_STAGES.find((s) => s.id === stage)?.title || stage}
+            </span>
           </div>
-        )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-1.5">
-          {SALES_PIPELINE_STAGES.map((st) => {
+          {(isUpdatingStage || stageFeedback) && (
+            <div className="flex items-center gap-2 text-xs">
+              {isUpdatingStage && (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#EA580C]" />
+                  Salvando etapa...
+                </span>
+              )}
+              {stageFeedback && !isUpdatingStage && (
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                  <Check className="w-3.5 h-3.5" />
+                  {stageFeedback}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Setas conectadas em formato Chevron indicando avanço linear */}
+        <div className="flex items-stretch overflow-x-auto no-scrollbar rounded-xl border border-slate-200/80 bg-slate-100/70 p-1 gap-0.5">
+          {SALES_PIPELINE_STAGES.map((st, idx) => {
+            const currentIdx = SALES_PIPELINE_STAGES.findIndex((s) => s.id === stage)
             const isActive = st.id === stage
+            const isPast = idx < currentIdx && stage !== 'venda_perdida'
+
+            // Clip-path de Chevron que conecta perfeitamente cada etapa
+            const isFirst = idx === 0
+            const isLast = idx === SALES_PIPELINE_STAGES.length - 1
+            const clipPath = isFirst
+              ? 'polygon(0% 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 0% 100%)'
+              : isLast
+              ? 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 12px 50%)'
+              : 'polygon(0% 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 0% 100%, 12px 50%)'
 
             return (
               <button
@@ -1609,18 +1640,23 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 disabled={isUpdatingStage}
                 onClick={() => void handleSelectStage(st.id)}
                 title={`Mover lead para: ${st.title}`}
-                style={isActive ? { backgroundColor: st.color, borderColor: st.color } : undefined}
-                className={`group relative flex items-center gap-2 px-2.5 py-2 rounded-xl border text-[11px] font-bold transition-all cursor-pointer text-left disabled:opacity-60 ${
+                style={{
+                  clipPath,
+                  ...(isActive ? { backgroundColor: st.color } : {}),
+                }}
+                className={`group relative flex-1 min-w-[130px] py-2.5 px-3.5 flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap select-none disabled:opacity-60 ${
                   isActive
-                    ? 'text-white shadow-sm'
-                    : 'bg-slate-50/80 border-slate-200/80 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    ? 'text-white shadow-xs'
+                    : isPast
+                    ? 'bg-slate-200/90 text-slate-700 hover:bg-slate-300'
+                    : 'bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
                 <st.Icon
                   className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-white' : ''}`}
                   style={!isActive ? { color: st.color } : undefined}
                 />
-                <span className="truncate leading-tight">{st.title}</span>
+                <span className="truncate">{st.title}</span>
               </button>
             )
           })}
@@ -1678,7 +1714,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     {/* Nome Completo */}
                     <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Nome Completo do Cliente:</label>
+                      <label className="text-xs font-bold text-slate-600 block mb-1">Nome Completo do Cliente:</label>
                       <input
                         type="text"
                         placeholder="Ex: Carlos Eduardo dos Santos"
@@ -1691,7 +1727,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     {/* Documento com Tipo Dinâmico (CPF, RG ou CNH) */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-[11px] font-bold text-slate-600">Documento:</label>
+                        <label className="text-xs font-bold text-slate-600">Documento:</label>
                         <div className="flex items-center gap-1">
                           {(['cpf', 'rg', 'cnh'] as const).map((docOpt) => (
                             <button
@@ -1701,7 +1737,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                                 setPfDocType(docOpt)
                                 if (pfDoc) setPfDoc(formatDocumentBy(pfDoc, docOpt))
                               }}
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase cursor-pointer transition-all ${
+                              className={`px-2 py-0.5 rounded text-xs font-bold uppercase cursor-pointer transition-all ${
                                 pfDocType === docOpt
                                   ? 'bg-[#EA580C] text-white'
                                   : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -1729,7 +1765,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                     {/* WhatsApp */}
                     <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">WhatsApp:</label>
+                      <label className="text-xs font-bold text-slate-600 block mb-1">WhatsApp:</label>
                       <input
                         type="text"
                         placeholder="(11) 99999-9999"
@@ -1741,7 +1777,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                     {/* E-mail */}
                     <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">E-mail:</label>
+                      <label className="text-xs font-bold text-slate-600 block mb-1">E-mail:</label>
                       <input
                         type="email"
                         placeholder="cliente@email.com.br"
@@ -1768,9 +1804,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                         {/* CNPJ (5 cols) */}
                         <div className="sm:col-span-5">
                           <div className="flex items-center justify-between mb-1">
-                            <label className="text-[11px] font-bold text-slate-600">CNPJ:</label>
+                            <label className="text-xs font-bold text-slate-600">CNPJ:</label>
                             {loadingCnpj && (
-                              <span className="text-[10px] text-[#EA580C] font-semibold flex items-center gap-1">
+                              <span className="text-xs text-[#EA580C] font-semibold flex items-center gap-1">
                                 <Loader2 className="w-3 h-3 animate-spin" /> Consultando...
                               </span>
                             )}
@@ -1794,7 +1830,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                             </button>
                           </div>
                           {cnpjFeedback && (
-                            <div className={`text-[10px] mt-1 font-medium ${cnpjFeedback.includes('sucesso') || cnpjFeedback.includes('localizada') ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            <div className={`text-xs mt-1 font-medium ${cnpjFeedback.includes('sucesso') || cnpjFeedback.includes('localizada') ? 'text-emerald-600' : 'text-amber-600'}`}>
                               {cnpjFeedback}
                             </div>
                           )}
@@ -1802,7 +1838,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                         {/* Razão Social (7 cols) */}
                         <div className="sm:col-span-7">
-                          <label className="text-[11px] font-bold text-slate-600 block mb-1">Razão Social:</label>
+                          <label className="text-xs font-bold text-slate-600 block mb-1">Razão Social:</label>
                           <input
                             type="text"
                             placeholder="Ex: Empresa de Transportes e Frotas Ltda."
@@ -1816,7 +1852,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       {/* Linha 2: Inscrição Estadual (IE), Inscrição Municipal (IM) e Telefone Comercial */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
-                          <label className="text-[11px] font-bold text-slate-600 block mb-1">Inscrição Estadual (IE):</label>
+                          <label className="text-xs font-bold text-slate-600 block mb-1">Inscrição Estadual (IE):</label>
                           <input
                             type="text"
                             placeholder="Ex: 123.456.789.012 ou ISENTO"
@@ -1826,7 +1862,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] font-bold text-slate-600 block mb-1">Inscrição Municipal (IM):</label>
+                          <label className="text-xs font-bold text-slate-600 block mb-1">Inscrição Municipal (IM):</label>
                           <input
                             type="text"
                             placeholder="Ex: 987654321 ou ISENTO"
@@ -1836,7 +1872,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] font-bold text-slate-600 block mb-1">Telefone Comercial:</label>
+                          <label className="text-xs font-bold text-slate-600 block mb-1">Telefone Comercial:</label>
                           <input
                             type="text"
                             placeholder="(11) 3333-3333"
@@ -1859,7 +1895,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                       {/* Linha 1: Nome do Responsável */}
                       <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">Nome do Responsável:</label>
+                        <label className="text-xs font-bold text-slate-600 block mb-1">Nome do Responsável:</label>
                         <input
                           type="text"
                           placeholder="Ex: Marcos Silva (Diretor / Comprador)"
@@ -1872,7 +1908,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       {/* Linha 2: WhatsApp e E-mail */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <label className="text-[11px] font-bold text-slate-600 block mb-1">WhatsApp:</label>
+                          <label className="text-xs font-bold text-slate-600 block mb-1">WhatsApp:</label>
                           <input
                             type="text"
                             placeholder="(11) 99999-9999"
@@ -1882,7 +1918,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] font-bold text-slate-600 block mb-1">E-mail:</label>
+                          <label className="text-xs font-bold text-slate-600 block mb-1">E-mail:</label>
                           <input
                             type="email"
                             placeholder="contato@empresa.com.br"
@@ -1898,7 +1934,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                 {/* Origem do Lead: WhatsApp, Instagram, Facebook, Manual, Site */}
                 <div className="pt-2 border-t border-slate-100">
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Origem do Lead:</label>
+                    <label className="text-xs font-bold text-slate-600 block mb-1">Origem do Lead:</label>
                     <div className="grid grid-cols-5 gap-1.5">
                       <button
                         type="button"
@@ -1980,7 +2016,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                   {/* Instagram */}
                   <div>
-                    <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 mb-1">
+                    <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5 mb-1">
                       <FaInstagram className="w-3.5 h-3.5 text-[#E1306C]" />
                       <span>Link do Instagram:</span>
                     </label>
@@ -2014,7 +2050,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                   {/* Facebook */}
                   <div>
-                    <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 mb-1">
+                    <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5 mb-1">
                       <FaFacebook className="w-3.5 h-3.5 text-[#1877F2]" />
                       <span>Link do Facebook:</span>
                     </label>
@@ -2048,7 +2084,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                   {/* Website */}
                   <div>
-                    <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 mb-1">
+                    <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5 mb-1">
                       <FaGlobe className="w-3.5 h-3.5 text-sky-600" />
                       <span>Website:</span>
                     </label>
@@ -2142,7 +2178,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     <Palette className="w-4 h-4 text-[#EA580C]" />
                     <span>Acabamento & Cor do Bagageiro (*COR: PRETO/BRANCO*)</span>
                   </h3>
-                  <span className="text-[11px] font-semibold text-slate-500">Padrão Oficial: Preto Epóxi</span>
+                  <span className="text-xs font-semibold text-slate-500">Padrão Oficial: Preto Epóxi</span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -2184,7 +2220,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                 {!['Preto Epóxi', 'Branco Epóxi', 'Cinza Alumínio'].includes(productColor) && (
                   <div className="pt-2 animate-in fade-in-50">
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                    <label className="text-xs font-bold text-slate-600 block mb-1">
                       Especifique a Cor / Acabamento Especial:
                     </label>
                     <input
@@ -2275,13 +2311,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                             {/* Dimensões, Peso e Valor do Produto */}
                             <div className="flex items-center gap-2 flex-wrap text-xs mt-1.5 font-mono text-slate-500">
                               {p.dimensions && (
-                                <span className="text-[11px] text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1.5">
+                                <span className="text-xs text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1.5">
                                   <span>📏</span>
                                   <span>{p.dimensions}</span>
                                 </span>
                               )}
                               {p.weight_kg !== undefined && p.weight_kg > 0 && (
-                                <span className="text-[11px] text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1.5">
+                                <span className="text-xs text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1.5">
                                   <FaWeightHanging className="w-3 h-3 text-slate-400 shrink-0" />
                                   <span>{p.weight_kg} kg</span>
                                 </span>
@@ -2365,7 +2401,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3.5">
                     {/* CEP do Cliente */}
                     <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                      <label className="text-xs font-bold text-slate-600 block mb-1">
                         CEP do Cliente:
                       </label>
                       <div className="flex gap-2 max-w-sm">
@@ -2397,7 +2433,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     {/* Campos de endereço completos */}
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
                       <div className="sm:col-span-8">
-                        <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Rua / Logradouro:</label>
+                        <label className="text-xs font-bold text-slate-500 block mb-0.5">Rua / Logradouro:</label>
                         <input
                           type="text"
                           placeholder="Ex: Av. Amazonas"
@@ -2407,7 +2443,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                         />
                       </div>
                       <div className="sm:col-span-4">
-                        <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Número:</label>
+                        <label className="text-xs font-bold text-slate-500 block mb-0.5">Número:</label>
                         <input
                           type="text"
                           placeholder="Ex: 1420"
@@ -2420,7 +2456,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
                       <div className="sm:col-span-4">
-                        <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Bairro:</label>
+                        <label className="text-xs font-bold text-slate-500 block mb-0.5">Bairro:</label>
                         <input
                           type="text"
                           placeholder="Ex: Centro"
@@ -2430,7 +2466,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                         />
                       </div>
                       <div className="sm:col-span-5">
-                        <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Cidade:</label>
+                        <label className="text-xs font-bold text-slate-500 block mb-0.5">Cidade:</label>
                         <input
                           type="text"
                           placeholder="Ex: Belo Horizonte"
@@ -2440,7 +2476,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                         />
                       </div>
                       <div className="sm:col-span-3">
-                        <label className="text-[10px] font-bold text-slate-500 block mb-0.5">UF:</label>
+                        <label className="text-xs font-bold text-slate-500 block mb-0.5">UF:</label>
                         <select
                           value={state}
                           onChange={(e) => setState(e.target.value)}
@@ -2461,7 +2497,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       {/* Peso Total da Carga */}
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
+                          <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
                             <FaWeightHanging className="w-3 h-3 text-slate-400" />
                             <span>Peso Total da Carga:</span>
                           </label>
@@ -2474,7 +2510,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                                     setCustomWeight(null)
                                     setIsEditingWeight(false)
                                   }}
-                                  className="text-[10px] text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                                  className="text-xs text-slate-500 hover:text-slate-800 underline cursor-pointer"
                                   title="Restaurar soma automática dos produtos do orçamento"
                                 >
                                   Restaurar auto
@@ -2483,7 +2519,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => setIsEditingWeight(false)}
-                                className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5 cursor-pointer"
+                                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5 cursor-pointer"
                               >
                                 <Check className="w-3 h-3" /> Concluir
                               </button>
@@ -2497,7 +2533,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                                 }
                                 setIsEditingWeight(true)
                               }}
-                              className="text-[10px] font-bold text-[#EA580C] hover:underline flex items-center gap-1 cursor-pointer"
+                              className="text-xs font-bold text-[#EA580C] hover:underline flex items-center gap-1 cursor-pointer"
                             >
                               <Pencil className="w-2.5 h-2.5" />
                               {customWeight !== null ? 'Alterar manual' : 'Editar'}
@@ -2532,7 +2568,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                       {/* Valor do Frete */}
                       <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        <label className="text-xs font-bold text-slate-600 block mb-1">
                           Valor do Frete (R$):
                         </label>
                         <input
@@ -2548,7 +2584,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     {/* Nome da Transportadora, Cotação Nº e Contato */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-200/80">
                       <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        <label className="text-xs font-bold text-slate-600 block mb-1">
                           Nome da Transportadora:
                         </label>
                         <input
@@ -2561,7 +2597,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       </div>
 
                       <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        <label className="text-xs font-bold text-slate-600 block mb-1">
                           Cotação Frete Nº:
                         </label>
                         <input
@@ -2574,7 +2610,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       </div>
 
                       <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        <label className="text-xs font-bold text-slate-600 block mb-1">
                           Contato Transportadora:
                         </label>
                         <input
@@ -2590,7 +2626,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     {/* Prazos de Produção e Entrega & Dimensões do Volume */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        <label className="text-xs font-bold text-slate-600 block mb-1">
                           Prazo de Produção:
                         </label>
                         <input
@@ -2603,7 +2639,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       </div>
 
                       <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        <label className="text-xs font-bold text-slate-600 block mb-1">
                           Prazo de Entrega:
                         </label>
                         <input
@@ -2616,7 +2652,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       </div>
 
                       <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        <label className="text-xs font-bold text-slate-600 block mb-1">
                           Dimensões Volume (C x L x A):
                         </label>
                         <input
@@ -2631,7 +2667,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                     {/* Código de Rastreio / NF */}
                     <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                      <label className="text-xs font-bold text-slate-600 block mb-1">
                         Código de Rastreio / Nota Fiscal:
                       </label>
                       <input
@@ -2645,7 +2681,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                     {/* Programação da Coleta */}
                     <div className="pt-2 border-t border-slate-200/80">
-                      <div className="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1.5">
+                      <div className="text-xs font-bold text-slate-600 mb-2 flex items-center gap-1.5">
                         <Clock className="w-3.5 h-3.5 text-[#EA580C]" />
                         <span>Programação da Coleta:</span>
                       </div>
@@ -2673,7 +2709,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3.5">
                     {/* Custo da Instalação (modificável) */}
                     <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                      <label className="text-xs font-bold text-slate-600 block mb-1">
                         Custo da Instalação (R$):
                       </label>
                       <input
@@ -2683,14 +2719,14 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                         className="w-full sm:w-48 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
                         placeholder="200.00"
                       />
-                      <span className="text-[10px] text-slate-400 block mt-1">
+                      <span className="text-xs text-slate-400 block mt-1">
                         Padrão do catálogo: {formatCurrency(selectedVehicle?.standard_installation_cost || 200)} (Totalmente modificável)
                       </span>
                     </div>
 
                     {/* Data e Horário da Instalação */}
                     <div className="pt-2 border-t border-slate-200/80">
-                      <div className="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1.5">
+                      <div className="text-xs font-bold text-slate-600 mb-2 flex items-center gap-1.5">
                         <Clock className="w-3.5 h-3.5 text-[#EA580C]" />
                         <span>Agendamento da Instalação na Loja:</span>
                       </div>
@@ -2715,14 +2751,14 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                             <div className="space-y-1 leading-relaxed">
                               <div className="font-bold text-amber-950 flex items-center gap-2">
                                 <span>Atenção: Já existe instalação agendada neste horário!</span>
-                                <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-amber-200/80 text-amber-900 font-bold">
+                                <span className="font-mono text-xs px-2 py-0.5 rounded bg-amber-200/80 text-amber-900 font-bold">
                                   {installationConflict.code}
                                 </span>
                               </div>
                               <div>
                                 Já existe uma instalação agendada para <strong>{installationConflict.date.split('-').reverse().join('/')} às {installationConflict.time}</strong> ({installationConflict.client} — {installationConflict.vehicle}).
                               </div>
-                              <div className="text-[11px] text-amber-800">
+                              <div className="text-xs text-amber-800">
                                 Recomendamos selecionar outro horário disponível para evitar espera na montagem do veículo.
                               </div>
                             </div>
@@ -2753,7 +2789,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       <p className="text-xs text-slate-500">Múltiplos registros salvos com autor, data e hora de registro.</p>
                     </div>
                   </div>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
                     {comments.length} registro(s)
                   </span>
                 </div>
@@ -2799,7 +2835,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       <p className="text-xs text-slate-500">Defina tarefas com prazo e responsável para receber alertas e notificações no CRM.</p>
                     </div>
                   </div>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
                     {tasks.filter((t) => !t.completed).length} pendente(s)
                   </span>
                 </div>
@@ -2921,15 +2957,15 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                               </p>
                               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                 {task.assigned_to ? (
-                                  <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
+                                  <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
                                     {task.assigned_to === 'Loja' ? <FaStore className="w-2.5 h-2.5 text-amber-600" /> : <FaUser className="w-2.5 h-2.5 text-slate-400" />}
                                     {task.assigned_to}
                                   </span>
                                 ) : (
-                                  <span className="text-[10px] text-slate-400 italic">Sem responsável</span>
+                                  <span className="text-xs text-slate-400 italic">Sem responsável</span>
                                 )}
                                 <span>•</span>
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                                   task.completed
                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                     : isOverdue
@@ -2985,7 +3021,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setHistoryFilter('all')}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         historyFilter === 'all'
                           ? 'bg-white text-slate-900 shadow-2xs'
                           : 'text-slate-500 hover:text-slate-900'
@@ -2996,7 +3032,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setHistoryFilter('comments')}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         historyFilter === 'comments'
                           ? 'bg-white text-slate-900 shadow-2xs'
                           : 'text-slate-500 hover:text-slate-900'
@@ -3007,7 +3043,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setHistoryFilter('history')}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         historyFilter === 'history'
                           ? 'bg-white text-slate-900 shadow-2xs'
                           : 'text-slate-500 hover:text-slate-900'
@@ -3027,7 +3063,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
                     {timelineItems.map((item) => (
                       <div key={item.id} className="relative">
-                        <div className={`absolute -left-6 top-1 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[10px] shadow-2xs ${
+                        <div className={`absolute -left-6 top-1 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-xs shadow-2xs ${
                           item.isComment
                             ? 'bg-sky-500 text-white'
                             : 'bg-orange-500 text-white'
@@ -3041,13 +3077,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                         <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-200/80 space-y-1">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
                             <span className="text-xs font-bold text-slate-800">{item.title}</span>
-                            <span className="text-[10px] font-mono text-slate-500">
+                            <span className="text-xs font-mono text-slate-500">
                               {new Date(item.date).toLocaleString('pt-BR')}
                             </span>
                           </div>
                           <p className="text-xs text-slate-600 whitespace-pre-wrap">{item.content}</p>
                           {item.author && (
-                            <div className="pt-1 border-t border-slate-200/50 flex items-center gap-1.5 text-[10px] text-slate-500">
+                            <div className="pt-1 border-t border-slate-200/50 flex items-center gap-1.5 text-xs text-slate-500">
                               <span>Registrado por:</span>
                               <strong className="text-slate-700">{item.author}</strong>
                             </div>
@@ -3074,7 +3110,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       <Paperclip className="w-4 h-4 text-[#EA580C]" />
                       <span>Central de Anexos & Propostas</span>
                     </h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
+                    <p className="text-xs text-slate-500 mt-0.5">
                       Histórico completo de propostas comerciais em PDF, fotos, notas fiscais e documentos do orçamento.
                     </p>
                   </div>
@@ -3108,7 +3144,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       <div className="text-xs font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors flex items-center gap-1.5">
                         <span>Gerar Orçamento em PDF</span>
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                      <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
                         Gera a proposta comercial oficial e salva automaticamente no histórico de anexos.
                       </p>
                     </div>
@@ -3127,7 +3163,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                         <span>Anexar Arquivos ou Fotos</span>
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                      <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
                         Imagens, PDFs, notas fiscais, planilhas e comprovantes de pagamento.
                       </p>
                     </div>
@@ -3156,7 +3192,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 {attachments.length === 0 ? (
                   <div className="p-8 text-center text-xs text-slate-400 italic space-y-1.5 border border-dashed border-slate-200 rounded-xl">
                     <p className="font-medium text-slate-500">Nenhum anexo registrado até o momento.</p>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-xs text-slate-400">
                       Gere a proposta comercial em PDF ou anexe arquivos pelos botões acima.
                     </p>
                   </div>
@@ -3202,7 +3238,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                                 <span className="text-xs font-bold text-slate-900 truncate max-w-[280px] sm:max-w-[360px]" title={doc.name}>
                                   {doc.name}
                                 </span>
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                                   isProposal
                                     ? 'bg-orange-50 text-[#EA580C] border border-orange-200'
                                     : isImage
@@ -3226,7 +3262,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                                     : 'Documento'}
                                 </span>
                               </div>
-                              <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-2 flex-wrap">
+                              <div className="text-xs text-slate-500 font-mono mt-0.5 flex items-center gap-2 flex-wrap">
                                 <span>{doc.file_size || 'N/A'}</span>
                                 <span>•</span>
                                 <span>{new Date(doc.uploaded_at).toLocaleString('pt-BR')}</span>
@@ -3348,7 +3384,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
             {/* Items List */}
             <div className="space-y-2 mb-4">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
                 <span>Itens Adicionados ({items.length})</span>
                 {effectiveWeightKg > 0 && (
                   <span className="font-mono text-slate-500">Peso Total: {effectiveWeightKg} kg</span>
@@ -3368,7 +3404,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     >
                       <div className="flex-1 min-w-0 pr-2">
                         <div className="font-bold text-slate-900 truncate">{i.product.name}</div>
-                        <div className="text-[10px] text-slate-500 font-mono">
+                        <div className="text-xs text-slate-500 font-mono">
                           {i.quantity}x {formatCurrency(i.product.base_price_10x)}
                           {i.product.weight_kg ? ` • ${i.product.weight_kg * i.quantity} kg` : ''}
                         </div>
@@ -3403,115 +3439,111 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               )}
             </div>
 
-            {/* Condição de Pagamento (Suporte a Forma Única ou Múltiplas Formas / Pagamento Dividido) */}
+            {/* Condição de Pagamento (Forma Padrão Direta com botão Combinar 2 Meios) */}
             <div className="pt-3 border-t border-slate-100 mb-4 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
                   <CreditCard className="w-4 h-4 text-[#EA580C]" />
-                  <span>Condição de Pagamento</span>
-                </h3>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Condição de Pagamento
+                  </span>
+                </div>
                 
-                {/* Toggle Modo Único vs Dividido (mesmo padrão visual e ícones do switch PF/PJ) */}
-                <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMode('single')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                      paymentMode === 'single'
-                        ? 'bg-white text-slate-900 shadow-xs'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    <CreditCard className="w-3.5 h-3.5 text-[#EA580C]" />
-                    <span>Forma Única</span>
-                  </button>
+                {/* Botão de Alternância Sem Switch: "Combinar 2 meios" ou "Voltar p/ Forma única" */}
+                {paymentMode === 'single' ? (
                   <button
                     type="button"
                     onClick={() => {
                       setPaymentMode('split')
                       if (paymentSplits.length === 0) {
+                        const half = Math.round((budget.finalTotal / 2) * 100) / 100
+                        const rest = Math.round((budget.finalTotal - half) * 100) / 100
                         setPaymentSplits([
                           {
-                            id: `split-${Date.now()}`,
-                            method: (paymentMethod as PaymentMethod) || 'pix',
-                            amount: budget.finalTotal,
-                            installments: cardInstallments || 1,
-                            notes: ''
+                            id: `split-${Date.now()}-1`,
+                            method: 'pix',
+                            amount: half,
+                            installments: 1,
+                            notes: 'Entrada PIX'
+                          },
+                          {
+                            id: `split-${Date.now()}-2`,
+                            method: 'cartao_link_igor',
+                            amount: rest,
+                            installments: 10,
+                            notes: 'Restante Cartão'
                           }
                         ])
                       }
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                      paymentMode === 'split'
-                        ? 'bg-white text-slate-900 shadow-xs'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
+                    className="text-xs font-bold text-[#EA580C] hover:text-orange-700 bg-orange-50 hover:bg-orange-100/80 border border-orange-200/80 px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                    title="Dividir o pagamento em duas ou mais formas (ex: entrada no PIX + restante no Cartão)"
                   >
-                    <Split className="w-3.5 h-3.5 text-[#EA580C]" />
-                    <span>Dividido / Misto</span>
+                    <Split className="w-3.5 h-3.5" />
+                    <span>Combinar 2 meios</span>
                   </button>
-                </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMode('single')}
+                    className="text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                    title="Retornar para forma única de pagamento"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Forma única</span>
+                  </button>
+                )}
               </div>
 
               {paymentMode === 'single' ? (
-                /* ================= MODO FORMA ÚNICA ================= */
+                /* ================= MODO FORMA ÚNICA (PADRÃO INLINE) ================= */
                 <div className="space-y-3">
+                  {/* 3 Formas Padrão em Linha Única (Inline) */}
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => handlePaymentMethodSelect('pix')}
-                      className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                      className={`py-2 px-2 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         paymentMethod === 'pix'
                           ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-xs'
                           : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                       }`}
                     >
-                      <Banknote className="w-3.5 h-3.5" />
-                      <span>À vista</span>
+                      <Banknote className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">À vista</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handlePaymentMethodSelect('boleto')}
-                      className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                      className={`py-2 px-2 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         paymentMethod === 'boleto'
                           ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-xs'
                           : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                       }`}
                     >
-                      <ReceiptText className="w-3.5 h-3.5" />
-                      <span>Boleto</span>
+                      <ReceiptText className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">Boleto</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handlePaymentMethodSelect('cartao_link_igor')}
-                      className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                      className={`py-2 px-2 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         paymentMethod === 'cartao_link_igor' || paymentMethod === 'cartao_presencial'
                           ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-xs'
                           : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                       }`}
                     >
-                      <CreditCard className="w-3.5 h-3.5" />
-                      <span>Cartão</span>
+                      <CreditCard className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">Cartão</span>
                     </button>
                   </div>
 
-                  {/* Se for À Vista (PIX): Escolha do Subtipo */}
+                  {/* Se for À Vista: Escolha do Subtipo Inline (sem texto redundante 'PIX Instantâneo') */}
                   {paymentMethod === 'pix' && (
                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-600 font-bold">Modalidade À Vista:</span>
-                        <span className="text-[10px] font-bold text-emerald-700 uppercase bg-emerald-100/70 px-2 py-0.5 rounded-full">
-                          {paymentSubtype === 'pix'
-                            ? 'PIX Instantâneo'
-                            : paymentSubtype === 'debito'
-                            ? 'Cartão de Débito'
-                            : paymentSubtype === 'transferencia'
-                            ? 'TED / Transferência'
-                            : 'Dinheiro em Espécie'}
-                        </span>
-                      </div>
+                      <span className="text-xs font-bold text-slate-600 block">Forma À Vista:</span>
                       <div className="grid grid-cols-4 gap-1.5">
                         {[
                           { id: 'pix', label: 'PIX' },
@@ -3523,7 +3555,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                             key={opt.id}
                             type="button"
                             onClick={() => setPaymentSubtype(opt.id as CashPaymentSubtype)}
-                            className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all border cursor-pointer text-center ${
+                            className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all border cursor-pointer text-center truncate ${
                               paymentSubtype === opt.id
                                 ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-2xs'
                                 : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
@@ -3583,7 +3615,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                             </div>
                             <span className="font-mono text-emerald-700">-{formatCurrency(budget.discountValue)}</span>
                           </div>
-                          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-emerald-200/60">
+                          <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-emerald-200/60">
                             <span className="italic">Exceção comercial autorizada</span>
                             <div className="flex items-center gap-2 font-bold">
                               <button
@@ -3627,7 +3659,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200">
                       <span className="font-semibold text-slate-700">Saldo Restante:</span>
                       {remainingSplitBalance === 0 ? (
-                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full flex items-center gap-1">
                           <Check className="w-3 h-3" /> 100% Distribuído
                         </span>
                       ) : remainingSplitBalance > 0 ? (
@@ -3652,7 +3684,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                           className="p-2.5 bg-white border border-slate-200 rounded-xl space-y-2 shadow-2xs"
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase">
+                            <span className="text-xs font-bold text-slate-400 uppercase">
                               Forma #{index + 1}
                             </span>
                             {paymentSplits.length > 1 && (
@@ -3711,7 +3743,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                           {/* Se for Cartão: Parcelas */}
                           {isCard && (
                             <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200/80">
-                              <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">Parcelamento:</span>
+                              <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Parcelamento:</span>
                               <select
                                 value={split.installments || 1}
                                 onChange={(e) => {
@@ -3720,7 +3752,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                                     prev.map((s, i) => (i === index ? { ...s, installments: inst } : s))
                                   )
                                 }}
-                                className="flex-1 bg-white border border-slate-200 rounded px-1.5 py-1 text-[11px] text-slate-800 font-mono focus:outline-none focus:border-[#EA580C]"
+                                className="flex-1 bg-white border border-slate-200 rounded px-1.5 py-1 text-xs text-slate-800 font-mono focus:outline-none focus:border-[#EA580C]"
                               >
                                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
                                     <option key={n} value={n}>
@@ -3743,7 +3775,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                                   prev.map((s, i) => (i === index ? { ...s, notes: txt } : s))
                                 )
                               }}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] text-slate-700 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C]"
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-700 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C]"
                             />
                           </div>
                         </div>
@@ -3832,7 +3864,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               </div>
 
               {budget.savingsVs10x > 0 && (
-                <div className="text-[11px] text-emerald-700 text-right font-sans font-semibold pt-0.5">
+                <div className="text-xs text-emerald-700 text-right font-sans font-semibold pt-0.5">
                   Economia cliente: {formatCurrency(budget.savingsVs10x)}
                 </div>
               )}
@@ -4008,7 +4040,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                 <span>Atenção: Concessão Excepcional</span>
               </div>
-              <p className="text-[11px] text-amber-800 leading-relaxed">
+              <p className="text-xs text-amber-800 leading-relaxed">
                 Descontos só devem ser concedidos em situações excepcionais autorizadas. O limite máximo para esta forma de pagamento ({paymentMethod === 'pix' ? 'À vista' : paymentMethod === 'boleto' ? 'Boleto' : 'Cartão'}) é de <strong>{maxAllowedDiscount}%</strong>.
               </p>
             </div>

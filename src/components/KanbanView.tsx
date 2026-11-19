@@ -238,12 +238,12 @@ const ColumnFilterDropdown: React.FC<ColumnFilterDropdownProps> = ({
             placeholder="Pesquisar..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-7 pr-2.5 py-1 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#EA580C] focus:bg-white transition-all font-medium"
+            className="w-full pl-7 pr-2.5 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#EA580C] focus:bg-white transition-all font-medium"
           />
         </div>
       )}
 
-      <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold px-0.5">
+      <div className="flex items-center justify-between text-xs text-slate-500 font-bold px-0.5">
         <button
           type="button"
           onClick={onSelectAll}
@@ -262,7 +262,7 @@ const ColumnFilterDropdown: React.FC<ColumnFilterDropdownProps> = ({
 
       <div className="max-h-48 overflow-y-auto space-y-0.5 pr-1 kanban-col-scroll">
         {filteredOptions.length === 0 ? (
-          <div className="py-4 text-center text-[11px] text-slate-400 font-medium">
+          <div className="py-4 text-center text-xs text-slate-400 font-medium">
             Nenhum item encontrado
           </div>
         ) : (
@@ -281,9 +281,9 @@ const ColumnFilterDropdown: React.FC<ColumnFilterDropdownProps> = ({
                     className="w-3.5 h-3.5 text-[#EA580C] rounded border-slate-300 focus:ring-[#EA580C] cursor-pointer"
                   />
                   {opt.icon}
-                  <span className="truncate text-[11px]">{opt.label}</span>
+                  <span className="truncate text-xs">{opt.label}</span>
                 </div>
-                <span className="text-[10px] font-mono text-slate-400 font-bold px-1.5 py-0.2 bg-slate-100 rounded-full shrink-0">
+                <span className="text-xs font-mono text-slate-400 font-bold px-1.5 py-0.2 bg-slate-100 rounded-full shrink-0">
                   {opt.count}
                 </span>
               </label>
@@ -297,14 +297,14 @@ const ColumnFilterDropdown: React.FC<ColumnFilterDropdownProps> = ({
           type="button"
           onClick={onClearSelection}
           disabled={selectedValues.length === 0}
-          className="text-[11px] font-bold text-slate-500 hover:text-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
+          className="text-xs font-bold text-slate-500 hover:text-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
         >
           Limpar filtro
         </button>
         <button
           type="button"
           onClick={onClose}
-          className="px-2.5 py-1 bg-[#EA580C] hover:bg-[#C2410C] text-white text-[11px] font-bold rounded-lg transition-all shadow-2xs cursor-pointer"
+          className="px-2.5 py-1 bg-[#EA580C] hover:bg-[#C2410C] text-white text-xs font-bold rounded-lg transition-all shadow-2xs cursor-pointer"
         >
           Concluir
         </button>
@@ -582,7 +582,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         ) : (
           <FaUser className="w-3 h-3 text-slate-400 shrink-0" />
         )}
-        <span className="text-[11px] font-semibold text-slate-600 truncate max-w-[110px]">
+        <span className="text-xs font-semibold text-slate-600 truncate max-w-[110px]">
           {name}
         </span>
       </div>
@@ -1161,7 +1161,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               }`}
             >
               <Columns3 className="w-3.5 h-3.5" />
-              <span className="text-[11px]">Kanban</span>
+              <span className="text-xs">Kanban</span>
             </button>
             <button
               type="button"
@@ -1174,7 +1174,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               }`}
             >
               <Table2 className="w-3.5 h-3.5" />
-              <span className="text-[11px]">Lista</span>
+              <span className="text-xs">Lista</span>
             </button>
           </div>
         </div>
@@ -1253,11 +1253,11 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         {col.title}
                       </h3>
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 shrink-0 font-mono">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 shrink-0 font-mono">
                       {colOpps.length}
                     </span>
                   </div>
-                  <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+                  <div className="mt-1 flex items-center justify-between text-xs text-slate-500 font-mono">
                     <span>Total:</span>
                     <span className="font-bold text-slate-800">{formatCurrency(colTotal)}</span>
                   </div>
@@ -1298,7 +1298,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             <>
                               {/* Linha 1: Headline #00000 + Badge Origem */}
                               <div className="flex items-center justify-between gap-1">
-                                <span className="font-mono font-bold text-[10px] text-slate-800 tracking-tight">
+                                <span className="font-mono font-bold text-xs text-slate-800 tracking-tight">
                                   {formatOrderCode(opp.order_number)}
                                 </span>
                                 <span 
@@ -1316,7 +1316,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                   {renderVehicleIcon(vehicle.iconType)}
                                   <span className="truncate max-w-[90px]">{vehicle.modelName}</span>
                                 </span>
-                                <span className="font-mono text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.5 rounded border border-emerald-300">
+                                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.5 rounded border border-emerald-300">
                                   {formatCurrency(opp.final_total)}
                                 </span>
                               </div>
@@ -1402,7 +1402,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                         e.stopPropagation()
                                         onConvertToOrder && onConvertToOrder(opp)
                                       }}
-                                      className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                                      className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
                                     >
                                       <CheckCircle2 className="w-2.5 h-2.5" />
                                       <span>Pedido</span>
@@ -1431,7 +1431,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                   {formatOrderCode(opp.order_number)}
                                 </span>
                                 <span 
-                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1.5 shadow-2xs ${originBadge.bgClasses}`}
+                                  className={`text-xs font-bold px-2 py-0.5 rounded-full border flex items-center gap-1.5 shadow-2xs ${originBadge.bgClasses}`}
                                   title={getOriginTitle(opp.contact?.origin)}
                                 >
                                   <OriginIcon className={`w-3 h-3 ${originBadge.iconColor} shrink-0`} />
@@ -1441,7 +1441,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 
                               {/* Linha 2: Modelo do Veículo em destaque (Pill Preto) + Responsável (Sem badge, com ícone Font Awesome) */}
                               <div className="flex items-center justify-between gap-1 flex-wrap">
-                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1.5 shadow-2xs">
+                                <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1.5 shadow-2xs">
                                   {renderVehicleIcon(vehicle.iconType)}
                                   <span className="truncate max-w-[120px]">{vehicle.modelName}</span>
                                 </span>
@@ -1460,11 +1460,11 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                               </div>
 
                               {/* Linha 4: Caixa de Descrição do Produto & Especificações */}
-                              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-[11px] space-y-0.5">
+                              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-xs space-y-0.5">
                                 <p className="font-medium text-slate-800 truncate">
                                   Bagageiro {vehicle.modelName} Modelo EXTREME
                                 </p>
-                                <div className="flex items-center justify-between text-[10px] text-slate-500">
+                                <div className="flex items-center justify-between text-xs text-slate-500">
                                   <span>
                                     {opp.fulfillment_type === 'instalacao_loja' 
                                       ? 'Instalação na Loja' 
@@ -1476,7 +1476,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 
                               {/* Linha 5: Badge do Preço em destaque verde (substituindo Cotação Igor e Nota Fiscal) */}
                               <div className="flex items-center justify-between pt-0.5">
-                                <span className="text-[11px] font-semibold text-slate-500">Valor Total:</span>
+                                <span className="text-xs font-semibold text-slate-500">Valor Total:</span>
                                 <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-100/90 px-2.5 py-0.5 rounded-lg border border-emerald-300 shadow-2xs">
                                   {formatCurrency(opp.final_total)}
                                 </span>
@@ -1484,7 +1484,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 
                               {/* Linha de Lembretes / Tarefas e Observações */}
                               {(pendingTasks.length > 0 || hasComments) && (
-                                <div className="flex items-center justify-between gap-1 text-[10px] pt-1 border-t border-slate-100/70">
+                                <div className="flex items-center justify-between gap-1 text-xs pt-1 border-t border-slate-100/70">
                                   {pendingTasks.length > 0 ? (() => {
                                     const today = new Date().toISOString().split('T')[0]
                                     const overdue = pendingTasks.find((t) => Boolean(t.due_date && t.due_date < today))
@@ -1516,7 +1516,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                   })() : <div />}
 
                                   {hasComments && (
-                                    <span className="text-[10px] font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0" title={`${opp.comments?.length} observação(ões) registrada(s)`}>
+                                    <span className="text-xs font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0" title={`${opp.comments?.length} observação(ões) registrada(s)`}>
                                       <MessageSquare className="w-3 h-3 text-slate-400" />
                                       <span>{opp.comments?.length}</span>
                                     </span>
@@ -1554,7 +1554,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                         e.stopPropagation()
                                         onConvertToOrder && onConvertToOrder(opp)
                                       }}
-                                      className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                                      className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
                                     >
                                       <CheckCircle2 className="w-3 h-3" />
                                       <span>Gerar Pedido</span>
@@ -1595,14 +1595,14 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               <button
                 type="button"
                 onClick={() => setStageFilter('all')}
-                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   stageFilter === 'all'
                     ? 'bg-slate-900 text-white shadow-2xs'
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/80'
                 }`}
               >
                 <span>Todas</span>
-                <span className={`font-mono text-[10px] px-1.5 py-0.2 rounded-full ${stageFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'}`}>
+                <span className={`font-mono text-xs px-1.5 py-0.2 rounded-full ${stageFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'}`}>
                   {filteredOpportunities.length}
                 </span>
               </button>
@@ -1616,7 +1616,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     type="button"
                     onClick={() => setStageFilter(st.id)}
                     style={isSelected ? { backgroundColor: st.stripeColor, borderColor: st.stripeColor } : undefined}
-                    className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
                       isSelected
                         ? 'text-white shadow-2xs'
                         : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200/80'
@@ -1627,7 +1627,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       style={!isSelected ? { color: st.stripeColor } : undefined}
                     />
                     <span className="whitespace-nowrap">{st.title}</span>
-                    <span className={`font-mono text-[10px] px-1.5 rounded-full ${isSelected ? 'bg-white/25 text-white' : 'bg-slate-200/70 text-slate-700'}`}>
+                    <span className={`font-mono text-xs px-1.5 rounded-full ${isSelected ? 'bg-white/25 text-white' : 'bg-slate-200/70 text-slate-700'}`}>
                       {count}
                     </span>
                   </button>
@@ -1650,12 +1650,12 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
             salesColumnFilters.responsibles.length > 0 ||
             stageFilter !== 'all') && (
             <div className="bg-white rounded-xl px-3 py-2 border border-slate-200/90 shadow-2xs flex items-center gap-2 flex-wrap text-xs">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                 Filtros ativos:
               </span>
 
               {stageFilter !== 'all' && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200 text-[#EA580C]">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200 text-[#EA580C]">
                   <span>Etapa: {SALES_STAGES.find((s) => s.id === stageFilter)?.title}</span>
                   <button
                     type="button"
@@ -1668,7 +1668,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               )}
 
               {salesColumnFilters.origins.length > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
                   <span>Canal: {salesColumnFilters.origins.map((o) => getOriginBadge(o).label).join(', ')}</span>
                   <button
                     type="button"
@@ -1681,7 +1681,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               )}
 
               {salesColumnFilters.vehicles.length > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
                   <span>Veículo: {salesColumnFilters.vehicles.join(', ')}</span>
                   <button
                     type="button"
@@ -1694,7 +1694,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               )}
 
               {salesColumnFilters.stages.length > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
                   <span>Etapa: {salesColumnFilters.stages.map((st) => SALES_STAGES.find((s) => s.id === st)?.title).join(', ')}</span>
                   <button
                     type="button"
@@ -1707,7 +1707,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               )}
 
               {salesColumnFilters.responsibles.length > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
                   <span>Responsável: {salesColumnFilters.responsibles.join(', ')}</span>
                   <button
                     type="button"
@@ -1722,7 +1722,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               <button
                 type="button"
                 onClick={clearAllSalesFilters}
-                className="ml-auto inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                className="ml-auto inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
               >
                 <RotateCcw className="w-3 h-3" />
                 <span>Limpar todos os filtros</span>
@@ -1735,7 +1735,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
             <div className="overflow-auto flex-1 min-h-0 kanban-col-scroll">
               <table className="w-full text-left border-collapse min-w-[920px]">
                 <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur border-b border-slate-200/90">
-                  <tr className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <tr className="text-xs font-bold uppercase tracking-wider text-slate-500">
                     <th className="py-3 px-4 w-24">Código</th>
 
                     {/* Cliente & Canal com filtro estilo Excel */}
@@ -1957,7 +1957,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         >
                           {/* Código */}
                           <td className="py-3 px-4 align-middle">
-                            <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg text-[11px]">
+                            <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg text-xs">
                               {formatOrderCode(opp.order_number)}
                             </span>
                           </td>
@@ -1970,7 +1970,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                   {opp.contact?.full_name || 'Cliente sem nome'}
                                 </span>
                                 <span
-                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${originBadge.bgClasses}`}
+                                  className={`text-xs font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${originBadge.bgClasses}`}
                                   title={getOriginTitle(opp.contact?.origin)}
                                 >
                                   <OriginIcon className={`w-2.5 h-2.5 ${originBadge.iconColor}`} />
@@ -1978,7 +1978,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                 </span>
                                 {pendingTasks.length > 0 && (
                                   <span
-                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200"
+                                    className="inline-flex items-center gap-1 text-xs font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200"
                                     title={`${pendingTasks.length} tarefa(s) pendente(s)`}
                                   >
                                     <Clock className="w-2.5 h-2.5" />
@@ -2001,7 +2001,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 
                           {/* Veículo */}
                           <td className="py-2.5 px-3 align-middle w-40">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-white text-[11px] font-bold shadow-2xs whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-white text-xs font-bold shadow-2xs whitespace-nowrap">
                               {renderVehicleIcon(vehicle.iconType)}
                               <span>{vehicle.modelName}</span>
                             </span>
@@ -2018,7 +2018,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                 value={normStage}
                                 onChange={(e) => requestChangeOpportunityStage(opp, e.target.value as OpportunityStage)}
                                 aria-label="Alterar etapa da oportunidade"
-                                className="w-[165px] pl-8 pr-6 py-1.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg text-[11px] font-bold text-slate-800 outline-none cursor-pointer transition-colors shadow-2xs"
+                                className="w-[165px] pl-8 pr-6 py-1.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg text-xs font-bold text-slate-800 outline-none cursor-pointer transition-colors shadow-2xs"
                               >
                                 {SALES_STAGES.map((st) => (
                                   <option key={st.id} value={st.id}>
@@ -2049,7 +2049,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                   type="button"
                                   onClick={() => onConvertToOrder(opp)}
                                   title="Gerar Pedido"
-                                  className="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                                  className="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
                                 >
                                   <CheckCircle2 className="w-3 h-3" />
                                   <span>Pedido</span>
@@ -2058,7 +2058,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => onSelectOpportunity?.(opp)}
-                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-[#EA580C] text-slate-700 hover:text-white text-[11px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-[#EA580C] text-slate-700 hover:text-white text-xs font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
                               >
                                 <span>Abrir</span>
                                 <ChevronRight className="w-3.5 h-3.5" />
@@ -2112,11 +2112,11 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         {col.title}
                       </h3>
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 shrink-0 font-mono">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 shrink-0 font-mono">
                       {colOrders.length}
                     </span>
                   </div>
-                  <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+                  <div className="mt-1 flex items-center justify-between text-xs text-slate-500 font-mono">
                     <span>Total:</span>
                     <span className="font-bold text-slate-800">{formatCurrency(colTotal)}</span>
                   </div>
@@ -2192,7 +2192,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             <>
                               {/* Linha 1: Headline #00000 + Badge Origem */}
                               <div className="flex items-center justify-between gap-1">
-                                <span className="font-mono font-bold text-[10px] text-slate-800 tracking-tight">
+                                <span className="font-mono font-bold text-xs text-slate-800 tracking-tight">
                                   {formatOrderCode(ord.order_number)}
                                 </span>
                                 <span 
@@ -2210,7 +2210,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                   {renderVehicleIcon(vehicle.iconType)}
                                   <span className="truncate max-w-[90px]">{vehicle.modelName}</span>
                                 </span>
-                                <span className="font-mono text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.5 rounded border border-emerald-300">
+                                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.5 rounded border border-emerald-300">
                                   {formatCurrency(ordTotal)}
                                 </span>
                               </div>
@@ -2272,7 +2272,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                   {formatOrderCode(ord.order_number)}
                                 </span>
                                 <span 
-                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1.5 shadow-2xs ${originBadge.bgClasses}`}
+                                  className={`text-xs font-bold px-2 py-0.5 rounded-full border flex items-center gap-1.5 shadow-2xs ${originBadge.bgClasses}`}
                                   title={getOriginTitle(ord.contact?.origin || linkedOpp?.contact?.origin)}
                                 >
                                   <OriginIcon className={`w-3 h-3 ${originBadge.iconColor} shrink-0`} />
@@ -2282,7 +2282,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 
                               {/* Linha 2: Modelo do Veículo em destaque (Pill Preto) + Responsável (Sem badge, com ícone Font Awesome) */}
                               <div className="flex items-center justify-between gap-1 flex-wrap">
-                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1.5 shadow-2xs">
+                                <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-white flex items-center gap-1.5 shadow-2xs">
                                   {renderVehicleIcon(vehicle.iconType)}
                                   <span className="truncate max-w-[120px]">{vehicle.modelName}</span>
                                 </span>
@@ -2301,11 +2301,11 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                               </div>
 
                               {/* Linha 4: Caixa de Descrição do Produto & Especificações */}
-                              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-[11px] space-y-0.5">
+                              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-xs space-y-0.5">
                                 <p className="font-medium text-slate-800 truncate">
                                   Bagageiro {vehicle.modelName} Modelo EXTREME
                                 </p>
-                                <div className="flex items-center justify-between text-[10px] text-slate-500">
+                                <div className="flex items-center justify-between text-xs text-slate-500">
                                   <span>
                                     {ord.fulfillment_type === 'instalacao_loja' 
                                       ? 'Instalação na Loja' 
@@ -2317,7 +2317,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 
                               {/* Linha 5: Badge do Preço em destaque verde (substituindo Cotação Igor e Nota Fiscal) */}
                               <div className="flex items-center justify-between pt-0.5">
-                                <span className="text-[11px] font-semibold text-slate-500">Valor do Pedido:</span>
+                                <span className="text-xs font-semibold text-slate-500">Valor do Pedido:</span>
                                 <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-100/90 px-2.5 py-0.5 rounded-lg border border-emerald-300 shadow-2xs">
                                   {formatCurrency(ordTotal)}
                                 </span>
@@ -2383,14 +2383,14 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               <button
                 type="button"
                 onClick={() => setStageFilter('all')}
-                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   stageFilter === 'all'
                     ? 'bg-slate-900 text-white shadow-2xs'
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/80'
                 }`}
               >
                 <span>Todos</span>
-                <span className={`font-mono text-[10px] px-1.5 rounded-full ${stageFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'}`}>
+                <span className={`font-mono text-xs px-1.5 rounded-full ${stageFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'}`}>
                   {filteredOrders.length}
                 </span>
               </button>
@@ -2404,7 +2404,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     type="button"
                     onClick={() => setStageFilter(st.id)}
                     style={isSelected ? { backgroundColor: st.stripeColor, borderColor: st.stripeColor } : undefined}
-                    className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
                       isSelected
                         ? 'text-white shadow-2xs'
                         : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200/80'
@@ -2415,7 +2415,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       style={!isSelected ? { color: st.stripeColor } : undefined}
                     />
                     <span className="whitespace-nowrap">{st.title}</span>
-                    <span className={`font-mono text-[10px] px-1.5 rounded-full ${isSelected ? 'bg-white/25 text-white' : 'bg-slate-200/70 text-slate-700'}`}>
+                    <span className={`font-mono text-xs px-1.5 rounded-full ${isSelected ? 'bg-white/25 text-white' : 'bg-slate-200/70 text-slate-700'}`}>
                       {count}
                     </span>
                   </button>
@@ -2439,12 +2439,12 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
             ordersColumnFilters.responsibles.length > 0 ||
             stageFilter !== 'all') && (
             <div className="bg-white rounded-xl px-3 py-2 border border-slate-200/90 shadow-2xs flex items-center gap-2 flex-wrap text-xs">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                 Filtros ativos:
               </span>
 
               {stageFilter !== 'all' && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200 text-[#EA580C]">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200 text-[#EA580C]">
                   <span>Etapa: {ORDER_STAGES.find((s) => s.id === stageFilter)?.title}</span>
                   <button
                     type="button"
@@ -2457,7 +2457,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               )}
 
               {ordersColumnFilters.origins.length > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
                   <span>Canal: {ordersColumnFilters.origins.map((o) => getOriginBadge(o).label).join(', ')}</span>
                   <button
                     type="button"
@@ -2470,7 +2470,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               )}
 
               {ordersColumnFilters.vehicles.length > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
                   <span>Veículo: {ordersColumnFilters.vehicles.join(', ')}</span>
                   <button
                     type="button"
@@ -2483,7 +2483,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               )}
 
               {ordersColumnFilters.fulfillments.length > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
                   <span>Modalidade: {ordersColumnFilters.fulfillments.map((f) => getFulfillmentLabel(f)).join(', ')}</span>
                   <button
                     type="button"
@@ -2496,7 +2496,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               )}
 
               {ordersColumnFilters.stages.length > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
                   <span>Etapa: {ordersColumnFilters.stages.map((st) => ORDER_STAGES.find((s) => s.id === st)?.title || st).join(', ')}</span>
                   <button
                     type="button"
@@ -2509,7 +2509,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               )}
 
               {ordersColumnFilters.responsibles.length > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
                   <span>Responsável: {ordersColumnFilters.responsibles.join(', ')}</span>
                   <button
                     type="button"
@@ -2524,7 +2524,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               <button
                 type="button"
                 onClick={clearAllOrdersFilters}
-                className="ml-auto inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                className="ml-auto inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
               >
                 <RotateCcw className="w-3 h-3" />
                 <span>Limpar todos os filtros</span>
@@ -2537,7 +2537,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
             <div className="overflow-auto flex-1 min-h-0 kanban-col-scroll">
               <table className="w-full text-left border-collapse min-w-[960px]">
                 <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur border-b border-slate-200/90">
-                  <tr className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <tr className="text-xs font-bold uppercase tracking-wider text-slate-500">
                     <th className="py-3 px-4 w-24">Pedido</th>
 
                     {/* Cliente & Canal com filtro estilo Excel */}
@@ -2809,7 +2809,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         >
                           {/* Código */}
                           <td className="py-3 px-4 align-middle">
-                            <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg text-[11px]">
+                            <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg text-xs">
                               {formatOrderCode(ord.order_number)}
                             </span>
                           </td>
@@ -2822,7 +2822,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                   {ord.contact?.full_name || linkedOpp?.contact?.full_name || 'Cliente'}
                                 </span>
                                 <span
-                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${originBadge.bgClasses}`}
+                                  className={`text-xs font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${originBadge.bgClasses}`}
                                   title={getOriginTitle(ord.contact?.origin || linkedOpp?.contact?.origin)}
                                 >
                                   <OriginIcon className={`w-2.5 h-2.5 ${originBadge.iconColor}`} />
@@ -2844,7 +2844,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 
                           {/* Veículo */}
                           <td className="py-2.5 px-3 align-middle w-40">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-white text-[11px] font-bold shadow-2xs whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-white text-xs font-bold shadow-2xs whitespace-nowrap">
                               {renderVehicleIcon(vehicle.iconType)}
                               <span>{vehicle.modelName}</span>
                             </span>
@@ -2853,11 +2853,11 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           {/* Modalidade + Agendamento */}
                           <td className="py-2.5 px-3 align-middle w-40">
                             <div className="flex flex-col gap-0.5">
-                              <span className="font-semibold text-slate-700 text-[11px] whitespace-nowrap">
+                              <span className="font-semibold text-slate-700 text-xs whitespace-nowrap">
                                 {getFulfillmentLabel(ord.fulfillment_type)}
                               </span>
                               {scheduleDate && (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-mono text-slate-500 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1 text-xs font-mono text-slate-500 whitespace-nowrap">
                                   <Calendar className="w-3 h-3 text-[#EA580C]" />
                                   {scheduleDate.split('-').reverse().join('/')}
                                   {scheduleTime ? ` às ${scheduleTime}` : ''}
@@ -2878,7 +2878,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                 disabled={!onUpdateOrderStatus}
                                 onChange={(e) => requestChangeOrderStatus(ord, e.target.value as OrderStatus)}
                                 aria-label="Alterar etapa do pedido"
-                                className="w-[165px] pl-8 pr-6 py-1.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg text-[11px] font-bold text-slate-800 outline-none cursor-pointer transition-colors shadow-2xs disabled:opacity-60"
+                                className="w-[165px] pl-8 pr-6 py-1.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg text-xs font-bold text-slate-800 outline-none cursor-pointer transition-colors shadow-2xs disabled:opacity-60"
                               >
                                 {ORDER_STAGES.map((st) => (
                                   <option key={st.id} value={st.id}>
@@ -2906,7 +2906,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             <button
                               type="button"
                               onClick={() => openOrderDetails(ord)}
-                              className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-[#EA580C] text-slate-700 hover:text-white text-[11px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                              className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-[#EA580C] text-slate-700 hover:text-white text-xs font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
                             >
                               <span>Abrir</span>
                               <ChevronRight className="w-3.5 h-3.5" />
