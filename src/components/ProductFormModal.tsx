@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import type { Product, ProductCategory, Vehicle } from '../types'
 import { PRODUCT_CATEGORIES, type ProductInput } from '../services/catalogService'
-import { formatCurrency } from '../utils/formatters'
 import {
   X,
   PackagePlus,
@@ -9,8 +8,7 @@ import {
   Save,
   Ruler,
   Scale,
-  CreditCard,
-  RefreshCw,
+  Tag,
   AlertCircle,
   Sparkles,
 } from 'lucide-react'
@@ -57,14 +55,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 }) => {
   const isEditing = Boolean(product)
 
-  const initialHasWeight = product
-    ? product.weight_kg !== undefined && product.weight_kg !== null && product.weight_kg > 0
-    : true
-
-  const initialAutoCalc = product
-    ? Math.abs(product.cash_price_5pct - round2(product.base_price_10x * 0.95)) < 0.05 &&
-      Math.abs(product.max_discount_price_10pct - round2(product.base_price_10x * 0.9)) < 0.05
-    : true
+  const initialWeight =
+    product && product.weight_kg !== undefined && product.weight_kg !== null && product.weight_kg > 0
+      ? formatDecimalForInput(product.weight_kg)
+      : ''
 
   const [name, setName] = useState(product?.name || '')
   const [sku, setSku] = useState(product?.sku || '')
@@ -78,27 +72,15 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   )
   const [modelVersion, setModelVersion] = useState(product?.model_version || '')
   const [dimensions, setDimensions] = useState(product?.dimensions || '')
-  const [hasWeight, setHasWeight] = useState(initialHasWeight)
-  const [weightInput, setWeightInput] = useState(
-    initialHasWeight && product ? formatDecimalForInput(product.weight_kg) : ''
-  )
-  const [weightTouched, setWeightTouched] = useState(Boolean(product))
+  const [weightInput, setWeightInput] = useState(initialWeight)
   const [description, setDescription] = useState(product?.description || '')
 
-  const [autoCalcDiscounts, setAutoCalcDiscounts] = useState(initialAutoCalc)
   const [basePriceInput, setBasePriceInput] = useState(
     product ? formatDecimalForInput(product.base_price_10x) : ''
-  )
-  const [cashPriceInput, setCashPriceInput] = useState(
-    product ? formatDecimalForInput(product.cash_price_5pct) : ''
-  )
-  const [pixPriceInput, setPixPriceInput] = useState(
-    product ? formatDecimalForInput(product.max_discount_price_10pct) : ''
   )
   const [installationCostInput, setInstallationCostInput] = useState(
     product ? formatDecimalForInput(product.installation_cost ?? 0) : '0'
   )
-  const [paymentNotes, setPaymentNotes] = useState(product?.payment_conditions_notes || '')
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -120,44 +102,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   )
 
   const parsedBase = parseDecimalInput(basePriceInput)
-  const parsedCash = parseDecimalInput(cashPriceInput)
-  const parsedPix = parseDecimalInput(pixPriceInput)
   const parsedInstall = parseDecimalInput(installationCostInput || '0')
-
-  const handleCategoryChange = (nextCat: ProductCategory) => {
-    setCategory(nextCat)
-    if (!isEditing && !weightTouched) {
-      const catOption = PRODUCT_CATEGORIES.find((c) => c.value === nextCat)
-      if (catOption) {
-        setHasWeight(catOption.defaultHasWeight)
-        if (!catOption.defaultHasWeight) {
-          setWeightInput('')
-        }
-      }
-    }
-  }
-
-  const handleBasePriceChange = (val: string) => {
-    setBasePriceInput(val)
-    if (autoCalcDiscounts) {
-      const num = parseDecimalInput(val)
-      if (!isNaN(num) && num >= 0) {
-        setCashPriceInput(formatDecimalForInput(round2(num * 0.95)))
-        setPixPriceInput(formatDecimalForInput(round2(num * 0.9)))
-      } else if (!val.trim()) {
-        setCashPriceInput('')
-        setPixPriceInput('')
-      }
-    }
-  }
-
-  const handleRecalculateDiscounts = () => {
-    const num = parseDecimalInput(basePriceInput)
-    if (!isNaN(num) && num >= 0) {
-      setCashPriceInput(formatDecimalForInput(round2(num * 0.95)))
-      setPixPriceInput(formatDecimalForInput(round2(num * 0.9)))
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -181,39 +126,27 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
 
     if (isNaN(parsedBase) || parsedBase < 0) {
-      setErrorMsg('Informe um valor válido para 10x sem juros (valor base).')
+      setErrorMsg('Informe um valor válido para o produto ou serviço.')
       return
     }
 
-    const finalCash = cashPriceInput.trim() ? parsedCash : round2(parsedBase * 0.95)
-    const finalPix = pixPriceInput.trim() ? parsedPix : round2(parsedBase * 0.9)
     const finalInstall = installationCostInput.trim() ? parsedInstall : 0
-
-    if (isNaN(finalCash) || finalCash < 0) {
-      setErrorMsg('Informe um valor válido para À vista (5% boleto).')
-      return
-    }
-
-    if (isNaN(finalPix) || finalPix < 0) {
-      setErrorMsg('Informe um valor válido para PIX (10% MAX).')
-      return
-    }
-
     if (isNaN(finalInstall) || finalInstall < 0) {
       setErrorMsg('Informe um valor válido para o custo de instalação.')
       return
     }
 
     let finalWeight: number | undefined = undefined
-    if (hasWeight && weightInput.trim()) {
+    if (weightInput.trim()) {
       const parsedWeight = parseDecimalInput(weightInput)
       if (isNaN(parsedWeight) || parsedWeight <= 0) {
-        setErrorMsg('Informe um peso válido maior que zero (kg) ou desmarque "Peso aplicável".')
+        setErrorMsg('Informe um peso válido maior que zero (kg) ou deixe em branco.')
         return
       }
       finalWeight = parsedWeight
     }
 
+    const baseRounded = round2(parsedBase)
     const payload: ProductInput = {
       name: trimmedName,
       sku: trimmedSku || undefined,
@@ -222,12 +155,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       model_version: modelVersion.trim() || undefined,
       dimensions: dimensions.trim() || undefined,
       weight_kg: finalWeight,
-      base_price_10x: round2(parsedBase),
-      cash_price_5pct: round2(finalCash),
-      max_discount_price_10pct: round2(finalPix),
+      base_price_10x: baseRounded,
+      cash_price_5pct: round2(baseRounded * 0.95),
+      max_discount_price_10pct: round2(baseRounded * 0.9),
       installation_cost: round2(finalInstall),
       description: description.trim() || undefined,
-      payment_conditions_notes: paymentNotes.trim() || undefined,
       is_active: true,
     }
 
@@ -245,15 +177,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   }
 
   if (!isOpen) return null
-
-  const boletoPct =
-    !isNaN(parsedBase) && parsedBase > 0 && !isNaN(parsedCash)
-      ? ((parsedBase - parsedCash) / parsedBase) * 100
-      : null
-  const pixPct =
-    !isNaN(parsedBase) && parsedBase > 0 && !isNaN(parsedPix)
-      ? ((parsedBase - parsedPix) / parsedBase) * 100
-      : null
 
   return (
     <div
@@ -288,7 +211,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               </h3>
               <p className="text-xs text-slate-500">
                 {isEditing
-                  ? 'Atualize as informações técnicas, veículo compatível e condições de pagamento.'
+                  ? 'Atualize as informações técnicas, veículo compatível e preço.'
                   : 'Preencha os dados do produto para disponibilizá-lo no catálogo e nos orçamentos.'}
               </p>
             </div>
@@ -357,7 +280,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   </label>
                   <select
                     value={category}
-                    onChange={(e) => handleCategoryChange(e.target.value as ProductCategory)}
+                    onChange={(e) => setCategory(e.target.value as ProductCategory)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-semibold cursor-pointer"
                   >
                     {PRODUCT_CATEGORIES.map((cat) => (
@@ -381,9 +304,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     {vehicles.map((v) => (
                       <option key={v.id} value={v.id}>
                         {v.model}
-                        {v.standard_installation_cost > 0
-                          ? ` (+R$ ${v.standard_installation_cost} inst.)`
-                          : ''}
                       </option>
                     ))}
                   </select>
@@ -430,6 +350,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   <label className="text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
                     <Ruler className="w-3.5 h-3.5 text-slate-400" />
                     <span>Medidas</span>
+                    <span className="text-slate-400 font-normal">(opcional)</span>
                   </label>
                   <input
                     type="text"
@@ -444,97 +365,44 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                      <Scale className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Peso (kg)</span>
-                    </label>
-                    <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={hasWeight}
-                        onChange={(e) => {
-                          setWeightTouched(true)
-                          setHasWeight(e.target.checked)
-                          if (!e.target.checked) setWeightInput('')
-                        }}
-                        className="rounded border-slate-300 accent-[#EA580C] cursor-pointer"
-                      />
-                      <span>Aplicável</span>
-                    </label>
-                  </div>
+                  <label className="text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                    <Scale className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Peso (kg)</span>
+                    <span className="text-slate-400 font-normal">(opcional)</span>
+                  </label>
 
-                  {hasWeight ? (
-                    <div className="relative">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={weightInput}
-                        onChange={(e) => {
-                          setWeightTouched(true)
-                          setWeightInput(e.target.value)
-                        }}
-                        placeholder="Ex: 38 ou 3,5"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-mono font-bold"
-                      />
-                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-mono font-bold text-slate-400">
-                        kg
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="w-full bg-slate-50/70 border border-dashed border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-400 italic">
-                      Peso não aplicável para este item
-                    </div>
-                  )}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={weightInput}
+                      onChange={(e) => setWeightInput(e.target.value)}
+                      placeholder="Ex: 38 ou 3,5"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-mono font-bold"
+                    />
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-mono font-bold text-slate-400">
+                      kg
+                    </span>
+                  </div>
                   <p className="text-[10px] text-slate-400 mt-1">
-                    Usado no cálculo automático de peso total para cotação de frete.
+                    Deixe em branco quando não se aplicar. Usado no cálculo automático de frete.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Section 3: Payment Conditions */}
+            {/* Section 3: Price */}
             <div className="pt-4 border-t border-slate-100 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                  <CreditCard className="w-3.5 h-3.5 text-[#EA580C]" />
-                  <span>3. Condições de Pagamento</span>
-                </h4>
+              <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-[#EA580C]" />
+                <span>3. Preço</span>
+              </h4>
 
-                <div className="flex items-center gap-3">
-                  <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={autoCalcDiscounts}
-                      onChange={(e) => {
-                        const checked = e.target.checked
-                        setAutoCalcDiscounts(checked)
-                        if (checked) handleRecalculateDiscounts()
-                      }}
-                      className="rounded border-slate-300 accent-[#EA580C] cursor-pointer"
-                    />
-                    <span>Auto-calcular 5% / 10%</span>
-                  </label>
-
-                  {!autoCalcDiscounts && (
-                    <button
-                      type="button"
-                      onClick={handleRecalculateDiscounts}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#EA580C] hover:text-[#C2410C] cursor-pointer"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                      <span>Recalcular</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-[#F8F9FA] p-4 rounded-2xl border border-slate-200/70 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Base 10x */}
+              <div className="bg-[#F8F9FA] p-4 rounded-2xl border border-slate-200/70 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
-                      10x sem juros (R$) <span className="text-[#EA580C]">*</span>
+                      Valor (R$) <span className="text-[#EA580C]">*</span>
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-mono font-bold text-slate-400">
@@ -545,83 +413,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         inputMode="decimal"
                         required
                         value={basePriceInput}
-                        onChange={(e) => handleBasePriceChange(e.target.value)}
+                        onChange={(e) => setBasePriceInput(e.target.value)}
                         placeholder="0,00"
-                        className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono font-bold"
+                        className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono font-bold"
                       />
                     </div>
-                    {!isNaN(parsedBase) && parsedBase > 0 && (
-                      <p className="text-[10px] text-slate-500 mt-1 font-mono">
-                        10x de {formatCurrency(parsedBase / 10)}
-                      </p>
-                    )}
                   </div>
 
-                  {/* Cash 5% */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-emerald-800 mb-1.5">
-                      À vista — 5% boleto (R$) <span className="text-[#EA580C]">*</span>
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-mono font-bold text-emerald-600">
-                        R$
-                      </span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        required
-                        value={cashPriceInput}
-                        onChange={(e) => {
-                          setAutoCalcDiscounts(false)
-                          setCashPriceInput(e.target.value)
-                        }}
-                        placeholder="0,00"
-                        className="w-full bg-white border border-emerald-200 rounded-xl pl-9 pr-3 py-2 text-xs text-emerald-800 focus:outline-none focus:border-emerald-500 font-mono font-bold"
-                      />
-                    </div>
-                    {boletoPct !== null && (
-                      <p className="text-[10px] text-emerald-700 mt-1 font-mono">
-                        {boletoPct > 0
-                          ? `-${boletoPct.toFixed(1).replace('.', ',')}% sobre tabela`
-                          : 'Sem desconto'}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* PIX 10% */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-[#EA580C] mb-1.5">
-                      PIX — 10% MAX (R$) <span className="text-[#EA580C]">*</span>
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-mono font-bold text-[#EA580C]">
-                        R$
-                      </span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        required
-                        value={pixPriceInput}
-                        onChange={(e) => {
-                          setAutoCalcDiscounts(false)
-                          setPixPriceInput(e.target.value)
-                        }}
-                        placeholder="0,00"
-                        className="w-full bg-white border border-[#FED7AA] rounded-xl pl-9 pr-3 py-2 text-xs text-[#EA580C] focus:outline-none focus:border-[#EA580C] font-mono font-bold"
-                      />
-                    </div>
-                    {pixPct !== null && (
-                      <p className="text-[10px] text-[#C2410C] mt-1 font-mono">
-                        {pixPct > 0
-                          ? `-${pixPct.toFixed(1).replace('.', ',')}% sobre tabela`
-                          : 'Sem desconto'}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Installation cost + Payment notes */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-200/70">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
                       Custo de Instalação (R$)
@@ -636,7 +434,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         value={installationCostInput}
                         onChange={(e) => setInstallationCostInput(e.target.value)}
                         placeholder="0,00"
-                        className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono font-bold"
+                        className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono font-bold"
                       />
                     </div>
                     {selectedVehicle &&
@@ -658,20 +456,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         </button>
                       )}
                   </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
-                      Observações de Pagamento <span className="text-slate-400 font-normal">(opcional)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={paymentNotes}
-                      onChange={(e) => setPaymentNotes(e.target.value)}
-                      placeholder="Ex: Condição especial para frotas ou sob encomenda"
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#EA580C] font-medium"
-                    />
-                  </div>
                 </div>
+
+                <p className="text-[11px] text-slate-500 leading-relaxed pt-1 border-t border-slate-200/60">
+                  As condições de pagamento e descontos (cartão de crédito em até 10x sem desconto, boleto até 5% e à vista — dinheiro, PIX, débito ou transferência — até 10%) são aplicados sobre o valor final no orçamento.
+                </p>
               </div>
             </div>
           </div>

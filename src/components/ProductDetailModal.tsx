@@ -8,9 +8,7 @@ import {
   Scale,
   Layers,
   Tag,
-  CreditCard,
   Banknote,
-  Zap,
   Wrench,
   Pencil,
   Trash2,
@@ -47,14 +45,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const vehicle = vehicles.find((v) => v.id === product.compatible_vehicle_id)
   const weightFormatted = formatWeightKg(product.weight_kg)
-
-  const installmentValue = product.base_price_10x > 0 ? product.base_price_10x / 10 : 0
-  const boletoSavings = Math.max(0, product.base_price_10x - product.cash_price_5pct)
-  const boletoPct =
-    product.base_price_10x > 0 ? (boletoSavings / product.base_price_10x) * 100 : 0
-  const pixSavings = Math.max(0, product.base_price_10x - product.max_discount_price_10pct)
-  const pixPct =
-    product.base_price_10x > 0 ? (pixSavings / product.base_price_10x) * 100 : 0
 
   return (
     <div
@@ -169,7 +159,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   Peso
                 </span>
                 <p className="text-xs font-bold font-mono text-slate-900 mt-0.5">
-                  {weightFormatted || 'Não aplicável'}
+                  {weightFormatted || 'Não informado'}
                 </p>
               </div>
             </div>
@@ -201,84 +191,27 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             </div>
           )}
 
-          {/* Payment Conditions */}
+          {/* Price */}
           <div className="space-y-2.5">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Condições de Pagamento
+              Preço
             </h4>
 
             <div className="bg-[#F8F9FA] p-4 rounded-2xl border border-slate-200/70 space-y-3">
-              {/* 10x sem juros */}
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0">
-                    <CreditCard className="w-3.5 h-3.5 text-slate-700" />
+                  <div className="w-8 h-8 rounded-xl bg-[#FFF3EA] border border-[#FED7AA] flex items-center justify-center shrink-0">
+                    <Banknote className="w-4 h-4 text-[#EA580C]" />
                   </div>
-                  <div>
-                    <span className="text-xs font-bold text-slate-800 block">
-                      10x sem juros (Cartão / Tabela)
-                    </span>
-                    {installmentValue > 0 && (
-                      <span className="text-[11px] text-slate-500">
-                        10 parcelas de <strong className="font-mono text-slate-700">{formatCurrency(installmentValue)}</strong>
-                      </span>
-                    )}
-                  </div>
+                  <span className="text-xs font-bold text-slate-800">
+                    Valor do Produto / Serviço
+                  </span>
                 </div>
-                <span className="text-sm font-bold font-mono text-[#121212]">
+                <span className="text-base font-bold font-mono text-[#121212]">
                   {formatCurrency(product.base_price_10x)}
                 </span>
               </div>
 
-              {/* Boleto 5% */}
-              <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-slate-200/70">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200/80 flex items-center justify-center shrink-0">
-                    <Banknote className="w-3.5 h-3.5 text-emerald-700" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-slate-800 block">
-                      À vista (5% boleto)
-                    </span>
-                    {boletoSavings > 0 ? (
-                      <span className="text-[11px] text-emerald-700 font-medium">
-                        Economia de {formatCurrency(boletoSavings)} ({boletoPct.toFixed(1).replace('.', ',')}%)
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-slate-500">Valor fixo sem desconto</span>
-                    )}
-                  </div>
-                </div>
-                <span className="text-sm font-bold font-mono text-emerald-700">
-                  {formatCurrency(product.cash_price_5pct)}
-                </span>
-              </div>
-
-              {/* PIX 10% */}
-              <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-slate-200/70">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-[#FFF3EA] border border-[#FED7AA] flex items-center justify-center shrink-0">
-                    <Zap className="w-3.5 h-3.5 text-[#EA580C]" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-[#EA580C] block">
-                      PIX (10% MAX)
-                    </span>
-                    {pixSavings > 0 ? (
-                      <span className="text-[11px] text-[#C2410C] font-medium">
-                        Economia de {formatCurrency(pixSavings)} ({pixPct.toFixed(1).replace('.', ',')}%)
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-slate-500">Valor fixo sem desconto</span>
-                    )}
-                  </div>
-                </div>
-                <span className="text-base font-bold font-mono text-[#EA580C]">
-                  {formatCurrency(product.max_discount_price_10pct)}
-                </span>
-              </div>
-
-              {/* Installation */}
               <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-slate-200/70 text-xs">
                 <div className="flex items-center gap-2 text-slate-600 font-medium">
                   <Wrench className="w-3.5 h-3.5 text-slate-400" />
@@ -291,12 +224,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </span>
               </div>
 
-              {product.payment_conditions_notes && (
-                <div className="pt-2.5 border-t border-slate-200/70 flex items-start gap-2 text-xs text-slate-600">
-                  <Info className="w-3.5 h-3.5 text-[#EA580C] shrink-0 mt-0.5" />
-                  <p className="leading-relaxed">{product.payment_conditions_notes}</p>
-                </div>
-              )}
+              <div className="pt-2.5 border-t border-slate-200/70 flex items-start gap-2 text-[11px] text-slate-500">
+                <Info className="w-3.5 h-3.5 text-[#EA580C] shrink-0 mt-0.5" />
+                <p className="leading-relaxed">
+                  Descontos e condições de pagamento (cartão de crédito em até 10x sem desconto, boleto até 5% e à vista — dinheiro, PIX, débito ou transferência — até 10%) são aplicados sobre o valor final no orçamento.
+                </p>
+              </div>
             </div>
           </div>
         </div>

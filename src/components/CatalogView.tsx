@@ -417,43 +417,23 @@ export const CatalogView: React.FC = () => {
                     )}
                   </div>
 
-                  {/* 3-Tier Pricing Card & Actions */}
+                  {/* Price Box & Actions */}
                   <div className="pt-3 border-t border-slate-100">
                     <div className="bg-[#F8F9FA] p-3.5 rounded-2xl border border-slate-100 space-y-1.5 mb-3 text-xs">
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500">10x sem juros:</span>
-                        <span className="font-bold text-[#121212] font-mono">
+                        <span className="text-slate-500 font-medium">Valor:</span>
+                        <span className="font-bold text-[#121212] font-mono text-sm">
                           {formatCurrency(p.base_price_10x)}
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500">À vista (5% boleto):</span>
-                        <span className="font-bold text-emerald-700 font-mono">
-                          {formatCurrency(p.cash_price_5pct)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
-                        <span className="text-[#EA580C] font-semibold">PIX (10% MAX):</span>
-                        <span className="font-bold text-[#EA580C] font-mono text-sm">
-                          {formatCurrency(p.max_discount_price_10pct)}
-                        </span>
-                      </div>
-
                       {p.installation_cost > 0 && (
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
                           <span>Instalação:</span>
                           <span className="font-mono text-slate-700 font-semibold">
                             +{formatCurrency(p.installation_cost)}
                           </span>
                         </div>
-                      )}
-
-                      {p.payment_conditions_notes && (
-                        <p className="text-[10px] text-slate-500 pt-1 border-t border-slate-200/60 line-clamp-1">
-                          {p.payment_conditions_notes}
-                        </p>
                       )}
                     </div>
 
