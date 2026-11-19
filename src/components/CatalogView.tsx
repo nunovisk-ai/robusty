@@ -79,28 +79,57 @@ export const CatalogView: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
 
-  // Toast feedback
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  // Error & Toast feedback
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
-  const showToast = useCallback((msg: string) => {
-    setToastMessage(msg)
+  const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
   }, [])
 
   useEffect(() => {
-    if (!toastMessage) return
-    const timer = setTimeout(() => setToastMessage(null), 3500)
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 4000)
     return () => clearTimeout(timer)
-  }, [toastMessage])
+  }, [toast])
 
-  useEffect(() => {
-    async function loadData() {
-      setLoading(true)
+  const loadCatalogFromDb = useCallback(async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
       const [vList, pList] = await Promise.all([fetchVehicles(), fetchProducts()])
       setVehicles(vList)
       setProducts(pList)
+    } catch (err) {
+      setLoadError(
+        err instanceof Error ? err.message : 'Erro ao conectar ao banco de dados do catálogo.'
+      )
+    } finally {
       setLoading(false)
     }
-    loadData()
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    Promise.all([fetchVehicles(), fetchProducts()])
+      .then(([vList, pList]) => {
+        if (!active) return
+        setVehicles(vList)
+        setProducts(pList)
+        setLoadError(null)
+      })
+      .catch((err) => {
+        if (!active) return
+        setLoadError(
+          err instanceof Error ? err.message : 'Erro ao conectar ao banco de dados do catálogo.'
+        )
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
   }, [])
 
   const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId)
@@ -161,14 +190,14 @@ export const CatalogView: React.FC = () => {
 
   const handleSaveProduct = async (input: ProductInput, editingId?: string) => {
     if (editingId) {
-      const { product: updated } = await updateProduct(editingId, input)
+      const updated = await updateProduct(editingId, input)
       setProducts((prev) => prev.map((p) => (p.id === editingId ? updated : p)))
-      showToast(`Produto "${updated.name}" atualizado com sucesso!`)
+      showToast(`Produto "${updated.name}" atualizado no banco de dados!`)
     } else {
-      const { product: created } = await createProduct(input)
+      const created = await createProduct(input)
       setProducts((prev) => [created, ...prev])
       setCurrentPage(1)
-      showToast(`Produto "${created.name}" cadastrado com sucesso!`)
+      showToast(`Produto "${created.name}" cadastrado no banco de dados!`)
     }
   }
 
@@ -176,9 +205,16 @@ export const CatalogView: React.FC = () => {
     if (!deletingProduct) return
     const target = deletingProduct
     setDeletingProduct(null)
-    await deleteProduct(target.id)
-    setProducts((prev) => prev.filter((p) => p.id !== target.id))
-    showToast(`Produto "${target.name}" excluído do catálogo.`)
+    try {
+      await deleteProduct(target.id)
+      setProducts((prev) => prev.filter((p) => p.id !== target.id))
+      showToast(`Produto "${target.name}" excluído do banco de dados.`)
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : 'Erro ao excluir produto no banco de dados.',
+        'error'
+      )
+    }
   }
 
   const hasActiveFilters =
@@ -194,13 +230,23 @@ export const CatalogView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Feedback Toast */}
-      {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700/80 text-xs font-semibold animate-in fade-in slide-in-from-bottom-2 duration-150">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{toastMessage}</span>
+      {toast && (
+        <div
+          className={`fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-xl border text-xs font-semibold animate-in fade-in slide-in-from-bottom-2 duration-150 ${
+            toast.type === 'error'
+              ? 'bg-rose-950 text-white border-rose-800'
+              : 'bg-slate-900 text-white border-slate-700/80'
+          }`}
+        >
+          {toast.type === 'error' ? (
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          )}
+          <span>{toast.message}</span>
           <button
             type="button"
-            onClick={() => setToastMessage(null)}
+            onClick={() => setToast(null)}
             aria-label="Fechar aviso"
             className="ml-1 p-0.5 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer"
           >
@@ -321,7 +367,24 @@ export const CatalogView: React.FC = () => {
 
       {/* Products Grid */}
       {loading ? (
-        <div className="py-20 text-center text-slate-400 text-sm">Carregando catálogo oficial...</div>
+        <div className="py-20 text-center text-slate-400 text-sm">Carregando catálogo do banco de dados...</div>
+      ) : loadError ? (
+        <div className="py-14 px-6 text-center bg-white rounded-2xl border border-rose-200 shadow-xs space-y-3">
+          <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center mx-auto">
+            <AlertTriangle className="w-5 h-5 text-rose-600" />
+          </div>
+          <p className="text-rose-800 text-sm font-bold">
+            Não foi possível carregar o catálogo do banco de dados
+          </p>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">{loadError}</p>
+          <button
+            type="button"
+            onClick={loadCatalogFromDb}
+            className="px-5 py-2 rounded-full text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] transition-colors cursor-pointer"
+          >
+            Tentar novamente
+          </button>
+        </div>
       ) : filteredProducts.length === 0 ? (
         <div className="py-16 px-6 text-center bg-white rounded-2xl border border-slate-200 shadow-xs space-y-4">
           <p className="text-slate-500 text-sm font-medium">

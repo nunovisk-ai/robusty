@@ -1,11 +1,10 @@
 -- ==============================================================================
--- ROBUSTY CRM — PRODUCTS CRUD SUPPORT (WEIGHT, PAYMENT NOTES & WRITE RLS)
+-- ROBUSTY CRM — PRODUCTS CRUD SUPPORT (WEIGHT & WRITE RLS)
 -- ==============================================================================
 
--- 1. Add optional weight_kg and payment_conditions_notes columns to products
+-- 1. Add optional weight_kg column to products
 ALTER TABLE public.products
-  ADD COLUMN IF NOT EXISTS weight_kg NUMERIC(10, 2) NULL,
-  ADD COLUMN IF NOT EXISTS payment_conditions_notes TEXT NULL;
+  ADD COLUMN IF NOT EXISTS weight_kg NUMERIC(10, 2) NULL;
 
 -- 2. Allow full CRUD operations on products table (matching CRM RLS pattern)
 DO $$ BEGIN
@@ -54,12 +53,6 @@ FROM (VALUES
   ('DUC-MAX-2023', 45.0),
   ('SAV-CS', 22.0),
   ('SAV-CD', 20.0),
-  ('SAV-ROLETE', 8.0),
-  ('MAS-L3H2', 48.0),
-  ('EXP-STANDARD', 24.0),
-  ('DAI-FURGAO', 52.0),
-  ('SPR-415-515', 55.0),
-  ('HR-CABINE', 26.0),
-  ('JBOX-L3H2', 46.0)
+  ('SAV-ROLETE', 8.0)
 ) AS v(sku, weight_kg)
 WHERE public.products.sku = v.sku AND public.products.weight_kg IS NULL;

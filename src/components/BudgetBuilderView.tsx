@@ -304,9 +304,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   // Load Vehicles & Products
   useEffect(() => {
     async function load() {
-      const [vList, pList] = await Promise.all([fetchVehicles(), fetchProducts()])
-      setVehicles(vList)
-      setAllProducts(pList)
+      try {
+        const [vList, pList] = await Promise.all([fetchVehicles(), fetchProducts()])
+        setVehicles(vList)
+        setAllProducts(pList)
+      } catch (err) {
+        console.error('Erro ao carregar catálogo no orçamento:', err)
+      }
     }
     load()
   }, [])
