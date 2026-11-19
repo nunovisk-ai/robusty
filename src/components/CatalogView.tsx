@@ -16,6 +16,10 @@ import { ProductFormModal } from './ProductFormModal'
 import { ProductDetailModal } from './ProductDetailModal'
 import { CustomAlertModal } from './CustomAlertModal'
 import {
+  CatalogVehiclePillsSkeleton,
+  CatalogProductsGridSkeleton,
+} from './SkeletonScreens'
+import {
   Search,
   AlertTriangle,
   Ruler,
@@ -286,37 +290,43 @@ export const CatalogView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 overflow-x-scroll pb-3 catalog-scroll">
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedVehicleId('all')
-              setCurrentPage(1)
-            }}
-            className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all border cursor-pointer ${
-              selectedVehicleId === 'all'
-                ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-sm shadow-orange-500/20'
-                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-            }`}
-          >
-            Todos os Veículos
-          </button>
-          {vehicles.map((v) => (
-            <button
-              type="button"
-              key={v.id}
-              onClick={() => {
-                setSelectedVehicleId(v.id)
-                setCurrentPage(1)
-              }}
-              className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all border cursor-pointer ${
-                selectedVehicleId === v.id
-                  ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-sm shadow-orange-500/20'
-                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-              }`}
-            >
-              <span>{v.model}</span>
-            </button>
-          ))}
+          {loading ? (
+            <CatalogVehiclePillsSkeleton />
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedVehicleId('all')
+                  setCurrentPage(1)
+                }}
+                className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all border cursor-pointer ${
+                  selectedVehicleId === 'all'
+                    ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-sm shadow-orange-500/20'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                Todos os Veículos
+              </button>
+              {vehicles.map((v) => (
+                <button
+                  type="button"
+                  key={v.id}
+                  onClick={() => {
+                    setSelectedVehicleId(v.id)
+                    setCurrentPage(1)
+                  }}
+                  className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all border cursor-pointer ${
+                    selectedVehicleId === v.id
+                      ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-sm shadow-orange-500/20'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>{v.model}</span>
+                </button>
+              ))}
+            </>
+          )}
         </div>
       </div>
 
@@ -367,7 +377,7 @@ export const CatalogView: React.FC = () => {
 
       {/* Products Grid */}
       {loading ? (
-        <div className="py-20 text-center text-slate-400 text-sm">Carregando catálogo do banco de dados...</div>
+        <CatalogProductsGridSkeleton count={itemsPerPage} />
       ) : loadError ? (
         <div className="py-14 px-6 text-center bg-white rounded-2xl border border-rose-200 shadow-xs space-y-3">
           <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center mx-auto">

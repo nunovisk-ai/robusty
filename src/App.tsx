@@ -9,6 +9,12 @@ import { OrdersView } from './components/OrdersView'
 import { CalendarView } from './components/CalendarView'
 import { SettingsView } from './components/SettingsView'
 import { LoginView, type CurrentUser } from './components/LoginView'
+import {
+  KanbanSkeleton,
+  OrdersSkeleton,
+  CalendarSkeleton,
+  BudgetSkeleton,
+} from './components/SkeletonScreens'
 import type {
   Opportunity,
   OpportunityStage,
@@ -617,12 +623,12 @@ export function App() {
 
         <main className={`flex-1 w-full ${activeTab === 'kanban' ? 'p-3 sm:px-6 sm:py-3 flex flex-col min-h-0 overflow-hidden max-w-full' : 'p-4 sm:p-6 sm:py-8 max-w-7xl mx-auto'}`}>
           {isLoadingCrm && activeTab !== 'catalog' && activeTab !== 'settings' ? (
-            <div className="flex-1 flex items-center justify-center py-20">
-              <div className="flex items-center gap-3 text-xs font-bold text-slate-500 bg-white px-5 py-3.5 rounded-2xl border border-slate-100 shadow-nexo">
-                <RefreshCw className="w-4 h-4 text-[#EA580C] animate-spin" />
-                <span>Carregando dados do Supabase...</span>
-              </div>
-            </div>
+            <>
+              {activeTab === 'kanban' && <KanbanSkeleton />}
+              {activeTab === 'orders' && <OrdersSkeleton />}
+              {activeTab === 'calendar' && <CalendarSkeleton />}
+              {activeTab === 'budget' && <BudgetSkeleton />}
+            </>
           ) : (
             <>
               {activeTab === 'kanban' && (

@@ -18,6 +18,10 @@ import { lookupCep } from '../services/cepService'
 import { CustomDatePicker } from './CustomDatePicker'
 import { CustomTimePicker } from './CustomTimePicker'
 import { CustomAlertModal } from './CustomAlertModal'
+import {
+  BudgetVehiclePillsSkeleton,
+  BudgetProductListSkeleton,
+} from './SkeletonScreens'
 import { generateProposalHtml, type ProposalPayload } from '../utils/proposalGenerator'
 import { ROBUSTY_LOGO_BASE64 } from '../assets/logoBase64'
 import type { CurrentUser } from './LoginView'
@@ -303,18 +307,27 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [discountModalOpen, setDiscountModalOpen] = useState(false)
   const [tempDiscountPercent, setTempDiscountPercent] = useState(0)
 
+  const [loadingCatalog, setLoadingCatalog] = useState(true)
+
   // Load Vehicles & Products
   useEffect(() => {
+    let cancelled = false
     async function load() {
       try {
         const [vList, pList] = await Promise.all([fetchVehicles(), fetchProducts()])
+        if (cancelled) return
         setVehicles(vList)
         setAllProducts(pList)
       } catch (err) {
         console.error('Erro ao carregar catálogo no orçamento:', err)
+      } finally {
+        if (!cancelled) setLoadingCatalog(false)
       }
     }
-    load()
+    void load()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   // Order vehicles alphabetically by model
@@ -1530,36 +1543,40 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                 {/* Grade de veículos distribuída em múltiplas linhas (sem rolagem horizontal) */}
                 <div className="flex flex-wrap gap-2">
-                  {sortedVehicles.map((v) => {
-                    const isSelected = selectedVehicleId === v.id
-                    const cleanModel = getCleanVehicleModel(v.model)
+                  {loadingCatalog ? (
+                    <BudgetVehiclePillsSkeleton />
+                  ) : (
+                    sortedVehicles.map((v) => {
+                      const isSelected = selectedVehicleId === v.id
+                      const cleanModel = getCleanVehicleModel(v.model)
 
-                    return (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() => {
-                          if (selectedVehicleId === v.id) {
-                            setSelectedVehicleId('')
-                            setItems([])
-                          } else {
-                            setSelectedVehicleId(v.id)
-                            setItems([])
-                          }
-                        }}
-                        className={`px-4 py-2.5 rounded-xl border flex items-center gap-2 transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#FFF3EA] border-[#EA580C] text-[#EA580C] font-bold shadow-xs'
-                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200/80 text-slate-700 font-medium'
-                        }`}
-                      >
-                        <span className={isSelected ? 'text-[#EA580C]' : 'text-slate-400'}>
-                          {renderVehicleIcon(v.model)}
-                        </span>
-                        <span className="text-xs whitespace-nowrap">{cleanModel}</span>
-                      </button>
-                    )
-                  })}
+                      return (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => {
+                            if (selectedVehicleId === v.id) {
+                              setSelectedVehicleId('')
+                              setItems([])
+                            } else {
+                              setSelectedVehicleId(v.id)
+                              setItems([])
+                            }
+                          }}
+                          className={`px-4 py-2.5 rounded-xl border flex items-center gap-2 transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#FFF3EA] border-[#EA580C] text-[#EA580C] font-bold shadow-xs'
+                              : 'bg-slate-50 hover:bg-slate-100 border-slate-200/80 text-slate-700 font-medium'
+                          }`}
+                        >
+                          <span className={isSelected ? 'text-[#EA580C]' : 'text-slate-400'}>
+                            {renderVehicleIcon(v.model)}
+                          </span>
+                          <span className="text-xs whitespace-nowrap">{cleanModel}</span>
+                        </button>
+                      )
+                    })
+                  )}
                 </div>
               </div>
 
@@ -1618,7 +1635,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 </div>
 
                 <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-                  {filteredCompatibleProducts.length === 0 ? (
+                  {loadingCatalog ? (
+                    <BudgetProductListSkeleton />
+                  ) : filteredCompatibleProducts.length === 0 ? (
                     <div className="py-8 text-center text-xs text-slate-400 font-medium border border-dashed border-slate-200 rounded-xl">
                       Nenhum produto encontrado para este filtro ou busca.
                     </div>
