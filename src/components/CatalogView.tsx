@@ -18,11 +18,9 @@ import { CustomAlertModal } from './CustomAlertModal'
 import {
   Search,
   AlertTriangle,
-  Plus,
   Ruler,
   Scale,
   Layers,
-  ArrowRight,
   Filter,
   Eye,
   Pencil,
@@ -32,15 +30,7 @@ import {
   X,
 } from 'lucide-react'
 
-interface CatalogViewProps {
-  onSelectForBudget?: (product: Product, vehicle?: Vehicle) => void
-  onNavigateToBudget?: () => void
-}
-
-export const CatalogView: React.FC<CatalogViewProps> = ({
-  onSelectForBudget,
-  onNavigateToBudget,
-}) => {
+export const CatalogView: React.FC = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('all')
@@ -171,41 +161,23 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
 
       {/* Top Banner / Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-              Tabela de Produtos & Condições Comerciais
-            </h2>
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">
-              Oficial Fev/2026
-            </span>
-          </div>
-          <p className="text-xs text-slate-500">
-            Valores oficiais de tabela com regras de parcelamento em 10x sem juros, 5% no boleto e 10% no PIX.
-          </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+            Tabela de Produtos & Condições Comerciais
+          </h2>
+          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">
+            Oficial Fev/2026
+          </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#EA580C] hover:bg-[#C2410C] text-white font-semibold rounded-xl text-xs transition-all shadow-sm shadow-orange-600/20 cursor-pointer"
-          >
-            <PackagePlus className="w-4 h-4" />
-            <span>Novo Produto</span>
-          </button>
-
-          {onNavigateToBudget && (
-            <button
-              type="button"
-              onClick={onNavigateToBudget}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-orange-50 text-[#EA580C] border border-[#FED7AA] font-semibold rounded-xl text-xs transition-all cursor-pointer"
-            >
-              <span>Criar Nova Oportunidade</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={handleOpenCreate}
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#EA580C] hover:bg-[#C2410C] text-white font-semibold rounded-xl text-xs transition-all shadow-sm shadow-orange-600/20 self-start sm:self-auto cursor-pointer"
+        >
+          <PackagePlus className="w-4 h-4" />
+          <span>Novo Produto</span>
+        </button>
       </div>
 
       {/* Vehicle Filter Pills */}
@@ -220,7 +192,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex items-center gap-2 overflow-x-scroll pb-3 catalog-scroll">
           <button
             type="button"
             onClick={() => setSelectedVehicleId('all')}
@@ -237,24 +209,13 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
               type="button"
               key={v.id}
               onClick={() => setSelectedVehicleId(v.id)}
-              className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all border flex items-center gap-1.5 cursor-pointer ${
+              className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all border cursor-pointer ${
                 selectedVehicleId === v.id
                   ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-sm shadow-orange-500/20'
                   : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
               }`}
             >
               <span>{v.model}</span>
-              {v.standard_installation_cost > 0 && (
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-mono ${
-                    selectedVehicleId === v.id
-                      ? 'bg-white/20 text-white'
-                      : 'bg-slate-200 text-slate-600'
-                  }`}
-                >
-                  +R$ {v.standard_installation_cost}
-                </span>
-              )}
             </button>
           ))}
         </div>
@@ -436,19 +397,8 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                     )}
                   </div>
 
-                  {onSelectForBudget && (
-                    <button
-                      type="button"
-                      onClick={() => onSelectForBudget(p, vehicle)}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-full bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold text-xs transition-all shadow-md shadow-orange-500/20 active:scale-98 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                      <span>Adicionar ao Orçamento</span>
-                    </button>
-                  )}
-
                   {/* CRUD Action Strip */}
-                  <div className="grid grid-cols-3 gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100">
+                  <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
                     <button
                       type="button"
                       onClick={() => setViewingProduct(p)}
@@ -493,7 +443,6 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
         onClose={() => setViewingProduct(null)}
         onEdit={handleOpenEdit}
         onDelete={handleRequestDelete}
-        onSelectForBudget={onSelectForBudget}
       />
 
       {/* Create / Edit Product Modal */}

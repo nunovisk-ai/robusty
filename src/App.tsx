@@ -15,8 +15,6 @@ import type {
   Order, 
   OrderStatus, 
   Appointment, 
-  Product, 
-  Vehicle,
   OpportunityComment,
   OpportunityHistoryEvent,
   OpportunityTask
@@ -935,14 +933,6 @@ export function App() {
     return true
   }
 
-  const handleSelectProductForBudget = (_prod: Product, vehicle?: Vehicle) => {
-    if (vehicle) {
-      setSelectedVehicleForBudget(vehicle.id)
-    }
-    setEditingOpportunity(null)
-    setActiveTab('budget')
-  }
-
   if (!currentUser) {
     return <LoginView onLoginSuccess={handleLoginSuccess} />
   }
@@ -1009,12 +999,7 @@ export function App() {
             />
           )}
 
-          {activeTab === 'catalog' && (
-            <CatalogView
-              onSelectForBudget={handleSelectProductForBudget}
-              onNavigateToBudget={handleOpenNewOpportunity}
-            />
-          )}
+          {activeTab === 'catalog' && <CatalogView />}
 
           {activeTab === 'orders' && (
             <OrdersView

@@ -14,7 +14,6 @@ import {
   Wrench,
   Pencil,
   Trash2,
-  Plus,
   AlertTriangle,
   FileText,
   Info,
@@ -26,7 +25,6 @@ interface ProductDetailModalProps {
   onClose: () => void
   onEdit: (product: Product) => void
   onDelete: (product: Product) => void
-  onSelectForBudget?: (product: Product, vehicle?: Vehicle) => void
 }
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
@@ -35,7 +33,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onClose,
   onEdit,
   onDelete,
-  onSelectForBudget,
 }) => {
   useEffect(() => {
     if (!product) return
@@ -329,23 +326,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-full text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition-colors cursor-pointer"
+              className="px-5 py-2 rounded-full text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
             >
               Fechar
             </button>
-            {onSelectForBudget && (
-              <button
-                type="button"
-                onClick={() => {
-                  onClose()
-                  onSelectForBudget(product, vehicle)
-                }}
-                className="flex items-center gap-1.5 px-5 py-2 rounded-full bg-[#EA580C] hover:bg-[#C2410C] text-white text-xs font-bold shadow-sm shadow-orange-500/20 transition-all cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Adicionar ao Orçamento</span>
-              </button>
-            )}
           </div>
         </div>
       </div>
