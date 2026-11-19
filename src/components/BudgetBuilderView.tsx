@@ -12,7 +12,10 @@ import type {
   AttachedDocument,
   OpportunityComment,
   OpportunityHistoryEvent,
-  OpportunityTask
+  OpportunityTask,
+  PersonType,
+  DocumentType,
+  PaymentSplit
 } from '../types'
 import { fetchVehicles, fetchProducts, calculateBudget, getMaxDiscountForPaymentMethod } from '../services/catalogService'
 import { lookupCep } from '../services/cepService'
@@ -26,7 +29,18 @@ import {
 import { generateProposalHtml, type ProposalPayload } from '../utils/proposalGenerator'
 import { ROBUSTY_LOGO_BASE64 } from '../assets/logoBase64'
 import type { CurrentUser } from './LoginView'
-import { formatBRPhone, formatBRCep, formatCurrency, getCleanVehicleModel, formatOrderCode } from '../utils/formatters'
+import { 
+  formatBRPhone, 
+  formatBRCep, 
+  formatCurrency, 
+  getCleanVehicleModel, 
+  formatOrderCode,
+  formatCPF,
+  formatCNPJ,
+  formatRG,
+  formatDocumentBy,
+  formatIE
+} from '../utils/formatters'
 import { 
   Truck, 
   Wrench, 
@@ -52,6 +66,7 @@ import {
   Upload,
   Eye,
   User,
+  Building2,
   Share2,
   ExternalLink,
   MessageSquare,
@@ -66,7 +81,9 @@ import {
   Lock,
   Pencil,
   Save,
-  Percent
+  Percent,
+  Split,
+  Palette
 } from 'lucide-react'
 import { 
   FaWhatsapp, 
@@ -203,6 +220,27 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     return formatBRPhone(raw.replace('+55', ''))
   })
   const [customerEmail, setCustomerEmail] = useState(() => initialOpportunity?.customer_email || initialOpportunity?.contact?.email || '')
+  
+  // Tipo de Pessoa (PF vs PJ) e Documentos com máscaras dinâmicas
+  const [personType, setPersonType] = useState<PersonType>(() => {
+    return initialOpportunity?.person_type || initialOpportunity?.contact?.person_type || 'fisica'
+  })
+  const [documentType, setDocumentType] = useState<DocumentType>(() => {
+    return initialOpportunity?.document_type || initialOpportunity?.contact?.document_type || 'cpf'
+  })
+  const [document, setDocument] = useState<string>(() => {
+    const raw = initialOpportunity?.document || initialOpportunity?.contact?.document || ''
+    const pType = initialOpportunity?.person_type || initialOpportunity?.contact?.person_type || 'fisica'
+    const dType = initialOpportunity?.document_type || initialOpportunity?.contact?.document_type || (pType === 'juridica' ? 'cnpj' : 'cpf')
+    return raw ? formatDocumentBy(raw, dType) : ''
+  })
+  const [stateRegistration, setStateRegistration] = useState<string>(() => {
+    return initialOpportunity?.state_registration || initialOpportunity?.contact?.state_registration || ''
+  })
+  const [tradeName, setTradeName] = useState<string>(() => {
+    return initialOpportunity?.trade_name || initialOpportunity?.contact?.trade_name || ''
+  })
+
   const [instagramUrl, setInstagramUrl] = useState(() => 
     initialOpportunity?.instagram_url || 
     initialOpportunity?.contact?.instagram_url || 
@@ -228,6 +266,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     if (orig === 'site_form' || orig === 'site') return 'site'
     if (orig === 'loja_presencial' || orig === 'manual') return 'manual'
     return 'whatsapp'
+  })
+
+  // Cor / Acabamento do Bagageiro / Produto
+  const [productColor, setProductColor] = useState<string>(() => {
+    return initialOpportunity?.product_color || 'Preto Epóxi'
   })
 
   // 2. Produtos Selecionados
@@ -258,9 +301,14 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [loadingCep, setLoadingCep] = useState(false)
   const [cepError, setCepError] = useState<string | null>(null)
 
-  // Transportadora
+  // Transportadora e Logística Oficial
   const [shippingCarrierName, setShippingCarrierName] = useState(() => initialOpportunity?.shipping_carrier_name || '')
   const [shippingTrackingCode, setShippingTrackingCode] = useState(() => initialOpportunity?.shipping_tracking_code || '')
+  const [shippingQuoteNumber, setShippingQuoteNumber] = useState<string>(() => initialOpportunity?.shipping_quote_number || '')
+  const [shippingCarrierContact, setShippingCarrierContact] = useState<string>(() => initialOpportunity?.shipping_carrier_contact || '')
+  const [deliveryLeadTime, setDeliveryLeadTime] = useState<string>(() => initialOpportunity?.delivery_lead_time || '')
+  const [productionLeadTime, setProductionLeadTime] = useState<string>(() => initialOpportunity?.production_lead_time || '')
+  const [shippingPackageDimensions, setShippingPackageDimensions] = useState<string>(() => initialOpportunity?.shipping_package_dimensions || '')
   const [freightValue, setFreightValue] = useState<number>(() => initialOpportunity?.freight_value || 0)
   const [pickupDate, setPickupDate] = useState<string>(() => initialOpportunity?.pickup_date || '')
   const [pickupTime, setPickupTime] = useState<string>(() => initialOpportunity?.pickup_time || '')
@@ -292,6 +340,20 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [discountPercent, setDiscountPercent] = useState<number>(() => {
     if (initialOpportunity?.discount_percent !== undefined) return initialOpportunity.discount_percent
     return 0
+  })
+
+  // Pagamento Dividido / Múltiplas Formas
+  const [paymentMode, setPaymentMode] = useState<'single' | 'split'>(() => {
+    if (initialOpportunity?.payment_splits && initialOpportunity.payment_splits.length > 1) {
+      return 'split'
+    }
+    return 'single'
+  })
+  const [paymentSplits, setPaymentSplits] = useState<PaymentSplit[]>(() => {
+    if (initialOpportunity?.payment_splits && initialOpportunity.payment_splits.length > 0) {
+      return initialOpportunity.payment_splits
+    }
+    return []
   })
 
   // UI state
@@ -542,11 +604,17 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       `*Identificador Único:* ${formatOrderCode(orderNumber)}`,
       `*Responsável:* ${assignedTo}`,
       `Olá ${customerName ? customerName : 'Cliente'}! Segue sua proposta oficial:`,
+      ...(document ? [`*${personType === 'juridica' ? 'CNPJ' : documentType.toUpperCase()}:* ${document}`] : []),
       ``,
       `*Veículo:* ${selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Utilitário'}`,
+      `*Acabamento/Cor:* ${productColor}`,
       `*Modalidade:* ${fulfillment === 'instalacao_loja' ? 'Instalação na Loja Robusty' : 'Envio por Transportadora'}`,
       ...(fulfillment === 'transportadora_envio' && city ? [`*Destino:* ${city}/${state} (CEP: ${cep})`] : []),
       ...(fulfillment === 'transportadora_envio' && shippingCarrierName ? [`*Transportadora:* ${shippingCarrierName}`] : []),
+      ...(fulfillment === 'transportadora_envio' && shippingQuoteNumber ? [`*Cotação Frete Nº:* ${shippingQuoteNumber}`] : []),
+      ...(fulfillment === 'transportadora_envio' && deliveryLeadTime ? [`*Prazo de Entrega:* ${deliveryLeadTime}`] : []),
+      ...(fulfillment === 'transportadora_envio' && productionLeadTime ? [`*Prazo de Produção:* ${productionLeadTime}`] : []),
+      ...(fulfillment === 'transportadora_envio' && shippingPackageDimensions ? [`*Dimensões do Volume:* ${shippingPackageDimensions}`] : []),
       ...(fulfillment === 'transportadora_envio' && shippingTrackingCode ? [`*Código de Rastreio:* ${shippingTrackingCode}`] : []),
       ...(fulfillment === 'transportadora_envio' && pickupDate ? [`*Previsão de Coleta:* ${pickupDate}${pickupTime ? ` às ${pickupTime}` : ' (horário a definir)'}`] : []),
       ...(fulfillment === 'instalacao_loja' && installationDate ? [`*Agendamento Instalação:* ${installationDate} às ${installationTime}`] : []),
@@ -564,13 +632,23 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       ...(fulfillment === 'instalacao_loja' && budget.installationValue > 0 ? [`• Custo de Instalação: ${formatCurrency(budget.installationValue)}`] : []),
       ``,
       `*VALOR TOTAL:* *${formatCurrency(budget.finalTotal)}*`,
-      `*Condição:* ${
-        paymentMethod === 'pix'
-          ? 'À vista no PIX (com desconto)'
-          : paymentMethod === 'boleto'
-          ? 'À vista no Boleto Bancário'
-          : `Cartão de Crédito em até ${cardInstallments}x de ${formatCurrency(budget.finalTotal / cardInstallments)}`
-      }`,
+      ...(paymentMode === 'split' && paymentSplits.length > 0
+        ? [
+            `*Condição de Pagamento (Dividido):*`,
+            ...paymentSplits.map((s, idx) => {
+              const methodLabel = s.method === 'pix' ? 'PIX / À vista' : s.method === 'cartao_link_igor' || s.method === 'cartao_presencial' ? `Cartão de Crédito (${s.installments || 1}x)` : s.method === 'boleto' ? 'Boleto Bancário' : 'Dinheiro / Transferência'
+              return `  ${idx + 1}. ${methodLabel}: ${formatCurrency(s.amount)}${s.notes ? ` (${s.notes})` : ''}`
+            })
+          ]
+        : [
+            `*Condição:* ${
+              paymentMethod === 'pix'
+                ? 'À vista no PIX (com desconto)'
+                : paymentMethod === 'boleto'
+                ? 'À vista no Boleto Bancário'
+                : `Cartão de Crédito em até ${cardInstallments}x de ${formatCurrency(budget.finalTotal / cardInstallments)}`
+            }`
+          ]),
       ``,
       `Qualquer dúvida estamos à disposição para confirmar seu pedido!`,
     ]
@@ -612,6 +690,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       customerName: customerName || 'Novo Cliente',
       customerPhone,
       customerEmail,
+      personType,
+      documentType: personType === 'fisica' ? documentType : 'cnpj',
+      document,
+      stateRegistration: personType === 'juridica' ? stateRegistration : undefined,
+      tradeName: personType === 'juridica' ? tradeName : undefined,
       instagramUrl: instagramUrl.trim() || undefined,
       facebookUrl: facebookUrl.trim() || undefined,
       websiteUrl: websiteUrl.trim() || undefined,
@@ -633,6 +716,12 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       freightValue,
       shippingCarrierName,
       shippingTrackingCode,
+      shippingQuoteNumber,
+      shippingCarrierContact,
+      deliveryLeadTime,
+      productionLeadTime,
+      shippingPackageDimensions,
+      productColor,
       pickupDate,
       pickupTime,
       installationDate,
@@ -643,6 +732,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       paymentMethod: (paymentMethod as PaymentMethod) || 'pix',
       discountPercent: budget.discountPercent,
       cardInstallments,
+      paymentSplits: paymentMode === 'split' ? paymentSplits : (paymentSplits.length > 0 ? paymentSplits : undefined),
       attachments: overrides?.attachments ?? attachments,
       comments: overrides?.comments ?? comments,
       history: overrides?.history ?? history,
@@ -812,6 +902,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       customerName,
       customerPhone,
       customerEmail,
+      personType,
+      documentType: personType === 'fisica' ? documentType : 'cnpj',
+      document,
+      stateRegistration: personType === 'juridica' ? stateRegistration : undefined,
+      tradeName: personType === 'juridica' ? tradeName : undefined,
       vehicleModel: selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Utilitário',
       items,
       budget,
@@ -819,6 +914,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       address: {
         street,
         number,
+        complement,
         neighborhood,
         city,
         state,
@@ -829,6 +925,15 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       installationDate,
       installationTime,
       paymentMethod: (paymentMethod as PaymentMethod) || 'pix',
+      cardInstallments,
+      paymentSplits: paymentMode === 'split' ? paymentSplits : undefined,
+      shippingCarrierName,
+      shippingQuoteNumber,
+      shippingCarrierContact,
+      deliveryLeadTime,
+      productionLeadTime,
+      shippingPackageDimensions,
+      productColor,
       totalWeightKg: effectiveWeightKg,
       assignedTo: currentUser?.name || assignedTo,
     }
@@ -985,12 +1090,12 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       url = URL.createObjectURL(blob)
     }
     if (url) {
-      const a = document.createElement('a')
+      const a = window.document.createElement('a')
       a.href = url
       a.download = doc.name
-      document.body.appendChild(a)
+      window.document.body.appendChild(a)
       a.click()
-      document.body.removeChild(a)
+      window.document.body.removeChild(a)
       return
     }
   }
@@ -1247,6 +1352,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
   const maxAllowedDiscount = getMaxDiscountForPaymentMethod(paymentMethod)
 
+  // Cálculos em tempo real para Pagamento Dividido
+  const totalSplitsAllocated = useMemo(() => {
+    return paymentSplits.reduce((acc, s) => acc + (Number(s.amount) || 0), 0)
+  }, [paymentSplits])
+
+  const remainingSplitBalance = Math.round((budget.finalTotal - totalSplitsAllocated) * 100) / 100
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Top Header with Back Button & Unique Identifier */}
@@ -1436,55 +1548,208 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
              ========================================================================= */}
           {activeFormTab === 'contact' && (
             <>
-              {/* Bloco 1.1: Dados do Contato */}
+              {/* Bloco 1.1: Dados do Contato / Cliente */}
               <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                  <span className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
                     <User className="w-4 h-4 text-[#EA580C]" />
-                    <span>1. Dados do Contato</span>
-                  </span>
-                  <span className="text-[11px] font-mono font-medium text-slate-400">{formatOrderCode(orderNumber)}</span>
-                </h3>
+                    <span>1. Dados do Contato / Cliente</span>
+                  </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {/* Nome do Cliente */}
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Nome do Cliente:</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Carlos Eduardo"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
-                    />
+                  {/* Seletor PF vs PJ */}
+                  <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPersonType('fisica')
+                        if (documentType === 'cnpj') setDocumentType('cpf')
+                        if (document) setDocument(formatCPF(document))
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        personType === 'fisica'
+                          ? 'bg-white text-slate-900 shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <User className="w-3.5 h-3.5 text-[#EA580C]" />
+                      <span>Pessoa Física (PF)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPersonType('juridica')
+                        setDocumentType('cnpj')
+                        if (document) setDocument(formatCNPJ(document))
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        personType === 'juridica'
+                          ? 'bg-white text-slate-900 shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <Building2 className="w-3.5 h-3.5 text-[#EA580C]" />
+                      <span>Pessoa Jurídica (PJ)</span>
+                    </button>
                   </div>
+                </div>
 
-                  {/* WhatsApp (com máscara brasileira DDD + número) */}
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">WhatsApp:</label>
-                    <input
-                      type="text"
-                      placeholder="(11) 99999-9999"
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(formatBRPhone(e.target.value))}
-                      className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
-                    />
+                {personType === 'fisica' ? (
+                  /* ================= CAMPOS PESSOA FÍSICA ================= */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Nome Completo */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Nome Completo do Cliente:</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Carlos Eduardo dos Santos"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
+                      />
+                    </div>
+
+                    {/* Documento com Tipo Dinâmico (CPF, RG ou CNH) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-bold text-slate-600">Documento:</label>
+                        <div className="flex items-center gap-1">
+                          {(['cpf', 'rg', 'cnh'] as const).map((docOpt) => (
+                            <button
+                              key={docOpt}
+                              type="button"
+                              onClick={() => {
+                                setDocumentType(docOpt)
+                                if (document) setDocument(formatDocumentBy(document, docOpt))
+                              }}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase cursor-pointer transition-all ${
+                                documentType === docOpt
+                                  ? 'bg-[#EA580C] text-white'
+                                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                              }`}
+                            >
+                              {docOpt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder={
+                          documentType === 'cpf'
+                            ? '000.000.000-00'
+                            : documentType === 'rg'
+                            ? '00.000.000-0'
+                            : '00000000000 (11 dígitos)'
+                        }
+                        value={document}
+                        onChange={(e) => setDocument(formatDocumentBy(e.target.value, documentType))}
+                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
+                      />
+                    </div>
+
+                    {/* WhatsApp */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">WhatsApp:</label>
+                      <input
+                        type="text"
+                        placeholder="(11) 99999-9999"
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(formatBRPhone(e.target.value))}
+                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
+                      />
+                    </div>
+
+                    {/* E-mail */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">E-mail:</label>
+                      <input
+                        type="email"
+                        placeholder="cliente@email.com.br"
+                        value={customerEmail}
+                        onChange={(e) => setCustomerEmail(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
+                      />
+                    </div>
                   </div>
+                ) : (
+                  /* ================= CAMPOS PESSOA JURÍDICA ================= */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Razão Social */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Razão Social:</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Empresa de Transportes e Frotas Ltda."
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
+                      />
+                    </div>
 
-                  {/* E-mail */}
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">E-mail:</label>
-                    <input
-                      type="email"
-                      placeholder="cliente@empresa.com.br"
-                      value={customerEmail}
-                      onChange={(e) => setCustomerEmail(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
-                    />
+                    {/* Nome Fantasia / Contato Responsável */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Nome Fantasia / Contato:</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Frotas Brasil - A/C Sr. Marcos"
+                        value={tradeName}
+                        onChange={(e) => setTradeName(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
+                      />
+                    </div>
+
+                    {/* CNPJ */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">CNPJ:</label>
+                      <input
+                        type="text"
+                        placeholder="00.000.000/0000-00"
+                        value={document}
+                        onChange={(e) => setDocument(formatCNPJ(e.target.value))}
+                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
+                      />
+                    </div>
+
+                    {/* Inscrição Estadual (IE) */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Inscrição Estadual (IE):</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: 123.456.789.012 ou ISENTO"
+                        value={stateRegistration}
+                        onChange={(e) => setStateRegistration(formatIE(e.target.value))}
+                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
+                      />
+                    </div>
+
+                    {/* WhatsApp */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Telefone Comercial / WhatsApp:</label>
+                      <input
+                        type="text"
+                        placeholder="(11) 99999-9999"
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(formatBRPhone(e.target.value))}
+                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 font-mono transition-all font-medium"
+                      />
+                    </div>
+
+                    {/* E-mail */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">E-mail Comercial / NFe:</label>
+                      <input
+                        type="email"
+                        placeholder="financeiro@empresa.com.br"
+                        value={customerEmail}
+                        onChange={(e) => setCustomerEmail(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/10 transition-all font-medium"
+                      />
+                    </div>
                   </div>
+                )}
 
-                  {/* Origem do Lead: WhatsApp, Instagram, Facebook, Manual, Site */}
-                  <div>
+                {/* Origem do Lead: WhatsApp, Instagram, Facebook, Manual, Site */}
+                <div className="pt-2 border-t border-slate-100">
                     <label className="text-[11px] font-bold text-slate-600 block mb-1">Origem do Lead:</label>
                     <div className="grid grid-cols-5 gap-1.5">
                       <button
@@ -1554,7 +1819,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     </div>
                   </div>
                 </div>
-              </div>
 
               {/* Bloco 1.2: Redes Sociais & Presença Digital (Instagram, Facebook e Website) */}
               <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-4">
@@ -1723,7 +1987,70 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 </div>
               </div>
 
-              {/* 2.2 Bagageiros e Acessórios Compatíveis */}
+              {/* 2.2 Cor e Acabamento do Bagageiro */}
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                    <Palette className="w-4 h-4 text-[#EA580C]" />
+                    <span>Acabamento & Cor do Bagageiro (*COR: PRETO/BRANCO*)</span>
+                  </h3>
+                  <span className="text-[11px] font-semibold text-slate-500">Padrão Oficial: Preto Epóxi</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {[
+                    { id: 'Preto Epóxi', label: 'Preto Epóxi', dotClass: 'bg-black border-slate-600' },
+                    { id: 'Branco Epóxi', label: 'Branco Epóxi', dotClass: 'bg-white border-slate-300' },
+                    { id: 'Cinza Alumínio', label: 'Cinza Alumínio', dotClass: 'bg-slate-400 border-slate-500' },
+                    { id: 'Personalizado', label: 'Outro / Especial...', dotClass: 'bg-gradient-to-tr from-amber-500 to-orange-500 border-orange-400' },
+                  ].map((opt) => {
+                    const isSelected =
+                      productColor === opt.id ||
+                      (opt.id === 'Personalizado' &&
+                        !['Preto Epóxi', 'Branco Epóxi', 'Cinza Alumínio'].includes(productColor))
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          if (opt.id === 'Personalizado') {
+                            if (['Preto Epóxi', 'Branco Epóxi', 'Cinza Alumínio'].includes(productColor)) {
+                              setProductColor('Sob Medida')
+                            }
+                          } else {
+                            setProductColor(opt.id)
+                          }
+                        }}
+                        className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-orange-50 border-[#EA580C] text-[#EA580C] font-bold shadow-xs'
+                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 font-medium'
+                        }`}
+                      >
+                        <span className={`w-3.5 h-3.5 rounded-full border shadow-xs shrink-0 ${opt.dotClass}`} />
+                        <span className="text-xs truncate">{opt.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {!['Preto Epóxi', 'Branco Epóxi', 'Cinza Alumínio'].includes(productColor) && (
+                  <div className="pt-2 animate-in fade-in-50">
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                      Especifique a Cor / Acabamento Especial:
+                    </label>
+                    <input
+                      type="text"
+                      value={productColor}
+                      onChange={(e) => setProductColor(e.target.value)}
+                      placeholder="Ex: Grafite Fosco, Amarelo Segurança..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-[#EA580C]"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* 2.3 Bagageiros e Acessórios Compatíveis */}
               <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -2070,8 +2397,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Nome da Transportadora e Código de Rastreio */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200/80">
+                    {/* Nome da Transportadora, Cotação Nº e Contato */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-200/80">
                       <div>
                         <label className="text-[11px] font-bold text-slate-600 block mb-1">
                           Nome da Transportadora:
@@ -2087,16 +2414,85 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                       <div>
                         <label className="text-[11px] font-bold text-slate-600 block mb-1">
-                          Código de Rastreio:
+                          Cotação Frete Nº:
                         </label>
                         <input
                           type="text"
-                          placeholder="Ex: BR123456789 ou NF-0045"
-                          value={shippingTrackingCode}
-                          onChange={(e) => setShippingTrackingCode(e.target.value)}
+                          placeholder="Ex: 21856"
+                          value={shippingQuoteNumber}
+                          onChange={(e) => setShippingQuoteNumber(e.target.value)}
                           className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
                         />
                       </div>
+
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                          Contato Transportadora:
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: (11) 3774-4674 / Sr. Marcos"
+                          value={shippingCarrierContact}
+                          onChange={(e) => setShippingCarrierContact(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Prazos de Produção e Entrega & Dimensões do Volume */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                          Prazo de Produção:
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 7 a 10 dias úteis"
+                          value={productionLeadTime}
+                          onChange={(e) => setProductionLeadTime(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                          Prazo de Entrega:
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 3 a 5 dias úteis"
+                          value={deliveryLeadTime}
+                          onChange={(e) => setDeliveryLeadTime(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                          Dimensões Volume (C x L x A):
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 220 x 140 x 35 cm"
+                          value={shippingPackageDimensions}
+                          onChange={(e) => setShippingPackageDimensions(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Código de Rastreio / NF */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        Código de Rastreio / Nota Fiscal:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ex: BR123456789 ou NF-0045"
+                        value={shippingTrackingCode}
+                        onChange={(e) => setShippingTrackingCode(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
+                      />
                     </div>
 
                     {/* Programação da Coleta */}
@@ -2859,124 +3255,354 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               )}
             </div>
 
-            {/* Condição de Pagamento (Obrigatório selecionar primeiro a forma de pagamento antes dos descontos) */}
+            {/* Condição de Pagamento (Suporte a Forma Única ou Múltiplas Formas / Pagamento Dividido) */}
             <div className="pt-3 border-t border-slate-100 mb-4 space-y-3">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                Forma de Pagamento:
-              </label>
-
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handlePaymentMethodSelect('pix')}
-                  className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    paymentMethod === 'pix'
-                      ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-xs'
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  <Banknote className="w-3.5 h-3.5" />
-                  <span>À vista</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handlePaymentMethodSelect('boleto')}
-                  className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    paymentMethod === 'boleto'
-                      ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-xs'
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  <ReceiptText className="w-3.5 h-3.5" />
-                  <span>Boleto</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handlePaymentMethodSelect('cartao_link_igor')}
-                  className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    paymentMethod === 'cartao_link_igor' || paymentMethod === 'cartao_presencial'
-                      ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-xs'
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  <CreditCard className="w-3.5 h-3.5" />
-                  <span>Cartão de Crédito</span>
-                </button>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                  Condição de Pagamento:
+                </label>
+                
+                {/* Toggle Modo Único vs Dividido */}
+                <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMode('single')}
+                    className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                      paymentMode === 'single'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Forma Única
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentMode('split')
+                      if (paymentSplits.length === 0) {
+                        setPaymentSplits([
+                          {
+                            id: `split-${Date.now()}`,
+                            method: (paymentMethod as PaymentMethod) || 'pix',
+                            amount: budget.finalTotal,
+                            installments: cardInstallments || 1,
+                            notes: ''
+                          }
+                        ])
+                      }
+                    }}
+                    className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                      paymentMode === 'split'
+                        ? 'bg-white text-[#EA580C] shadow-2xs font-extrabold'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Split className="w-3 h-3" />
+                    <span>Dividido / Misto</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Se for Cartão: Seleção de Parcelas */}
-              {(paymentMethod === 'cartao_link_igor' || paymentMethod === 'cartao_presencial') && (
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-slate-600 font-bold">Parcelas no Cartão:</span>
-                    <span className="font-mono text-slate-800 font-bold">
-                      {cardInstallments}x de {formatCurrency(budget.finalTotal / cardInstallments)}
-                    </span>
-                  </div>
-                  <select
-                    value={cardInstallments}
-                    onChange={(e) => setCardInstallments(parseInt(e.target.value))}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono cursor-pointer"
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                      <option key={num} value={num}>
-                        {num}x sem juros ({formatCurrency(budget.finalTotal / num)})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {paymentMode === 'single' ? (
+                /* ================= MODO FORMA ÚNICA ================= */
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handlePaymentMethodSelect('pix')}
+                      className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                        paymentMethod === 'pix'
+                          ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Banknote className="w-3.5 h-3.5" />
+                      <span>À vista</span>
+                    </button>
 
-              {/* Concessão de Desconto Comercial (Exceção) para À vista ou Boleto */}
-              {(paymentMethod === 'pix' || paymentMethod === 'boleto') && maxAllowedDiscount > 0 && (
-                <div>
-                  {discountPercent === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => handlePaymentMethodSelect('boleto')}
+                      className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                        paymentMethod === 'boleto'
+                          ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <ReceiptText className="w-3.5 h-3.5" />
+                      <span>Boleto</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handlePaymentMethodSelect('cartao_link_igor')}
+                      className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                        paymentMethod === 'cartao_link_igor' || paymentMethod === 'cartao_presencial'
+                          ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <CreditCard className="w-3.5 h-3.5" />
+                      <span>Cartão</span>
+                    </button>
+                  </div>
+
+                  {/* Se for Cartão: Seleção de Parcelas */}
+                  {(paymentMethod === 'cartao_link_igor' || paymentMethod === 'cartao_presencial') && (
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-slate-600 font-bold">Parcelas no Cartão:</span>
+                        <span className="font-mono text-slate-800 font-bold">
+                          {cardInstallments}x de {formatCurrency(budget.finalTotal / cardInstallments)}
+                        </span>
+                      </div>
+                      <select
+                        value={cardInstallments}
+                        onChange={(e) => setCardInstallments(parseInt(e.target.value))}
+                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono cursor-pointer"
+                      >
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                          <option key={num} value={num}>
+                            {num}x sem juros ({formatCurrency(budget.finalTotal / num)})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Concessão de Desconto Comercial (Exceção) para À vista ou Boleto */}
+                  {(paymentMethod === 'pix' || paymentMethod === 'boleto') && maxAllowedDiscount > 0 && (
+                    <div>
+                      {discountPercent === 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTempDiscountPercent(0)
+                            setDiscountModalOpen(true)
+                          }}
+                          className="w-full py-2.5 px-3 border border-dashed border-slate-300 hover:border-[#EA580C] hover:bg-orange-50/50 rounded-xl text-xs font-semibold text-slate-600 hover:text-[#EA580C] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <Percent className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Conceder Desconto (Exceção)</span>
+                        </button>
+                      ) : (
+                        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs space-y-1.5 animate-in fade-in-50">
+                          <div className="flex items-center justify-between text-emerald-900 font-bold">
+                            <div className="flex items-center gap-1.5">
+                              <Percent className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Desconto Concedido: {discountPercent}%</span>
+                            </div>
+                            <span className="font-mono text-emerald-700">-{formatCurrency(budget.discountValue)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-emerald-200/60">
+                            <span className="italic">Exceção comercial autorizada</span>
+                            <div className="flex items-center gap-2 font-bold">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTempDiscountPercent(discountPercent)
+                                  setDiscountModalOpen(true)
+                                }}
+                                className="text-[#EA580C] hover:underline cursor-pointer"
+                              >
+                                Alterar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDiscountPercent(0)}
+                                className="text-rose-600 hover:underline cursor-pointer"
+                              >
+                                Remover
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* ================= MODO PAGAMENTO DIVIDIDO (MÚLTIPLAS FORMAS) ================= */
+                <div className="space-y-3">
+                  {/* Painel de Alocação de Saldo em Tempo Real */}
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-600">Total do Pedido:</span>
+                      <span className="font-mono font-bold text-slate-900">{formatCurrency(budget.finalTotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-600">Total Alocado:</span>
+                      <span className="font-mono font-bold text-emerald-700">{formatCurrency(totalSplitsAllocated)}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200">
+                      <span className="font-semibold text-slate-700">Saldo Restante:</span>
+                      {remainingSplitBalance === 0 ? (
+                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Check className="w-3 h-3" /> 100% Distribuído
+                        </span>
+                      ) : remainingSplitBalance > 0 ? (
+                        <span className="font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                          +{formatCurrency(remainingSplitBalance)}
+                        </span>
+                      ) : (
+                        <span className="font-mono font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                          Excesso: {formatCurrency(Math.abs(remainingSplitBalance))}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Lista de Formas de Pagamento Adicionadas */}
+                  <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                    {paymentSplits.map((split, index) => {
+                      const isCard = split.method === 'cartao_link_igor' || split.method === 'cartao_presencial'
+                      return (
+                        <div
+                          key={split.id || index}
+                          className="p-2.5 bg-white border border-slate-200 rounded-xl space-y-2 shadow-2xs"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">
+                              Forma #{index + 1}
+                            </span>
+                            {paymentSplits.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPaymentSplits((prev) => prev.filter((_, i) => i !== index))
+                                }}
+                                className="text-slate-400 hover:text-rose-600 p-0.5 cursor-pointer"
+                                title="Remover esta forma"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            {/* Método */}
+                            <div>
+                              <select
+                                value={split.method}
+                                onChange={(e) => {
+                                  const nextMethod = e.target.value as PaymentMethod
+                                  setPaymentSplits((prev) =>
+                                    prev.map((s, i) => (i === index ? { ...s, method: nextMethod } : s))
+                                  )
+                                }}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-[#EA580C] font-medium cursor-pointer"
+                              >
+                                <option value="pix">PIX / À vista</option>
+                                <option value="cartao_link_igor">Cartão de Crédito</option>
+                                <option value="boleto">Boleto Bancário</option>
+                                <option value="dinheiro">Dinheiro / Transf.</option>
+                              </select>
+                            </div>
+
+                            {/* Valor (R$) */}
+                            <div>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="R$ 0,00"
+                                value={split.amount || ''}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0
+                                  setPaymentSplits((prev) =>
+                                    prev.map((s, i) => (i === index ? { ...s, amount: val } : s))
+                                  )
+                                }}
+                                className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-[#EA580C]"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Se for Cartão: Parcelas */}
+                          {isCard && (
+                            <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200/80">
+                              <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">Parcelamento:</span>
+                              <select
+                                value={split.installments || 1}
+                                onChange={(e) => {
+                                  const inst = parseInt(e.target.value) || 1
+                                  setPaymentSplits((prev) =>
+                                    prev.map((s, i) => (i === index ? { ...s, installments: inst } : s))
+                                  )
+                                }}
+                                className="flex-1 bg-white border border-slate-200 rounded px-1.5 py-1 text-[11px] text-slate-800 font-mono focus:outline-none focus:border-[#EA580C]"
+                              >
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                                  <option key={n} value={n}>
+                                    {n}x de {formatCurrency((split.amount || 0) / n)}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
+                          {/* Observação rápida */}
+                          <div>
+                            <input
+                              type="text"
+                              placeholder="Observação (ex: Entrada PIX, Restante na entrega)"
+                              value={split.notes || ''}
+                              onChange={(e) => {
+                                const txt = e.target.value
+                                setPaymentSplits((prev) =>
+                                  prev.map((s, i) => (i === index ? { ...s, notes: txt } : s))
+                                )
+                              }}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] text-slate-700 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C]"
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Ações do Pagamento Dividido */}
+                  <div className="flex items-center gap-2 pt-1">
                     <button
                       type="button"
                       onClick={() => {
-                        setTempDiscountPercent(0)
-                        setDiscountModalOpen(true)
+                        const newSplitAmount = remainingSplitBalance > 0 ? remainingSplitBalance : 0
+                        setPaymentSplits((prev) => [
+                          ...prev,
+                          {
+                            id: `split-${Date.now()}`,
+                            method: 'cartao_link_igor',
+                            amount: newSplitAmount,
+                            installments: 5,
+                            notes: ''
+                          }
+                        ])
                       }}
-                      className="w-full py-2.5 px-3 border border-dashed border-slate-300 hover:border-[#EA580C] hover:bg-orange-50/50 rounded-xl text-xs font-semibold text-slate-600 hover:text-[#EA580C] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      className="flex-1 py-2 px-2.5 bg-orange-50 hover:bg-orange-100 text-[#EA580C] border border-orange-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                     >
-                      <Percent className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Conceder Desconto (Exceção)</span>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Adicionar Forma</span>
                     </button>
-                  ) : (
-                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs space-y-1.5 animate-in fade-in-50">
-                      <div className="flex items-center justify-between text-emerald-900 font-bold">
-                        <div className="flex items-center gap-1.5">
-                          <Percent className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Desconto Concedido: {discountPercent}%</span>
-                        </div>
-                        <span className="font-mono text-emerald-700">-{formatCurrency(budget.discountValue)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-emerald-200/60">
-                        <span className="italic">Exceção comercial autorizada</span>
-                        <div className="flex items-center gap-2 font-bold">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setTempDiscountPercent(discountPercent)
-                              setDiscountModalOpen(true)
-                            }}
-                            className="text-[#EA580C] hover:underline cursor-pointer"
-                          >
-                            Alterar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDiscountPercent(0)}
-                            className="text-rose-600 hover:underline cursor-pointer"
-                          >
-                            Remover
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+
+                    {remainingSplitBalance > 0 && paymentSplits.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaymentSplits((prev) => {
+                            const lastIdx = prev.length - 1
+                            return prev.map((s, idx) =>
+                              idx === lastIdx ? { ...s, amount: Math.round(((s.amount || 0) + remainingSplitBalance) * 100) / 100 } : s
+                            )
+                          })
+                        }}
+                        className="py-2 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                        title="Completar o saldo que falta nesta última forma"
+                      >
+                        Auto-completar
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

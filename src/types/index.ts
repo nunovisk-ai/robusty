@@ -84,6 +84,17 @@ export interface Product {
   is_active: boolean
 }
 
+export type PersonType = 'fisica' | 'juridica'
+export type DocumentType = 'cpf' | 'rg' | 'cnh' | 'cnpj'
+
+export interface PaymentSplit {
+  id: string
+  method: PaymentMethod | 'cartao_credito' | 'dinheiro' | 'outro'
+  amount: number
+  installments?: number
+  notes?: string
+}
+
 export interface Contact {
   id: string
   full_name: string
@@ -94,7 +105,11 @@ export interface Contact {
   facebook_url?: string
   website_url?: string
   email?: string
+  person_type?: PersonType
+  document_type?: DocumentType
   document?: string
+  state_registration?: string
+  trade_name?: string
   origin: LeadOrigin
   notes?: string
   tags?: string[]
@@ -202,6 +217,18 @@ export interface Opportunity {
   website_url?: string
   total_weight_kg?: number
   customer_email?: string
+  person_type?: PersonType
+  document_type?: DocumentType
+  document?: string
+  state_registration?: string
+  trade_name?: string
+  shipping_quote_number?: string
+  shipping_carrier_contact?: string
+  delivery_lead_time?: string
+  production_lead_time?: string
+  shipping_package_dimensions?: string
+  product_color?: string
+  payment_splits?: PaymentSplit[]
   address?: Partial<Address>
   lost_reason?: string
   notes?: string
@@ -224,6 +251,18 @@ export interface Order {
   contact_id: string
   contact?: Contact
   customer_email?: string
+  person_type?: PersonType
+  document_type?: DocumentType
+  document?: string
+  state_registration?: string
+  trade_name?: string
+  shipping_quote_number?: string
+  shipping_carrier_contact?: string
+  delivery_lead_time?: string
+  production_lead_time?: string
+  shipping_package_dimensions?: string
+  product_color?: string
+  payment_splits?: PaymentSplit[]
   fulfillment_type: FulfillmentType
   status: OrderStatus
   payment_status: string

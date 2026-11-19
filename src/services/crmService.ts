@@ -16,6 +16,9 @@ import type {
   Order,
   OrderStatus,
   PaymentMethod,
+  PersonType,
+  DocumentType,
+  PaymentSplit,
   Product,
   Vehicle,
 } from '../types'
@@ -64,7 +67,11 @@ function mapContactRow(raw: any): Contact | undefined {
     facebook_url: raw.facebook_url || undefined,
     website_url: raw.website_url || undefined,
     email: raw.email || undefined,
+    person_type: (raw.person_type || 'fisica') as PersonType,
+    document_type: (raw.document_type || 'cpf') as DocumentType,
     document: raw.document || undefined,
+    state_registration: raw.state_registration || undefined,
+    trade_name: raw.trade_name || undefined,
     origin: (raw.origin || 'whatsapp_inbound') as LeadOrigin,
     notes: raw.notes || undefined,
     tags: Array.isArray(raw.tags) ? raw.tags : [],
@@ -173,6 +180,18 @@ function mapOpportunityRow(row: any): Opportunity {
         ? toNumber(row.total_weight_kg)
         : undefined,
     customer_email: row.customer_email || contact?.email || undefined,
+    person_type: (row.person_type || contact?.person_type || 'fisica') as PersonType,
+    document_type: (row.document_type || contact?.document_type || 'cpf') as DocumentType,
+    document: row.document || contact?.document || undefined,
+    state_registration: row.state_registration || contact?.state_registration || undefined,
+    trade_name: row.trade_name || contact?.trade_name || undefined,
+    shipping_quote_number: row.shipping_quote_number || undefined,
+    shipping_carrier_contact: row.shipping_carrier_contact || undefined,
+    delivery_lead_time: row.delivery_lead_time || undefined,
+    production_lead_time: row.production_lead_time || undefined,
+    shipping_package_dimensions: row.shipping_package_dimensions || undefined,
+    product_color: row.product_color || 'Preto Epóxi',
+    payment_splits: Array.isArray(row.payment_splits) ? row.payment_splits : [],
     address: extractPrimaryAddress(row.address, row.contact?.addresses),
     lost_reason: row.lost_reason || undefined,
     notes: row.notes || undefined,
@@ -201,6 +220,20 @@ function mapOrderRow(row: any): Order {
     contact_id: row.contact_id,
     contact: contact || opportunity?.contact,
     customer_email: row.customer_email || contact?.email || opportunity?.customer_email || undefined,
+    person_type: (row.person_type || opportunity?.person_type || contact?.person_type || 'fisica') as PersonType,
+    document_type: (row.document_type || opportunity?.document_type || contact?.document_type || 'cpf') as DocumentType,
+    document: row.document || opportunity?.document || contact?.document || undefined,
+    state_registration: row.state_registration || opportunity?.state_registration || contact?.state_registration || undefined,
+    trade_name: row.trade_name || opportunity?.trade_name || contact?.trade_name || undefined,
+    shipping_quote_number: row.shipping_quote_number || opportunity?.shipping_quote_number || undefined,
+    shipping_carrier_contact: row.shipping_carrier_contact || opportunity?.shipping_carrier_contact || undefined,
+    delivery_lead_time: row.delivery_lead_time || opportunity?.delivery_lead_time || undefined,
+    production_lead_time: row.production_lead_time || opportunity?.production_lead_time || undefined,
+    shipping_package_dimensions: row.shipping_package_dimensions || opportunity?.shipping_package_dimensions || undefined,
+    product_color: row.product_color || opportunity?.product_color || 'Preto Epóxi',
+    payment_splits: Array.isArray(row.payment_splits)
+      ? row.payment_splits
+      : opportunity?.payment_splits || [],
     fulfillment_type: row.fulfillment_type as FulfillmentType,
     status: row.status as OrderStatus,
     payment_status: row.payment_status || 'pendente',
@@ -315,6 +348,11 @@ export interface SaveOpportunityPayload {
   customerName: string
   customerPhone?: string
   customerEmail?: string
+  personType?: PersonType
+  documentType?: DocumentType
+  document?: string
+  stateRegistration?: string
+  tradeName?: string
   instagramUrl?: string
   facebookUrl?: string
   websiteUrl?: string
@@ -331,12 +369,19 @@ export interface SaveOpportunityPayload {
   finalTotal: number
   paymentMethod?: PaymentMethod
   cardInstallments?: number
+  paymentSplits?: PaymentSplit[]
   pickupDate?: string
   pickupTime?: string
   installationDate?: string
   installationTime?: string
   shippingCarrierName?: string
   shippingTrackingCode?: string
+  shippingQuoteNumber?: string
+  shippingCarrierContact?: string
+  deliveryLeadTime?: string
+  productionLeadTime?: string
+  shippingPackageDimensions?: string
+  productColor?: string
   totalWeightKg?: number
   address?: Partial<Address>
   items?: Array<{ product: Product; quantity: number }>
@@ -354,6 +399,11 @@ async function upsertContact(payload: SaveOpportunityPayload): Promise<Contact> 
   const contactFields = {
     full_name: payload.customerName?.trim() || 'Novo Cliente',
     email: payload.customerEmail?.trim() || null,
+    person_type: payload.personType || 'fisica',
+    document_type: payload.documentType || 'cpf',
+    document: payload.document?.trim() || null,
+    state_registration: payload.stateRegistration?.trim() || null,
+    trade_name: payload.tradeName?.trim() || null,
     instagram_handle: payload.instagramUrl?.trim() || null,
     instagram_url: payload.instagramUrl?.trim() || null,
     facebook_url: payload.facebookUrl?.trim() || null,
@@ -608,6 +658,18 @@ export async function saveOpportunityToSupabase(
         ? toNumber(payload.totalWeightKg)
         : null,
     customer_email: payload.customerEmail?.trim() || null,
+    person_type: payload.personType || contact.person_type || 'fisica',
+    document_type: payload.documentType || contact.document_type || 'cpf',
+    document: payload.document?.trim() || contact.document || null,
+    state_registration: payload.stateRegistration?.trim() || contact.state_registration || null,
+    trade_name: payload.tradeName?.trim() || contact.trade_name || null,
+    shipping_quote_number: payload.shippingQuoteNumber?.trim() || null,
+    shipping_carrier_contact: payload.shippingCarrierContact?.trim() || null,
+    delivery_lead_time: payload.deliveryLeadTime?.trim() || null,
+    production_lead_time: payload.productionLeadTime?.trim() || null,
+    shipping_package_dimensions: payload.shippingPackageDimensions?.trim() || null,
+    product_color: payload.productColor?.trim() || 'Preto Epóxi',
+    payment_splits: payload.paymentSplits ?? [],
     address: hasAddress ? payload.address : null,
     attachments: cleanAttachments,
     comments: payload.comments ?? [],
@@ -661,6 +723,18 @@ export async function saveOpportunityToSupabase(
         contact_id: contact.id,
         assigned_to: payload.assignedTo || null,
         customer_email: payload.customerEmail?.trim() || null,
+        person_type: payload.personType || contact.person_type || 'fisica',
+        document_type: payload.documentType || contact.document_type || 'cpf',
+        document: payload.document?.trim() || contact.document || null,
+        state_registration: payload.stateRegistration?.trim() || contact.state_registration || null,
+        trade_name: payload.tradeName?.trim() || contact.trade_name || null,
+        shipping_quote_number: payload.shippingQuoteNumber?.trim() || null,
+        shipping_carrier_contact: payload.shippingCarrierContact?.trim() || null,
+        delivery_lead_time: payload.deliveryLeadTime?.trim() || null,
+        production_lead_time: payload.productionLeadTime?.trim() || null,
+        shipping_package_dimensions: payload.shippingPackageDimensions?.trim() || null,
+        product_color: payload.productColor?.trim() || 'Preto Epóxi',
+        payment_splits: payload.paymentSplits ?? [],
         instagram_url: payload.instagramUrl?.trim() || null,
         facebook_url: payload.facebookUrl?.trim() || null,
         website_url: payload.websiteUrl?.trim() || null,
@@ -792,6 +866,18 @@ export async function upsertOrderInSupabase(opp: Opportunity): Promise<Order> {
     contact_id: opp.contact_id,
     assigned_to: opp.assigned_to || 'Igor',
     customer_email: opp.customer_email || opp.contact?.email || null,
+    person_type: opp.person_type || opp.contact?.person_type || 'fisica',
+    document_type: opp.document_type || opp.contact?.document_type || 'cpf',
+    document: opp.document || opp.contact?.document || null,
+    state_registration: opp.state_registration || opp.contact?.state_registration || null,
+    trade_name: opp.trade_name || opp.contact?.trade_name || null,
+    shipping_quote_number: opp.shipping_quote_number || null,
+    shipping_carrier_contact: opp.shipping_carrier_contact || null,
+    delivery_lead_time: opp.delivery_lead_time || null,
+    production_lead_time: opp.production_lead_time || null,
+    shipping_package_dimensions: opp.shipping_package_dimensions || null,
+    product_color: opp.product_color || 'Preto Epóxi',
+    payment_splits: opp.payment_splits || [],
     instagram_url: opp.instagram_url || opp.contact?.instagram_url || null,
     facebook_url: opp.facebook_url || opp.contact?.facebook_url || null,
     website_url: opp.website_url || opp.contact?.website_url || null,
