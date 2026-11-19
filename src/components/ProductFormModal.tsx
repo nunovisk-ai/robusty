@@ -398,7 +398,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <span>3. Preço</span>
               </h4>
 
-              <div className="bg-[#F8F9FA] p-4 rounded-2xl border border-slate-200/70 space-y-3">
+              <div className="bg-[#F8F9FA] p-4 rounded-2xl border border-slate-200/70">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
@@ -457,10 +457,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       )}
                   </div>
                 </div>
-
-                <p className="text-[11px] text-slate-500 leading-relaxed pt-1 border-t border-slate-200/60">
-                  As condições de pagamento e descontos (cartão de crédito em até 10x sem desconto, boleto até 5% e à vista — dinheiro, PIX, débito ou transferência — até 10%) são aplicados sobre o valor final no orçamento.
-                </p>
               </div>
             </div>
           </div>

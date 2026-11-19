@@ -14,7 +14,6 @@ import {
   Trash2,
   AlertTriangle,
   FileText,
-  Info,
 } from 'lucide-react'
 
 interface ProductDetailModalProps {
@@ -222,13 +221,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     ? `+${formatCurrency(product.installation_cost)}`
                     : 'Sem taxa adicional'}
                 </span>
-              </div>
-
-              <div className="pt-2.5 border-t border-slate-200/70 flex items-start gap-2 text-[11px] text-slate-500">
-                <Info className="w-3.5 h-3.5 text-[#EA580C] shrink-0 mt-0.5" />
-                <p className="leading-relaxed">
-                  Descontos e condições de pagamento (cartão de crédito em até 10x sem desconto, boleto até 5% e à vista — dinheiro, PIX, débito ou transferência — até 10%) são aplicados sobre o valor final no orçamento.
-                </p>
               </div>
             </div>
           </div>
