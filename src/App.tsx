@@ -454,6 +454,7 @@ export function App() {
   // Open existing Opportunity/Order in Gerador de Orçamento
   const handleSelectOpportunityToEdit = (opp: Opportunity) => {
     setEditingOpportunity(opp)
+    setBudgetInstanceKey(Date.now())
     setActiveTab('budget')
   }
 
@@ -606,8 +607,13 @@ export function App() {
     }
   }
 
+  // Auto-save: atualiza o perfil do lead/oportunidade imediatamente sem redirecionar para fora
+  const handleAutoSaveOpportunity = async (data: any) => {
+    await handleSaveOpportunity(data, { stayOnPage: true })
+  }
+
   // 1. Salvar: cria ou atualiza card no Funil de Vendas e reflete no Funil de Pedidos
-  const handleSaveOpportunity = async (data: any) => {
+  const handleSaveOpportunity = async (data: any, options?: { stayOnPage?: boolean }) => {
     const isEditing = opportunities.some((o) => o.id === data.id)
     const existingOpp = opportunities.find((o) => o.id === data.id)
 
@@ -663,10 +669,10 @@ export function App() {
         discount_applied: 0,
         total_price: i.product.base_price_10x * i.quantity,
       })),
-      attachments: data.attachments || existingOpp?.attachments || [],
-      comments: data.comments || existingOpp?.comments || [],
-      history: data.history || existingOpp?.history || [],
-      tasks: data.tasks || existingOpp?.tasks || [],
+      attachments: data.attachments ?? existingOpp?.attachments ?? [],
+      comments: data.comments ?? existingOpp?.comments ?? [],
+      history: data.history ?? existingOpp?.history ?? [],
+      tasks: data.tasks ?? existingOpp?.tasks ?? [],
       created_at: existingOpp?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
@@ -699,10 +705,10 @@ export function App() {
             shipping_carrier_name: data.shippingCarrierName || ord.shipping_carrier_name,
             shipping_tracking_code: data.shippingTrackingCode || ord.shipping_tracking_code,
             total_weight_kg: data.totalWeightKg,
-            attachments: data.attachments || existingOpp?.attachments || [],
-            comments: data.comments || existingOpp?.comments || [],
-            history: data.history || existingOpp?.history || [],
-            tasks: data.tasks || existingOpp?.tasks || [],
+            attachments: data.attachments ?? existingOpp?.attachments ?? [],
+            comments: data.comments ?? existingOpp?.comments ?? [],
+            history: data.history ?? existingOpp?.history ?? [],
+            tasks: data.tasks ?? existingOpp?.tasks ?? [],
           }
         }
         return ord
@@ -737,8 +743,12 @@ export function App() {
       state: data.address?.state,
     }).catch((err) => console.warn('Supabase sync skipped:', err))
 
-    setEditingOpportunity(null)
-    setActiveTab('kanban')
+    if (options?.stayOnPage) {
+      setEditingOpportunity(updatedOpp)
+    } else {
+      setEditingOpportunity(null)
+      setActiveTab('kanban')
+    }
   }
 
   // 2. Gerar Pedido: integra o card diretamente com o Funil de Pedidos
@@ -798,10 +808,10 @@ export function App() {
         discount_applied: 0,
         total_price: i.product.base_price_10x * i.quantity,
       })),
-      attachments: data.attachments || existingOpp?.attachments || [],
-      comments: data.comments || existingOpp?.comments || [],
-      history: data.history || existingOpp?.history || [],
-      tasks: data.tasks || existingOpp?.tasks || [],
+      attachments: data.attachments ?? existingOpp?.attachments ?? [],
+      comments: data.comments ?? existingOpp?.comments ?? [],
+      history: data.history ?? existingOpp?.history ?? [],
+      tasks: data.tasks ?? existingOpp?.tasks ?? [],
       created_at: existingOpp?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
@@ -876,10 +886,10 @@ export function App() {
         installation_date: data.installationDate,
         installation_time: data.installationTime,
         total_weight_kg: data.totalWeightKg,
-        attachments: data.attachments || existingOpp?.attachments || [],
-        comments: data.comments || existingOpp?.comments || [],
-        history: data.history || existingOpp?.history || [],
-        tasks: data.tasks || existingOpp?.tasks || [],
+        attachments: data.attachments ?? existingOpp?.attachments ?? [],
+        comments: data.comments ?? existingOpp?.comments ?? [],
+        history: data.history ?? existingOpp?.history ?? [],
+        tasks: data.tasks ?? existingOpp?.tasks ?? [],
         created_at: new Date().toISOString(),
       }
       setOrders((prev) => [newOrder, ...prev])
@@ -982,7 +992,7 @@ export function App() {
 
           {activeTab === 'budget' && (
             <BudgetBuilderView
-              key={editingOpportunity ? editingOpportunity.id : `new-budget-${budgetInstanceKey}`}
+              key={budgetInstanceKey}
               initialVehicleId={selectedVehicleForBudget}
               initialOpportunity={editingOpportunity}
               existingOrderNumber={nextOpportunityNumber}
@@ -991,6 +1001,7 @@ export function App() {
               existingAppointments={appointments}
               currentUser={currentUser}
               onSaveToKanban={handleSaveOpportunity}
+              onAutoSaveOpportunity={handleAutoSaveOpportunity}
               onGenerateOrder={handleGenerateOrderFromBudget}
               onDeleteOpportunity={handleDeleteOpportunity}
               onMarkLost={handleMarkOpportunityLost}

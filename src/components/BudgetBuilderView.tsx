@@ -86,7 +86,8 @@ interface BudgetBuilderViewProps {
   existingOpportunities?: Opportunity[]
   existingAppointments?: Appointment[]
   currentUser?: CurrentUser | null
-  onSaveToKanban?: (opportunityData: any) => void
+  onSaveToKanban?: (opportunityData: any, options?: { stayOnPage?: boolean }) => void
+  onAutoSaveOpportunity?: (opportunityData: any) => void
   onGenerateOrder?: (opportunityData: any) => void
   onDeleteOpportunity?: (oppId: string) => void
   onMarkLost?: (oppId: string) => void
@@ -115,6 +116,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   existingAppointments = [],
   currentUser,
   onSaveToKanban,
+  onAutoSaveOpportunity,
   onGenerateOrder,
   onDeleteOpportunity,
   onMarkLost,
@@ -132,6 +134,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     if (existingOrderNumber) return existingOrderNumber
     return 1
   })
+
+  // ID Estável da Oportunidade (garante que múltiplos auto-salvamentos de comentários/tarefas atualizem o mesmo card)
+  const [opportunityId] = useState<string>(() => initialOpportunity?.id || `opp-${Date.now()}`)
 
   // Responsável: Igor, Norlando ou Loja (por padrão vazio para nova oportunidade)
   const [assignedTo, setAssignedTo] = useState<'Igor' | 'Norlando' | 'Loja' | ''>(() => {
@@ -266,7 +271,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     return [
       {
         id: `hist-init-${Date.now()}`,
-        opportunity_id: initialOpportunity?.id,
+        opportunity_id: opportunityId,
         type: 'created',
         description: `Orçamento ${formatOrderCode(orderNumber)} criado no CRM`,
         user: assignedTo,
@@ -283,6 +288,10 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [newTaskTime, setNewTaskTime] = useState('')
   const [newTaskAssignee, setNewTaskAssignee] = useState<'Norlando' | 'Igor' | 'Loja' | ''>('')
   const [historyFilter, setHistoryFilter] = useState<'all' | 'comments' | 'history'>('all')
+
+  // Feedback visual de salvamento imediato
+  const [commentSavedMsg, setCommentSavedMsg] = useState(false)
+  const [taskSavedMsg, setTaskSavedMsg] = useState(false)
 
   // Modais Padronizados
   const [conflictModalOpen, setConflictModalOpen] = useState(false)
@@ -308,6 +317,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   }, [vehicles])
 
   const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId)
+
+  // Verifica se a oportunidade já está salva no CRM (original ou via auto-save)
+  const isOpportunitySaved = useMemo(() => {
+    return Boolean(initialOpportunity || existingOpportunities.some((o) => o.id === opportunityId))
+  }, [initialOpportunity, existingOpportunities, opportunityId])
 
   // Compatible products for vehicle (se nenhum veículo estiver selecionado, exibe todos os produtos)
   const compatibleProducts = useMemo(() => {
@@ -504,8 +518,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     setTimeout(() => setCopied(false), 2500)
   }
 
-  // Build payload
-  const buildOpportunityData = () => {
+  // Build payload com suporte a overrides para auto-save imediato
+  const buildOpportunityData = (overrides?: {
+    comments?: OpportunityComment[]
+    tasks?: OpportunityTask[]
+    history?: OpportunityHistoryEvent[]
+    attachments?: AttachedDocument[]
+  }) => {
     const mappedOrigin = (() => {
       switch (leadOrigin) {
         case 'instagram': return 'instagram_direct'
@@ -517,7 +536,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     })()
 
     return {
-      id: initialOpportunity?.id || `opp-${Date.now()}`,
+      id: opportunityId,
       orderNumber,
       orderCode: formatOrderCode(orderNumber),
       assignedTo,
@@ -555,10 +574,25 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       paymentMethod: (paymentMethod as PaymentMethod) || 'pix',
       discountPercent: budget.discountPercent,
       cardInstallments,
-      attachments,
-      comments,
-      history,
-      tasks,
+      attachments: overrides?.attachments ?? attachments,
+      comments: overrides?.comments ?? comments,
+      history: overrides?.history ?? history,
+      tasks: overrides?.tasks ?? tasks,
+    }
+  }
+
+  // Persistência Imediata no Perfil do Lead (Kanban e Store) sem sair da tela
+  const autoSaveOpportunity = (overrides?: {
+    comments?: OpportunityComment[]
+    tasks?: OpportunityTask[]
+    history?: OpportunityHistoryEvent[]
+    attachments?: AttachedDocument[]
+  }) => {
+    const payload = buildOpportunityData(overrides)
+    if (onAutoSaveOpportunity) {
+      onAutoSaveOpportunity(payload)
+    } else if (onSaveToKanban) {
+      onSaveToKanban(payload, { stayOnPage: true })
     }
   }
 
@@ -693,20 +727,24 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       uploaded_by: authorName
     }
 
-    setAttachments((prev) => [newProposalDoc, ...prev.filter((d) => d.type !== 'orcamento_pdf')])
+    const updatedAttachments = [newProposalDoc, ...attachments.filter((d) => d.type !== 'orcamento_pdf')]
+    setAttachments(updatedAttachments)
 
     const historyEvent: OpportunityHistoryEvent = {
       id: `hist-prop-${Date.now()}`,
-      opportunity_id: initialOpportunity?.id,
+      opportunity_id: opportunityId,
       type: 'note',
       description: `Gerou e anexou a proposta comercial oficial (${formatOrderCode(orderNumber)})`,
       user: authorName,
       created_at: new Date().toISOString()
     }
-    setHistory((prev) => [historyEvent, ...prev])
+    const updatedHistory = [historyEvent, ...history]
+    setHistory(updatedHistory)
 
     setProposalSuccessMsg(true)
     setTimeout(() => setProposalSuccessMsg(false), 4000)
+
+    autoSaveOpportunity({ attachments: updatedAttachments, history: updatedHistory })
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -752,7 +790,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
       newHistoryEvents.push({
         id: `hist-attach-${Date.now()}-${index}`,
-        opportunity_id: initialOpportunity?.id,
+        opportunity_id: opportunityId,
         type: 'note',
         description: `Anexou o arquivo "${file.name}"`,
         user: authorName,
@@ -760,9 +798,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       })
     })
 
-    setAttachments((prev) => [...newDocs, ...prev])
-    setHistory((prev) => [...newHistoryEvents, ...prev])
+    const updatedAttachments = [...newDocs, ...attachments]
+    const updatedHistory = [...newHistoryEvents, ...history]
+    setAttachments(updatedAttachments)
+    setHistory(updatedHistory)
     e.target.value = ''
+
+    autoSaveOpportunity({ attachments: updatedAttachments, history: updatedHistory })
   }
 
   const handleViewDocument = (doc: AttachedDocument) => {
@@ -833,20 +875,27 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     const authorName = currentUser?.name || assignedTo || 'Usuário'
     const comment: OpportunityComment = {
       id: `comm-${Date.now()}`,
-      opportunity_id: initialOpportunity?.id,
+      opportunity_id: opportunityId,
       author: authorName,
       text: newCommentText.trim(),
       created_at: new Date().toISOString()
     }
-    setComments((prev) => [comment, ...prev])
+    const updatedComments = [comment, ...comments]
+    setComments(updatedComments)
     setNewCommentText('')
+
+    setCommentSavedMsg(true)
+    setTimeout(() => setCommentSavedMsg(false), 3000)
+
+    autoSaveOpportunity({ comments: updatedComments })
   }
 
   const handleAddTask = () => {
     if (!newTaskTitle.trim()) return
+    const authorName = currentUser?.name || assignedTo || 'Usuário'
     const task: OpportunityTask = {
       id: `task-${Date.now()}`,
-      opportunity_id: initialOpportunity?.id,
+      opportunity_id: opportunityId,
       order_number: orderNumber,
       client_name: customerName || 'Cliente',
       title: newTaskTitle.trim(),
@@ -856,31 +905,85 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       completed: false,
       created_at: new Date().toISOString()
     }
-    setTasks((prev) => [task, ...prev])
+    const updatedTasks = [task, ...tasks]
+    setTasks(updatedTasks)
     setNewTaskTitle('')
     setNewTaskDate('')
     setNewTaskTime('')
     setNewTaskAssignee('')
+
+    const historyEvent: OpportunityHistoryEvent = {
+      id: `hist-task-${Date.now()}`,
+      opportunity_id: opportunityId,
+      type: 'note',
+      description: `Criou a tarefa: "${task.title}"${task.assigned_to ? ` para ${task.assigned_to}` : ''}`,
+      user: authorName,
+      created_at: new Date().toISOString()
+    }
+    const updatedHistory = [historyEvent, ...history]
+    setHistory(updatedHistory)
+
+    setTaskSavedMsg(true)
+    setTimeout(() => setTaskSavedMsg(false), 3000)
+
+    autoSaveOpportunity({ tasks: updatedTasks, history: updatedHistory })
   }
 
   const handleToggleTask = (taskId: string) => {
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === taskId) {
-          const nextCompleted = !t.completed
-          return {
-            ...t,
-            completed: nextCompleted,
-            completed_at: nextCompleted ? new Date().toISOString() : undefined
-          }
+    let toggledTaskTitle = ''
+    let isNowCompleted = false
+    const updatedTasks = tasks.map((t) => {
+      if (t.id === taskId) {
+        const nextCompleted = !t.completed
+        toggledTaskTitle = t.title
+        isNowCompleted = nextCompleted
+        return {
+          ...t,
+          completed: nextCompleted,
+          completed_at: nextCompleted ? new Date().toISOString() : undefined
         }
-        return t
-      })
-    )
+      }
+      return t
+    })
+    setTasks(updatedTasks)
+
+    let updatedHistory = history
+    if (toggledTaskTitle) {
+      const historyEvent: OpportunityHistoryEvent = {
+        id: `hist-task-toggle-${Date.now()}`,
+        opportunity_id: opportunityId,
+        type: 'note',
+        description: isNowCompleted ? `Concluiu a tarefa: "${toggledTaskTitle}"` : `Reabriu a tarefa: "${toggledTaskTitle}"`,
+        user: currentUser?.name || assignedTo || 'Usuário',
+        created_at: new Date().toISOString()
+      }
+      updatedHistory = [historyEvent, ...history]
+      setHistory(updatedHistory)
+    }
+
+    autoSaveOpportunity({ tasks: updatedTasks, history: updatedHistory })
   }
 
   const handleDeleteTask = (taskId: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== taskId))
+    const targetTask = tasks.find((t) => t.id === taskId)
+    const updatedTasks = tasks.filter((t) => t.id !== taskId)
+    setTasks(updatedTasks)
+
+    let updatedHistory = history
+    if (targetTask) {
+      const historyEvent: OpportunityHistoryEvent = {
+        id: `hist-task-del-${Date.now()}`,
+        opportunity_id: opportunityId,
+        type: 'note',
+        description: `Excluiu a tarefa: "${targetTask.title}"`,
+        user: currentUser?.name || assignedTo || 'Usuário',
+        created_at: new Date().toISOString()
+      }
+      updatedHistory = [historyEvent, ...history]
+      setHistory(updatedHistory)
+    }
+
+    autoSaveOpportunity({ tasks: updatedTasks, history: updatedHistory })
   }
 
   // Linha do tempo unificada ordenada da mais recente para a mais antiga
@@ -925,8 +1028,10 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
   const handleConfirmDeleteAttachment = () => {
     if (attachmentToDelete) {
-      setAttachments((prev) => prev.filter((a) => a.id !== attachmentToDelete.id))
+      const updatedAttachments = attachments.filter((a) => a.id !== attachmentToDelete.id)
+      setAttachments(updatedAttachments)
       setAttachmentToDelete(null)
+      autoSaveOpportunity({ attachments: updatedAttachments })
     }
   }
 
@@ -982,16 +1087,16 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
   // 3. Apagar Orçamento
   const handleDelete = () => {
-    if (initialOpportunity && onDeleteOpportunity) {
-      onDeleteOpportunity(initialOpportunity.id)
+    if (onDeleteOpportunity) {
+      onDeleteOpportunity(opportunityId)
     }
     setDeleteModalOpen(false)
   }
 
   // 4. Marcar Oportunidade Perdida / Venda Não Concluída
   const handleMarkLost = () => {
-    if (initialOpportunity && onMarkLost) {
-      onMarkLost(initialOpportunity.id)
+    if (onMarkLost) {
+      onMarkLost(opportunityId)
     }
     setLostModalOpen(false)
   }
@@ -1920,7 +2025,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     rows={3}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EA580C]/20 focus:border-[#EA580C] transition-all resize-none"
                   />
-                  <div className="flex justify-end">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    {commentSavedMsg ? (
+                      <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg animate-fade-in font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>✓ Observação salva no perfil do lead!</span>
+                      </div>
+                    ) : <div />}
                     <button
                       type="button"
                       onClick={handleAddComment}
@@ -2016,6 +2127,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       </button>
                     </div>
                   </div>
+
+                  {taskSavedMsg && (
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg animate-fade-in font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>✓ Tarefa criada e salva no perfil do lead!</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Lista de Tarefas */}
@@ -2744,7 +2862,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               )}
 
               {/* Ações Secundárias com Modal Padronizado */}
-              {initialOpportunity && (
+              {isOpportunitySaved && (
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                   <button
                     type="button"
