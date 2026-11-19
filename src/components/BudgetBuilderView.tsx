@@ -86,7 +86,7 @@ import {
   FaPaperPlane,
   FaComments,
   FaCreditCard,
-  FaTrophy,
+  FaDollarSign,
   FaCircleXmark
 } from 'react-icons/fa6'
 
@@ -106,7 +106,7 @@ const SALES_PIPELINE_STAGES: PipelineStageOption[] = [
   { id: 'orcamento_enviado', title: 'Orçamento enviado', color: '#EA580C', Icon: FaPaperPlane },
   { id: 'em_negociacao', title: 'Em negociação', color: '#F59E0B', Icon: FaComments },
   { id: 'aguardando_pagamento', title: 'Aguardando Pagamento', color: '#EAB308', Icon: FaCreditCard },
-  { id: 'venda_ganha', title: 'Venda Ganha', color: '#10B981', Icon: FaTrophy },
+  { id: 'venda_ganha', title: 'Venda Ganha', color: '#10B981', Icon: FaDollarSign },
   { id: 'venda_perdida', title: 'Venda Perdida', color: '#EF4444', Icon: FaCircleXmark },
 ]
 
@@ -1379,29 +1379,14 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         </button>
       </div>
 
-      {/* Barra Interativa de Etapas do Funil (Permite visualizar e avançar o lead sem voltar ao Kanban) */}
-      <div className="bg-white p-3 sm:px-4 sm:py-3 rounded-2xl border border-slate-100 shadow-nexo space-y-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Etapa do Funil
-            </span>
-            {(() => {
-              const activeStageCfg = SALES_PIPELINE_STAGES.find((s) => s.id === stage) || SALES_PIPELINE_STAGES[0]
-              return (
-                <span
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-white shadow-2xs"
-                  style={{ backgroundColor: activeStageCfg.color }}
-                >
-                  <activeStageCfg.Icon className="w-3 h-3 text-white shrink-0" />
-                  {activeStageCfg.title}
-                </span>
-              )
-            })()}
+      {/* Barra Interativa de Etapas do Funil */}
+      <div className="bg-white p-3 sm:px-4 sm:py-3 rounded-2xl border border-slate-100 shadow-nexo space-y-2">
+        {(isUpdatingStage || stageFeedback) && (
+          <div className="flex items-center gap-2 justify-end text-xs">
             {isUpdatingStage && (
               <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400">
                 <Loader2 className="w-3 h-3 animate-spin text-[#EA580C]" />
-                Salvando...
+                Salvando etapa...
               </span>
             )}
             {stageFeedback && !isUpdatingStage && (
@@ -1411,17 +1396,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               </span>
             )}
           </div>
-        </div>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-1.5">
-          {SALES_PIPELINE_STAGES.map((st, idx) => {
-            const currentStageIndex = SALES_PIPELINE_STAGES.findIndex((s) => s.id === stage)
+          {SALES_PIPELINE_STAGES.map((st) => {
             const isActive = st.id === stage
-            const isLost = st.id === 'venda_perdida'
-            const isCompleted =
-              stage !== 'venda_perdida' &&
-              !isLost &&
-              currentStageIndex > idx
 
             return (
               <button
@@ -1434,10 +1413,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 className={`group relative flex items-center gap-2 px-2.5 py-2 rounded-xl border text-[11px] font-bold transition-all cursor-pointer text-left disabled:opacity-60 ${
                   isActive
                     ? 'text-white shadow-sm'
-                    : isCompleted
-                    ? 'bg-emerald-50/70 border-emerald-200/80 text-emerald-800 hover:bg-emerald-100/80'
-                    : isLost
-                    ? 'bg-rose-50/50 border-rose-200/70 text-rose-700 hover:bg-rose-100/70'
                     : 'bg-slate-50/80 border-slate-200/80 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                 }`}
               >
