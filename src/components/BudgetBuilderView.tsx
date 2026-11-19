@@ -79,7 +79,15 @@ import {
   FaTruck, 
   FaCarSide, 
   FaTruckPickup,
-  FaWeightHanging
+  FaWeightHanging,
+  FaUserPlus,
+  FaMagnifyingGlass,
+  FaCalculator,
+  FaPaperPlane,
+  FaComments,
+  FaCreditCard,
+  FaTrophy,
+  FaCircleXmark
 } from 'react-icons/fa6'
 
 type BudgetFormTab = 'contact' | 'products' | 'fulfillment' | 'history' | 'attachments'
@@ -88,17 +96,18 @@ interface PipelineStageOption {
   id: OpportunityStage
   title: string
   color: string
+  Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>
 }
 
 const SALES_PIPELINE_STAGES: PipelineStageOption[] = [
-  { id: 'novo_lead', title: 'Novo lead', color: '#6366F1' },
-  { id: 'em_qualificacao', title: 'Em qualificação', color: '#0EA5E9' },
-  { id: 'aguardando_cotacao', title: 'Aguardando Cotação', color: '#2563EB' },
-  { id: 'orcamento_enviado', title: 'Orçamento enviado', color: '#EA580C' },
-  { id: 'em_negociacao', title: 'Em negociação', color: '#F59E0B' },
-  { id: 'aguardando_pagamento', title: 'Aguardando Pagamento', color: '#EAB308' },
-  { id: 'venda_ganha', title: 'Venda Ganha', color: '#10B981' },
-  { id: 'venda_perdida', title: 'Venda Perdida', color: '#EF4444' },
+  { id: 'novo_lead', title: 'Novo lead', color: '#6366F1', Icon: FaUserPlus },
+  { id: 'em_qualificacao', title: 'Em qualificação', color: '#0EA5E9', Icon: FaMagnifyingGlass },
+  { id: 'aguardando_cotacao', title: 'Aguardando Cotação', color: '#2563EB', Icon: FaCalculator },
+  { id: 'orcamento_enviado', title: 'Orçamento enviado', color: '#EA580C', Icon: FaPaperPlane },
+  { id: 'em_negociacao', title: 'Em negociação', color: '#F59E0B', Icon: FaComments },
+  { id: 'aguardando_pagamento', title: 'Aguardando Pagamento', color: '#EAB308', Icon: FaCreditCard },
+  { id: 'venda_ganha', title: 'Venda Ganha', color: '#10B981', Icon: FaTrophy },
+  { id: 'venda_perdida', title: 'Venda Perdida', color: '#EF4444', Icon: FaCircleXmark },
 ]
 
 const normalizePipelineStage = (rawStage?: string): OpportunityStage => {
@@ -178,6 +187,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [stage, setStage] = useState<OpportunityStage>(() =>
     normalizePipelineStage(initialOpportunity?.stage || 'novo_lead')
   )
+  const [stageToConfirm, setStageToConfirm] = useState<OpportunityStage | null>(null)
   const [isUpdatingStage, setIsUpdatingStage] = useState(false)
   const [stageFeedback, setStageFeedback] = useState<string | null>(null)
 
@@ -666,8 +676,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     }
   }
 
-  // Alterar etapa do funil diretamente pela tela de orçamento (persiste imediatamente se já existir no banco)
-  const handleSelectStage = async (nextStage: OpportunityStage) => {
+  // Executar mudança de etapa após confirmação do usuário (persiste imediatamente se já existir no banco)
+  const applyStageChange = async (nextStage: OpportunityStage) => {
     if (nextStage === stage || isUpdatingStage) return
 
     const prevStage = stage
@@ -705,16 +715,10 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     }
   }
 
-  const currentStageIndex = SALES_PIPELINE_STAGES.findIndex((s) => s.id === stage)
-  const nextSequentialStage =
-    currentStageIndex >= 0 && currentStageIndex < SALES_PIPELINE_STAGES.length - 2
-      ? SALES_PIPELINE_STAGES[currentStageIndex + 1]
-      : null
-
-  const handleAdvanceStage = () => {
-    if (nextSequentialStage) {
-      void handleSelectStage(nextSequentialStage.id)
-    }
+  // Solicitar confirmação ao clicar em uma etapa
+  const handleSelectStage = (nextStage: OpportunityStage) => {
+    if (nextStage === stage || isUpdatingStage) return
+    setStageToConfirm(nextStage)
   }
 
   // Detecção de Conflito de Instalação (Requisito 4)
@@ -1389,7 +1393,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-white shadow-2xs"
                   style={{ backgroundColor: activeStageCfg.color }}
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
+                  <activeStageCfg.Icon className="w-3 h-3 text-white shrink-0" />
                   {activeStageCfg.title}
                 </span>
               )
@@ -1407,23 +1411,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               </span>
             )}
           </div>
-
-          {nextSequentialStage && (
-            <button
-              type="button"
-              disabled={isUpdatingStage}
-              onClick={handleAdvanceStage}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white border border-orange-200 hover:border-[#EA580C] text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
-              title={`Avançar para ${nextSequentialStage.title}`}
-            >
-              <span>Avançar para {nextSequentialStage.title}</span>
-              <ArrowRight className="w-3.5 h-3.5 shrink-0" />
-            </button>
-          )}
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-1.5">
           {SALES_PIPELINE_STAGES.map((st, idx) => {
+            const currentStageIndex = SALES_PIPELINE_STAGES.findIndex((s) => s.id === stage)
             const isActive = st.id === stage
             const isLost = st.id === 'venda_perdida'
             const isCompleted =
@@ -1439,7 +1431,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 onClick={() => void handleSelectStage(st.id)}
                 title={`Mover lead para: ${st.title}`}
                 style={isActive ? { backgroundColor: st.color, borderColor: st.color } : undefined}
-                className={`group relative flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-[11px] font-bold transition-all cursor-pointer text-left disabled:opacity-60 ${
+                className={`group relative flex items-center gap-2 px-2.5 py-2 rounded-xl border text-[11px] font-bold transition-all cursor-pointer text-left disabled:opacity-60 ${
                   isActive
                     ? 'text-white shadow-sm'
                     : isCompleted
@@ -1449,14 +1441,10 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     : 'bg-slate-50/80 border-slate-200/80 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                 }`}
               >
-                {isCompleted ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                ) : (
-                  <span
-                    className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-white' : ''}`}
-                    style={!isActive ? { backgroundColor: st.color } : undefined}
-                  />
-                )}
+                <st.Icon
+                  className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-white' : ''}`}
+                  style={!isActive ? { color: st.color } : undefined}
+                />
                 <span className="truncate leading-tight">{st.title}</span>
               </button>
             )
@@ -3305,6 +3293,49 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* MODAL: CONFIRMAR MUDANÇA DE ETAPA DO LEAD */}
+      <CustomAlertModal
+        isOpen={!!stageToConfirm}
+        onClose={() => setStageToConfirm(null)}
+        type="warning"
+        title="Confirmar Mudança de Etapa"
+        message={
+          stageToConfirm ? (
+            <div className="space-y-3">
+              <p className="text-slate-600 text-sm">
+                Deseja alterar a etapa deste lead ({customerName || 'Cliente'}) de:
+              </p>
+              <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl">
+                <span className="font-bold text-slate-700 text-xs px-2.5 py-1 rounded-xl bg-slate-200/80">
+                  {SALES_PIPELINE_STAGES.find((s) => s.id === stage)?.title || stage}
+                </span>
+                <ArrowRight className="w-4 h-4 text-slate-400 shrink-0" />
+                <span
+                  className="font-bold text-white text-xs px-2.5 py-1 rounded-xl shadow-2xs"
+                  style={{
+                    backgroundColor:
+                      SALES_PIPELINE_STAGES.find((s) => s.id === stageToConfirm)?.color || '#EA580C',
+                  }}
+                >
+                  {SALES_PIPELINE_STAGES.find((s) => s.id === stageToConfirm)?.title || stageToConfirm}
+                </span>
+              </div>
+            </div>
+          ) : (
+            ''
+          )
+        }
+        primaryButtonText="Confirmar Mudança"
+        onPrimaryAction={() => {
+          if (stageToConfirm) {
+            void applyStageChange(stageToConfirm)
+          }
+          setStageToConfirm(null)
+        }}
+        secondaryButtonText="Cancelar"
+        onSecondaryAction={() => setStageToConfirm(null)}
+      />
     </div>
   )
 }

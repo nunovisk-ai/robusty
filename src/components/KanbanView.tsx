@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import type { Opportunity, OpportunityStage, Order, OrderStatus } from '../types'
 import { formatOrderCode } from '../utils/formatters'
+import { CustomAlertModal } from './CustomAlertModal'
 import { 
   Search, 
   Plus, 
@@ -17,19 +18,34 @@ import {
   ChevronRight,
   Clock,
   Calendar,
-  MessageSquare
+  MessageSquare,
+  RotateCcw
 } from 'lucide-react'
 import { 
   FaWhatsapp, 
   FaInstagram, 
   FaFacebook, 
   FaStore, 
-  FaUser,
-  FaGlobe,
+  FaUser, 
+  FaGlobe, 
   FaTruck, 
   FaVanShuttle, 
   FaCarSide, 
-  FaTruckPickup 
+  FaTruckPickup,
+  FaUserPlus,
+  FaMagnifyingGlass,
+  FaCalculator,
+  FaPaperPlane,
+  FaComments,
+  FaCreditCard,
+  FaTrophy,
+  FaCircleXmark,
+  FaFileLines,
+  FaBoxesPacking,
+  FaClock as FaClock6,
+  FaTruckFast,
+  FaCircleCheck,
+  FaBan
 } from 'react-icons/fa6'
 
 interface KanbanViewProps {
@@ -48,97 +64,266 @@ interface SalesStageConfig {
   id: OpportunityStage
   title: string
   stripeColor: string
+  Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>
 }
 
 interface OrderStageConfig {
   id: OrderStatus
   title: string
   stripeColor: string
+  Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>
 }
 
-// 8 Etapas solicitadas pelo usuário para o Funil de Vendas:
-// Novo lead, Em qualificação, Aguardando Cotação, Orçamento enviado, Em negociação, Aguardando Pagamento, Venda Ganha, Venda Perdida
+// 8 Etapas com ícones representativos do Font Awesome para o Funil de Vendas
 const SALES_STAGES: SalesStageConfig[] = [
   { 
     id: 'novo_lead', 
     title: 'Novo lead', 
-    stripeColor: '#6366F1' 
+    stripeColor: '#6366F1',
+    Icon: FaUserPlus
   },
   { 
     id: 'em_qualificacao', 
     title: 'Em qualificação', 
-    stripeColor: '#0EA5E9' 
+    stripeColor: '#0EA5E9',
+    Icon: FaMagnifyingGlass
   },
   { 
     id: 'aguardando_cotacao', 
     title: 'Aguardando Cotação', 
-    stripeColor: '#2563EB' 
+    stripeColor: '#2563EB',
+    Icon: FaCalculator
   },
   { 
     id: 'orcamento_enviado', 
     title: 'Orçamento enviado', 
-    stripeColor: '#EA580C' 
+    stripeColor: '#EA580C',
+    Icon: FaPaperPlane
   },
   { 
     id: 'em_negociacao', 
     title: 'Em negociação', 
-    stripeColor: '#F59E0B' 
+    stripeColor: '#F59E0B',
+    Icon: FaComments
   },
   { 
     id: 'aguardando_pagamento', 
     title: 'Aguardando Pagamento', 
-    stripeColor: '#EAB308' 
+    stripeColor: '#EAB308',
+    Icon: FaCreditCard
   },
   { 
     id: 'venda_ganha', 
     title: 'Venda Ganha', 
-    stripeColor: '#10B981' 
+    stripeColor: '#10B981',
+    Icon: FaTrophy
   },
   { 
     id: 'venda_perdida', 
     title: 'Venda Perdida', 
-    stripeColor: '#EF4444' 
+    stripeColor: '#EF4444',
+    Icon: FaCircleXmark
   },
 ]
 
-// 6 Etapas solicitadas pelo usuário para o Funil de Pedidos:
-// Pedido Gerado, Em preparação, Aguardando Coleta/Instalação, Em entrega/Instalação, Pedido Concluído, Pedido Cancelado
+// 6 Etapas com ícones representativos do Font Awesome para o Funil de Pedidos
 const ORDER_STAGES: OrderStageConfig[] = [
   { 
     id: 'pedido_gerado', 
     title: 'Pedido Gerado', 
-    stripeColor: '#3B82F6' 
+    stripeColor: '#3B82F6',
+    Icon: FaFileLines
   },
   { 
     id: 'em_preparacao', 
     title: 'Em preparação', 
-    stripeColor: '#8B5CF6' 
+    stripeColor: '#8B5CF6',
+    Icon: FaBoxesPacking
   },
   { 
     id: 'aguardando_coleta_instalacao', 
     title: 'Aguardando Coleta/Instalação', 
-    stripeColor: '#0284C7' 
+    stripeColor: '#0284C7',
+    Icon: FaClock6
   },
   { 
     id: 'em_entrega_instalacao', 
     title: 'Em entrega/Instalação', 
-    stripeColor: '#06B6D4' 
+    stripeColor: '#06B6D4',
+    Icon: FaTruckFast
   },
   { 
     id: 'pedido_concluido', 
     title: 'Pedido Concluído', 
-    stripeColor: '#10B981' 
+    stripeColor: '#10B981',
+    Icon: FaCircleCheck
   },
   { 
     id: 'pedido_cancelado', 
     title: 'Pedido Cancelado', 
-    stripeColor: '#EF4444' 
+    stripeColor: '#EF4444',
+    Icon: FaBan
   },
 ]
 
 interface VehicleInfo {
   modelName: string
   iconType: 'kombi' | 'large_van' | 'medium_van' | 'small_van' | 'truck' | 'default'
+}
+
+interface ColumnFilterOption {
+  value: string
+  label: string
+  count: number
+  icon?: React.ReactNode
+}
+
+interface ColumnFilterDropdownProps {
+  title: string
+  isOpen: boolean
+  onClose: () => void
+  options: ColumnFilterOption[]
+  selectedValues: string[]
+  onToggleValue: (val: string) => void
+  onSelectAll: () => void
+  onClearSelection: () => void
+  alignRight?: boolean
+}
+
+const ColumnFilterDropdown: React.FC<ColumnFilterDropdownProps> = ({
+  title,
+  isOpen,
+  onClose,
+  options,
+  selectedValues,
+  onToggleValue,
+  onSelectAll,
+  onClearSelection,
+  alignRight = false,
+}) => {
+  const [search, setSearch] = useState('')
+
+  if (!isOpen) return null
+
+  const filteredOptions = options.filter((o) =>
+    o.label.toLowerCase().includes(search.toLowerCase().trim())
+  )
+
+  return (
+    <div
+      data-filter-popover
+      onClick={(e) => e.stopPropagation()}
+      className={`absolute top-full mt-1.5 z-40 w-64 bg-white rounded-2xl border border-slate-200/90 shadow-2xl p-3 text-slate-800 space-y-2.5 animate-in fade-in zoom-in-95 duration-100 font-sans normal-case tracking-normal ${
+        alignRight ? 'right-0' : 'left-0'
+      }`}
+    >
+      <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Filter className="w-3.5 h-3.5 text-[#EA580C] shrink-0" />
+          <span className="text-xs font-bold text-slate-800 truncate">{title}</span>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {options.length > 3 && (
+        <div className="relative">
+          <Search className="w-3 h-3 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Pesquisar..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-7 pr-2.5 py-1 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#EA580C] focus:bg-white transition-all font-medium"
+          />
+        </div>
+      )}
+
+      <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold px-0.5">
+        <button
+          type="button"
+          onClick={onSelectAll}
+          className="hover:text-[#EA580C] transition-colors cursor-pointer"
+        >
+          Marcar todos
+        </button>
+        <button
+          type="button"
+          onClick={onClearSelection}
+          className="hover:text-rose-600 transition-colors cursor-pointer"
+        >
+          Desmarcar todos
+        </button>
+      </div>
+
+      <div className="max-h-48 overflow-y-auto space-y-0.5 pr-1 kanban-col-scroll">
+        {filteredOptions.length === 0 ? (
+          <div className="py-4 text-center text-[11px] text-slate-400 font-medium">
+            Nenhum item encontrado
+          </div>
+        ) : (
+          filteredOptions.map((opt) => {
+            const isChecked = selectedValues.includes(opt.value)
+            return (
+              <label
+                key={opt.value}
+                className="flex items-center justify-between gap-2 p-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-xs font-medium text-slate-700 transition-colors select-none"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => onToggleValue(opt.value)}
+                    className="w-3.5 h-3.5 text-[#EA580C] rounded border-slate-300 focus:ring-[#EA580C] cursor-pointer"
+                  />
+                  {opt.icon}
+                  <span className="truncate text-[11px]">{opt.label}</span>
+                </div>
+                <span className="text-[10px] font-mono text-slate-400 font-bold px-1.5 py-0.2 bg-slate-100 rounded-full shrink-0">
+                  {opt.count}
+                </span>
+              </label>
+            )
+          })
+        )}
+      </div>
+
+      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={onClearSelection}
+          disabled={selectedValues.length === 0}
+          className="text-[11px] font-bold text-slate-500 hover:text-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
+        >
+          Limpar filtro
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-2.5 py-1 bg-[#EA580C] hover:bg-[#C2410C] text-white text-[11px] font-bold rounded-lg transition-all shadow-2xs cursor-pointer"
+        >
+          Concluir
+        </button>
+      </div>
+    </div>
+  )
+}
+
+interface PendingStageChange {
+  type: 'opportunity' | 'order'
+  id: string
+  code: string
+  clientName: string
+  fromStageId: string
+  fromStageTitle: string
+  toStageId: string
+  toStageTitle: string
+  toColor: string
 }
 
 export const KanbanView: React.FC<KanbanViewProps> = ({ 
@@ -156,9 +341,56 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('')
   const [density, setDensity] = useState<'detailed' | 'compact'>('detailed')
 
+  // Filtros de Coluna no formato Excel para o Funil de Vendas
+  const [salesColumnFilters, setSalesColumnFilters] = useState<{
+    vehicles: string[]
+    origins: string[]
+    stages: string[]
+    responsibles: string[]
+  }>({
+    vehicles: [],
+    origins: [],
+    stages: [],
+    responsibles: []
+  })
+
+  // Filtros de Coluna no formato Excel para o Funil de Pedidos
+  const [ordersColumnFilters, setOrdersColumnFilters] = useState<{
+    vehicles: string[]
+    origins: string[]
+    fulfillments: string[]
+    stages: string[]
+    responsibles: string[]
+  }>({
+    vehicles: [],
+    origins: [],
+    fulfillments: [],
+    stages: [],
+    responsibles: []
+  })
+
+  // Dropdown de filtro atualmente aberto
+  const [activeFilterDropdown, setActiveFilterDropdown] = useState<string | null>(null)
+
+  // Estado para Confirmação de Mudança de Etapa (Modal)
+  const [pendingStageChange, setPendingStageChange] = useState<PendingStageChange | null>(null)
+
   // Drag and Drop State
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null)
   const [dragOverStageId, setDragOverStageId] = useState<string | null>(null)
+
+  // Fechar dropdown de filtro ao clicar fora
+  useEffect(() => {
+    if (!activeFilterDropdown) return
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-filter-popover]') && !target.closest('[data-filter-trigger]')) {
+        setActiveFilterDropdown(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [activeFilterDropdown])
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
@@ -558,11 +790,56 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     }
   }
 
+  // Solicitar confirmação de mudança de etapa / status
+  const requestChangeOpportunityStage = (opp: Opportunity, targetStage: OpportunityStage) => {
+    const fromStageId = normalizeOppStage(opp.stage)
+    if (fromStageId === targetStage) return
+
+    const fromStageCfg = SALES_STAGES.find((s) => s.id === fromStageId)
+    const toStageCfg = SALES_STAGES.find((s) => s.id === targetStage)
+
+    setPendingStageChange({
+      type: 'opportunity',
+      id: opp.id,
+      code: formatOrderCode(opp.order_number),
+      clientName: opp.contact?.full_name || 'Lead',
+      fromStageId,
+      fromStageTitle: fromStageCfg?.title || fromStageId,
+      toStageId: targetStage,
+      toStageTitle: toStageCfg?.title || targetStage,
+      toColor: toStageCfg?.stripeColor || '#EA580C',
+    })
+  }
+
+  const requestChangeOrderStatus = (ord: Order, targetStatus: OrderStatus) => {
+    const fromStatusId = normalizeOrdStatus(ord.status)
+    if (fromStatusId === targetStatus) return
+
+    const fromStatusCfg = ORDER_STAGES.find((s) => s.id === fromStatusId)
+    const toStatusCfg = ORDER_STAGES.find((s) => s.id === targetStatus)
+    const linkedOpp = ord.opportunity || opportunities.find((o) => o.id === ord.opportunity_id || o.order_number === ord.order_number)
+
+    setPendingStageChange({
+      type: 'order',
+      id: ord.id,
+      code: formatOrderCode(ord.order_number),
+      clientName: ord.contact?.full_name || linkedOpp?.contact?.full_name || 'Cliente',
+      fromStageId: fromStatusId,
+      fromStageTitle: fromStatusCfg?.title || fromStatusId,
+      toStageId: targetStatus,
+      toStageTitle: toStatusCfg?.title || targetStatus,
+      toColor: toStatusCfg?.stripeColor || '#EA580C',
+    })
+  }
+
   const handleDropOpportunity = (e: React.DragEvent, targetStage: OpportunityStage) => {
     e.preventDefault()
     const oppId = e.dataTransfer.getData('text/plain') || draggedItemId
     if (oppId) {
-      onMoveStage(oppId, targetStage)
+      const targetOpp = opportunities.find((o) => o.id === oppId)
+      if (targetOpp) {
+        requestChangeOpportunityStage(targetOpp, targetStage)
+      }
     }
     setDraggedItemId(null)
     setDragOverStageId(null)
@@ -571,11 +848,30 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   const handleDropOrder = (e: React.DragEvent, targetStage: OrderStatus) => {
     e.preventDefault()
     const ordId = e.dataTransfer.getData('text/plain') || draggedItemId
-    if (ordId && onUpdateOrderStatus) {
-      onUpdateOrderStatus(ordId, targetStage)
+    if (ordId) {
+      const targetOrd = orders.find((o) => o.id === ordId)
+      if (targetOrd) {
+        requestChangeOrderStatus(targetOrd, targetStage)
+      }
     }
     setDraggedItemId(null)
     setDragOverStageId(null)
+  }
+
+  const handleConfirmStageChange = () => {
+    if (!pendingStageChange) return
+
+    if (pendingStageChange.type === 'opportunity') {
+      onMoveStage?.(pendingStageChange.id, pendingStageChange.toStageId as OpportunityStage)
+    } else if (pendingStageChange.type === 'order') {
+      onUpdateOrderStatus?.(pendingStageChange.id, pendingStageChange.toStageId as OrderStatus)
+    }
+
+    setPendingStageChange(null)
+  }
+
+  const handleCancelStageChange = () => {
+    setPendingStageChange(null)
   }
 
   const openOrderDetails = (ord: Order) => {
@@ -627,14 +923,220 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     }
   }
 
-  // Itens filtrados pela etapa selecionada na visualização em Lista
-  const listOpportunities = stageFilter === 'all'
-    ? filteredOpportunities
-    : filteredOpportunities.filter((o) => normalizeOppStage(o.stage) === stageFilter)
+  // Opções para filtros de coluna (Funil de Vendas)
+  const salesVehicleOptions = useMemo<ColumnFilterOption[]>(() => {
+    const counts: Record<string, number> = {}
+    filteredOpportunities.forEach((opp) => {
+      const vModel = getVehicleModelInfo(opp.vehicle?.model || opp.vehicle_model_year).modelName
+      counts[vModel] = (counts[vModel] || 0) + 1
+    })
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([modelName, count]) => ({
+        value: modelName,
+        label: modelName,
+        count,
+      }))
+  }, [filteredOpportunities])
 
-  const listOrders = stageFilter === 'all'
-    ? filteredOrders
-    : filteredOrders.filter((o) => normalizeOrdStatus(o.status) === stageFilter)
+  const salesOriginOptions = useMemo<ColumnFilterOption[]>(() => {
+    const counts: Record<string, number> = {}
+    filteredOpportunities.forEach((opp) => {
+      const orig = opp.contact?.origin || 'outros'
+      counts[orig] = (counts[orig] || 0) + 1
+    })
+    return Object.entries(counts).map(([orig, count]) => {
+      const badge = getOriginBadge(orig)
+      const Icon = badge.Icon
+      return {
+        value: orig,
+        label: badge.label,
+        count,
+        icon: <Icon className={`w-3 h-3 ${badge.iconColor}`} />,
+      }
+    })
+  }, [filteredOpportunities])
+
+  const salesStageOptions = useMemo<ColumnFilterOption[]>(() => {
+    const counts: Record<string, number> = {}
+    filteredOpportunities.forEach((opp) => {
+      const st = normalizeOppStage(opp.stage)
+      counts[st] = (counts[st] || 0) + 1
+    })
+    return SALES_STAGES.map((st) => ({
+      value: st.id,
+      label: st.title,
+      count: counts[st.id] || 0,
+      icon: <st.Icon className="w-3 h-3" style={{ color: st.stripeColor }} />,
+    })).filter((o) => o.count > 0)
+  }, [filteredOpportunities])
+
+  const salesResponsibleOptions = useMemo<ColumnFilterOption[]>(() => {
+    const counts: Record<string, number> = {}
+    filteredOpportunities.forEach((opp) => {
+      const resp = opp.assigned_to || 'Não atribuído'
+      counts[resp] = (counts[resp] || 0) + 1
+    })
+    return Object.entries(counts).map(([name, count]) => ({
+      value: name,
+      label: name,
+      count,
+      icon: <FaUser className="w-3 h-3 text-slate-400" />,
+    }))
+  }, [filteredOpportunities])
+
+  // Opções para filtros de coluna (Funil de Pedidos)
+  const ordersVehicleOptions = useMemo<ColumnFilterOption[]>(() => {
+    const counts: Record<string, number> = {}
+    filteredOrders.forEach((ord) => {
+      const vModel = getVehicleModelInfo(getOrderVehicleModel(ord)).modelName
+      counts[vModel] = (counts[vModel] || 0) + 1
+    })
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([modelName, count]) => ({
+        value: modelName,
+        label: modelName,
+        count,
+      }))
+  }, [filteredOrders])
+
+  const ordersOriginOptions = useMemo<ColumnFilterOption[]>(() => {
+    const counts: Record<string, number> = {}
+    filteredOrders.forEach((ord) => {
+      const linkedOpp = ord.opportunity || opportunities.find((o) => o.id === ord.opportunity_id || o.order_number === ord.order_number)
+      const orig = ord.contact?.origin || linkedOpp?.contact?.origin || 'outros'
+      counts[orig] = (counts[orig] || 0) + 1
+    })
+    return Object.entries(counts).map(([orig, count]) => {
+      const badge = getOriginBadge(orig)
+      const Icon = badge.Icon
+      return {
+        value: orig,
+        label: badge.label,
+        count,
+        icon: <Icon className={`w-3 h-3 ${badge.iconColor}`} />,
+      }
+    })
+  }, [filteredOrders, opportunities])
+
+  const ordersFulfillmentOptions = useMemo<ColumnFilterOption[]>(() => {
+    const counts: Record<string, number> = {}
+    filteredOrders.forEach((ord) => {
+      const ful = ord.fulfillment_type || 'outro'
+      counts[ful] = (counts[ful] || 0) + 1
+    })
+    return Object.entries(counts).map(([type, count]) => ({
+      value: type,
+      label: getFulfillmentLabel(type),
+      count,
+    }))
+  }, [filteredOrders])
+
+  const ordersStageOptions = useMemo<ColumnFilterOption[]>(() => {
+    const counts: Record<string, number> = {}
+    filteredOrders.forEach((ord) => {
+      const st = normalizeOrdStatus(ord.status)
+      counts[st] = (counts[st] || 0) + 1
+    })
+    return ORDER_STAGES.map((st) => ({
+      value: st.id,
+      label: st.title,
+      count: counts[st.id] || 0,
+      icon: <st.Icon className="w-3 h-3" style={{ color: st.stripeColor }} />,
+    })).filter((o) => o.count > 0)
+  }, [filteredOrders])
+
+  const ordersResponsibleOptions = useMemo<ColumnFilterOption[]>(() => {
+    const counts: Record<string, number> = {}
+    filteredOrders.forEach((ord) => {
+      const linkedOpp = ord.opportunity || opportunities.find((o) => o.id === ord.opportunity_id || o.order_number === ord.order_number)
+      const resp = ord.assigned_to || linkedOpp?.assigned_to || 'Não atribuído'
+      counts[resp] = (counts[resp] || 0) + 1
+    })
+    return Object.entries(counts).map(([name, count]) => ({
+      value: name,
+      label: name,
+      count,
+      icon: <FaUser className="w-3 h-3 text-slate-400" />,
+    }))
+  }, [filteredOrders, opportunities])
+
+  // Limpeza de todos os filtros de Vendas
+  const clearAllSalesFilters = () => {
+    setSalesColumnFilters({
+      vehicles: [],
+      origins: [],
+      stages: [],
+      responsibles: []
+    })
+    setStageFilter('all')
+  }
+
+  // Limpeza de todos os filtros de Pedidos
+  const clearAllOrdersFilters = () => {
+    setOrdersColumnFilters({
+      vehicles: [],
+      origins: [],
+      fulfillments: [],
+      stages: [],
+      responsibles: []
+    })
+    setStageFilter('all')
+  }
+
+  // Filtragem composta para a Lista de Vendas
+  const listOpportunities = filteredOpportunities.filter((opp) => {
+    if (stageFilter !== 'all' && normalizeOppStage(opp.stage) !== stageFilter) {
+      return false
+    }
+    if (salesColumnFilters.vehicles.length > 0) {
+      const vModel = getVehicleModelInfo(opp.vehicle?.model || opp.vehicle_model_year).modelName
+      if (!salesColumnFilters.vehicles.includes(vModel)) return false
+    }
+    if (salesColumnFilters.origins.length > 0) {
+      const orig = opp.contact?.origin || 'outros'
+      if (!salesColumnFilters.origins.includes(orig)) return false
+    }
+    if (salesColumnFilters.stages.length > 0) {
+      const st = normalizeOppStage(opp.stage)
+      if (!salesColumnFilters.stages.includes(st)) return false
+    }
+    if (salesColumnFilters.responsibles.length > 0) {
+      const resp = opp.assigned_to || 'Não atribuído'
+      if (!salesColumnFilters.responsibles.includes(resp)) return false
+    }
+    return true
+  })
+
+  // Filtragem composta para a Lista de Pedidos
+  const listOrders = filteredOrders.filter((ord) => {
+    const linkedOpp = ord.opportunity || opportunities.find((o) => o.id === ord.opportunity_id || o.order_number === ord.order_number)
+    if (stageFilter !== 'all' && normalizeOrdStatus(ord.status) !== stageFilter) {
+      return false
+    }
+    if (ordersColumnFilters.vehicles.length > 0) {
+      const vModel = getVehicleModelInfo(getOrderVehicleModel(ord)).modelName
+      if (!ordersColumnFilters.vehicles.includes(vModel)) return false
+    }
+    if (ordersColumnFilters.origins.length > 0) {
+      const orig = ord.contact?.origin || linkedOpp?.contact?.origin || 'outros'
+      if (!ordersColumnFilters.origins.includes(orig)) return false
+    }
+    if (ordersColumnFilters.fulfillments.length > 0) {
+      const ful = ord.fulfillment_type || 'outro'
+      if (!ordersColumnFilters.fulfillments.includes(ful)) return false
+    }
+    if (ordersColumnFilters.stages.length > 0) {
+      const st = normalizeOrdStatus(ord.status)
+      if (!ordersColumnFilters.stages.includes(st)) return false
+    }
+    if (ordersColumnFilters.responsibles.length > 0) {
+      const resp = ord.assigned_to || linkedOpp?.assigned_to || 'Não atribuído'
+      if (!ordersColumnFilters.responsibles.includes(resp)) return false
+    }
+    return true
+  })
 
   return (
     <div className="flex-1 flex flex-col min-h-0 space-y-3">
@@ -800,9 +1302,9 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 <div className="p-3 bg-white border-b border-slate-200/80 shrink-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span 
-                        className="w-2 h-2 rounded-full shrink-0" 
-                        style={{ backgroundColor: col.stripeColor }}
+                      <col.Icon 
+                        className="w-3.5 h-3.5 shrink-0" 
+                        style={{ color: col.stripeColor }}
                       />
                       <h3 className="font-heading font-bold text-xs text-slate-800 tracking-tight truncate">
                         {col.title}
@@ -942,7 +1444,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                     <button 
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        onMoveStage(opp.id, SALES_STAGES[colIdx - 1].id)
+                                        requestChangeOpportunityStage(opp, SALES_STAGES[colIdx - 1].id)
                                       }}
                                       title="Voltar etapa" 
                                       className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors cursor-pointer"
@@ -966,7 +1468,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                     <button 
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        onMoveStage(opp.id, SALES_STAGES[colIdx + 1].id)
+                                        requestChangeOpportunityStage(opp, SALES_STAGES[colIdx + 1].id)
                                       }}
                                       title="Avançar etapa" 
                                       className="p-1 bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white rounded transition-colors cursor-pointer"
@@ -1094,7 +1596,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                     <button 
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        onMoveStage(opp.id, SALES_STAGES[colIdx - 1].id)
+                                        requestChangeOpportunityStage(opp, SALES_STAGES[colIdx - 1].id)
                                       }}
                                       title="Voltar etapa" 
                                       className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors cursor-pointer"
@@ -1118,7 +1620,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                     <button 
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        onMoveStage(opp.id, SALES_STAGES[colIdx + 1].id)
+                                        requestChangeOpportunityStage(opp, SALES_STAGES[colIdx + 1].id)
                                       }}
                                       title="Avançar etapa" 
                                       className="p-1 bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white rounded-lg transition-colors cursor-pointer"
@@ -1141,7 +1643,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         </div>
       )}
 
-      {/* 1B. FUNIL DE VENDAS — MODO LISTA (Tabela com filtro por etapa e troca/avanço rápido de etapa) */}
+      {/* 1B. FUNIL DE VENDAS — MODO LISTA (Tabela com filtros estilo Excel e troca rápida de etapa) */}
       {pipelineType === 'vendas' && viewMode === 'list' && (
         <div className="flex-1 flex flex-col min-h-0 space-y-2.5">
           {/* Filtro rápido por Etapa + Resumo Financeiro */}
@@ -1177,9 +1679,9 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200/80'
                     }`}
                   >
-                    <span
-                      className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-white' : ''}`}
-                      style={!isSelected ? { backgroundColor: st.stripeColor } : undefined}
+                    <st.Icon
+                      className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : ''}`}
+                      style={!isSelected ? { color: st.stripeColor } : undefined}
                     />
                     <span className="whitespace-nowrap">{st.title}</span>
                     <span className={`font-mono text-[10px] px-1.5 rounded-full ${isSelected ? 'bg-white/25 text-white' : 'bg-slate-200/70 text-slate-700'}`}>
@@ -1198,17 +1700,290 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
             </div>
           </div>
 
+          {/* Barra de Filtros Ativos com Botão de Limpar Todos os Filtros */}
+          {(salesColumnFilters.vehicles.length > 0 ||
+            salesColumnFilters.origins.length > 0 ||
+            salesColumnFilters.stages.length > 0 ||
+            salesColumnFilters.responsibles.length > 0 ||
+            stageFilter !== 'all') && (
+            <div className="bg-white rounded-xl px-3 py-2 border border-slate-200/90 shadow-2xs flex items-center gap-2 flex-wrap text-xs">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Filtros ativos:
+              </span>
+
+              {stageFilter !== 'all' && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200 text-[#EA580C]">
+                  <span>Etapa: {SALES_STAGES.find((s) => s.id === stageFilter)?.title}</span>
+                  <button
+                    type="button"
+                    onClick={() => setStageFilter('all')}
+                    className="hover:text-rose-600 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+
+              {salesColumnFilters.origins.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                  <span>Canal: {salesColumnFilters.origins.map((o) => getOriginBadge(o).label).join(', ')}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSalesColumnFilters((prev) => ({ ...prev, origins: [] }))}
+                    className="hover:text-rose-600 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+
+              {salesColumnFilters.vehicles.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                  <span>Veículo: {salesColumnFilters.vehicles.join(', ')}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSalesColumnFilters((prev) => ({ ...prev, vehicles: [] }))}
+                    className="hover:text-rose-600 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+
+              {salesColumnFilters.stages.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                  <span>Etapa: {salesColumnFilters.stages.map((st) => SALES_STAGES.find((s) => s.id === st)?.title).join(', ')}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSalesColumnFilters((prev) => ({ ...prev, stages: [] }))}
+                    className="hover:text-rose-600 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+
+              {salesColumnFilters.responsibles.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                  <span>Responsável: {salesColumnFilters.responsibles.join(', ')}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSalesColumnFilters((prev) => ({ ...prev, responsibles: [] }))}
+                    className="hover:text-rose-600 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+
+              <button
+                type="button"
+                onClick={clearAllSalesFilters}
+                className="ml-auto inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Limpar todos os filtros</span>
+              </button>
+            </div>
+          )}
+
           {/* Tabela de Oportunidades com Scroll Interno */}
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs flex-1 min-h-0 flex flex-col overflow-hidden">
             <div className="overflow-auto flex-1 min-h-0 kanban-col-scroll">
               <table className="w-full text-left border-collapse min-w-[920px]">
-                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur border-b border-slate-200/90">
+                <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur border-b border-slate-200/90">
                   <tr className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     <th className="py-3 px-4 w-24">Código</th>
-                    <th className="py-3 px-3">Cliente & Canal</th>
-                    <th className="py-3 px-3">Veículo</th>
-                    <th className="py-3 px-3 w-64">Etapa do Funil</th>
-                    <th className="py-3 px-3 w-32">Responsável</th>
+
+                    {/* Cliente & Canal com filtro estilo Excel */}
+                    <th className="py-3 px-3 relative">
+                      <div className="flex items-center gap-1.5">
+                        <span>Cliente & Canal</span>
+                        <button
+                          type="button"
+                          data-filter-trigger
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setActiveFilterDropdown((c) => (c === 'vendas-origin' ? null : 'vendas-origin'))
+                          }}
+                          title="Filtrar por Canal"
+                          className={`p-1 rounded-md transition-colors cursor-pointer ${
+                            salesColumnFilters.origins.length > 0
+                              ? 'bg-orange-100 text-[#EA580C] ring-1 ring-orange-400 font-bold'
+                              : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                          }`}
+                        >
+                          <Filter className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <ColumnFilterDropdown
+                        title="Filtrar por Canal"
+                        isOpen={activeFilterDropdown === 'vendas-origin'}
+                        onClose={() => setActiveFilterDropdown(null)}
+                        options={salesOriginOptions}
+                        selectedValues={salesColumnFilters.origins}
+                        onToggleValue={(val) =>
+                          setSalesColumnFilters((prev) => ({
+                            ...prev,
+                            origins: prev.origins.includes(val)
+                              ? prev.origins.filter((v) => v !== val)
+                              : [...prev.origins, val],
+                          }))
+                        }
+                        onSelectAll={() =>
+                          setSalesColumnFilters((prev) => ({
+                            ...prev,
+                            origins: salesOriginOptions.map((o) => o.value),
+                          }))
+                        }
+                        onClearSelection={() =>
+                          setSalesColumnFilters((prev) => ({ ...prev, origins: [] }))
+                        }
+                      />
+                    </th>
+
+                    {/* Veículo com filtro estilo Excel */}
+                    <th className="py-3 px-3 relative">
+                      <div className="flex items-center gap-1.5">
+                        <span>Veículo</span>
+                        <button
+                          type="button"
+                          data-filter-trigger
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setActiveFilterDropdown((c) => (c === 'vendas-vehicle' ? null : 'vendas-vehicle'))
+                          }}
+                          title="Filtrar por Veículo"
+                          className={`p-1 rounded-md transition-colors cursor-pointer ${
+                            salesColumnFilters.vehicles.length > 0
+                              ? 'bg-orange-100 text-[#EA580C] ring-1 ring-orange-400 font-bold'
+                              : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                          }`}
+                        >
+                          <Filter className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <ColumnFilterDropdown
+                        title="Filtrar por Veículo"
+                        isOpen={activeFilterDropdown === 'vendas-vehicle'}
+                        onClose={() => setActiveFilterDropdown(null)}
+                        options={salesVehicleOptions}
+                        selectedValues={salesColumnFilters.vehicles}
+                        onToggleValue={(val) =>
+                          setSalesColumnFilters((prev) => ({
+                            ...prev,
+                            vehicles: prev.vehicles.includes(val)
+                              ? prev.vehicles.filter((v) => v !== val)
+                              : [...prev.vehicles, val],
+                          }))
+                        }
+                        onSelectAll={() =>
+                          setSalesColumnFilters((prev) => ({
+                            ...prev,
+                            vehicles: salesVehicleOptions.map((o) => o.value),
+                          }))
+                        }
+                        onClearSelection={() =>
+                          setSalesColumnFilters((prev) => ({ ...prev, vehicles: [] }))
+                        }
+                      />
+                    </th>
+
+                    {/* Etapa do Funil com filtro estilo Excel */}
+                    <th className="py-3 px-3 w-64 relative">
+                      <div className="flex items-center gap-1.5">
+                        <span>Etapa do Funil</span>
+                        <button
+                          type="button"
+                          data-filter-trigger
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setActiveFilterDropdown((c) => (c === 'vendas-stage' ? null : 'vendas-stage'))
+                          }}
+                          title="Filtrar por Etapa"
+                          className={`p-1 rounded-md transition-colors cursor-pointer ${
+                            salesColumnFilters.stages.length > 0
+                              ? 'bg-orange-100 text-[#EA580C] ring-1 ring-orange-400 font-bold'
+                              : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                          }`}
+                        >
+                          <Filter className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <ColumnFilterDropdown
+                        title="Filtrar por Etapa"
+                        isOpen={activeFilterDropdown === 'vendas-stage'}
+                        onClose={() => setActiveFilterDropdown(null)}
+                        options={salesStageOptions}
+                        selectedValues={salesColumnFilters.stages}
+                        onToggleValue={(val) =>
+                          setSalesColumnFilters((prev) => ({
+                            ...prev,
+                            stages: prev.stages.includes(val)
+                              ? prev.stages.filter((v) => v !== val)
+                              : [...prev.stages, val],
+                          }))
+                        }
+                        onSelectAll={() =>
+                          setSalesColumnFilters((prev) => ({
+                            ...prev,
+                            stages: salesStageOptions.map((o) => o.value),
+                          }))
+                        }
+                        onClearSelection={() =>
+                          setSalesColumnFilters((prev) => ({ ...prev, stages: [] }))
+                        }
+                      />
+                    </th>
+
+                    {/* Responsável com filtro estilo Excel */}
+                    <th className="py-3 px-3 w-36 relative">
+                      <div className="flex items-center gap-1.5">
+                        <span>Responsável</span>
+                        <button
+                          type="button"
+                          data-filter-trigger
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setActiveFilterDropdown((c) => (c === 'vendas-responsible' ? null : 'vendas-responsible'))
+                          }}
+                          title="Filtrar por Responsável"
+                          className={`p-1 rounded-md transition-colors cursor-pointer ${
+                            salesColumnFilters.responsibles.length > 0
+                              ? 'bg-orange-100 text-[#EA580C] ring-1 ring-orange-400 font-bold'
+                              : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                          }`}
+                        >
+                          <Filter className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <ColumnFilterDropdown
+                        title="Filtrar por Responsável"
+                        isOpen={activeFilterDropdown === 'vendas-responsible'}
+                        onClose={() => setActiveFilterDropdown(null)}
+                        options={salesResponsibleOptions}
+                        selectedValues={salesColumnFilters.responsibles}
+                        onToggleValue={(val) =>
+                          setSalesColumnFilters((prev) => ({
+                            ...prev,
+                            responsibles: prev.responsibles.includes(val)
+                              ? prev.responsibles.filter((v) => v !== val)
+                              : [...prev.responsibles, val],
+                          }))
+                        }
+                        onSelectAll={() =>
+                          setSalesColumnFilters((prev) => ({
+                            ...prev,
+                            responsibles: salesResponsibleOptions.map((o) => o.value),
+                          }))
+                        }
+                        onClearSelection={() =>
+                          setSalesColumnFilters((prev) => ({ ...prev, responsibles: [] }))
+                        }
+                        alignRight
+                      />
+                    </th>
+
                     <th className="py-3 px-3 w-32 text-right">Valor</th>
                     <th className="py-3 px-4 w-36 text-right">Ações</th>
                   </tr>
@@ -1228,7 +2003,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       const vehicle = getVehicleModelInfo(opp.vehicle?.model || opp.vehicle_model_year)
                       const originBadge = getOriginBadge(opp.contact?.origin)
                       const OriginIcon = originBadge.Icon
-                      const canAdvance = stageIdx >= 0 && stageIdx < SALES_STAGES.length - 2
                       const isWonStage = normStage === 'venda_ganha'
                       const pendingTasks = (opp.tasks || []).filter((t) => !t.completed)
 
@@ -1290,16 +2064,16 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             </span>
                           </td>
 
-                          {/* Etapa Interativa (Select + Avançar 1 clique) */}
+                          {/* Etapa Interativa com Ícone Font Awesome (sem botão setinha para avançar) */}
                           <td className="py-3 px-3 align-middle" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center gap-1.5">
-                              <span
-                                className="w-2.5 h-2.5 rounded-full shrink-0"
-                                style={{ backgroundColor: stageCfg.stripeColor }}
+                            <div className="flex items-center gap-2">
+                              <stageCfg.Icon
+                                className="w-3.5 h-3.5 shrink-0"
+                                style={{ color: stageCfg.stripeColor }}
                               />
                               <select
                                 value={normStage}
-                                onChange={(e) => onMoveStage(opp.id, e.target.value as OpportunityStage)}
+                                onChange={(e) => requestChangeOpportunityStage(opp, e.target.value as OpportunityStage)}
                                 aria-label="Alterar etapa da oportunidade"
                                 className="flex-1 min-w-[160px] bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-800 outline-none cursor-pointer transition-colors"
                               >
@@ -1309,16 +2083,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                   </option>
                                 ))}
                               </select>
-                              {canAdvance && (
-                                <button
-                                  type="button"
-                                  onClick={() => onMoveStage(opp.id, SALES_STAGES[stageIdx + 1].id)}
-                                  title={`Avançar para ${SALES_STAGES[stageIdx + 1].title}`}
-                                  className="p-1.5 rounded-lg bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white border border-orange-200/80 hover:border-[#EA580C] transition-colors cursor-pointer shrink-0"
-                                >
-                                  <ArrowRight className="w-3.5 h-3.5" />
-                                </button>
-                              )}
                             </div>
                           </td>
 
@@ -1397,9 +2161,9 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 <div className="p-3 bg-white border-b border-slate-200/80 shrink-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span 
-                        className="w-2 h-2 rounded-full shrink-0" 
-                        style={{ backgroundColor: col.stripeColor }}
+                      <col.Icon
+                        className="w-3.5 h-3.5 shrink-0"
+                        style={{ color: col.stripeColor }}
                       />
                       <h3 className="font-heading font-bold text-xs text-slate-800 tracking-tight truncate">
                         {col.title}
@@ -1532,7 +2296,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                     <button 
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        onUpdateOrderStatus(ord.id, ORDER_STAGES[colIdx - 1].id)
+                                        requestChangeOrderStatus(ord, ORDER_STAGES[colIdx - 1].id)
                                       }}
                                       title="Voltar etapa" 
                                       className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors cursor-pointer"
@@ -1545,7 +2309,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                     <button 
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        onUpdateOrderStatus(ord.id, ORDER_STAGES[colIdx + 1].id)
+                                        requestChangeOrderStatus(ord, ORDER_STAGES[colIdx + 1].id)
                                       }}
                                       title="Avançar etapa" 
                                       className="p-1 bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white rounded transition-colors cursor-pointer"
@@ -1631,7 +2395,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                     <button 
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        onUpdateOrderStatus(ord.id, ORDER_STAGES[colIdx - 1].id)
+                                        requestChangeOrderStatus(ord, ORDER_STAGES[colIdx - 1].id)
                                       }}
                                       title="Voltar etapa" 
                                       className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors cursor-pointer"
@@ -1644,7 +2408,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                     <button 
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        onUpdateOrderStatus(ord.id, ORDER_STAGES[colIdx + 1].id)
+                                        requestChangeOrderStatus(ord, ORDER_STAGES[colIdx + 1].id)
                                       }}
                                       title="Avançar etapa" 
                                       className="p-1 bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white rounded transition-colors cursor-pointer"
@@ -1703,9 +2467,9 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200/80'
                     }`}
                   >
-                    <span
-                      className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-white' : ''}`}
-                      style={!isSelected ? { backgroundColor: st.stripeColor } : undefined}
+                    <st.Icon
+                      className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : ''}`}
+                      style={!isSelected ? { color: st.stripeColor } : undefined}
                     />
                     <span className="whitespace-nowrap">{st.title}</span>
                     <span className={`font-mono text-[10px] px-1.5 rounded-full ${isSelected ? 'bg-white/25 text-white' : 'bg-slate-200/70 text-slate-700'}`}>
@@ -1724,18 +2488,351 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
             </div>
           </div>
 
+          {/* Barra de Filtros Ativos com Botão de Limpar Todos os Filtros */}
+          {(ordersColumnFilters.vehicles.length > 0 ||
+            ordersColumnFilters.origins.length > 0 ||
+            ordersColumnFilters.fulfillments.length > 0 ||
+            ordersColumnFilters.stages.length > 0 ||
+            ordersColumnFilters.responsibles.length > 0 ||
+            stageFilter !== 'all') && (
+            <div className="bg-white rounded-xl px-3 py-2 border border-slate-200/90 shadow-2xs flex items-center gap-2 flex-wrap text-xs">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Filtros ativos:
+              </span>
+
+              {stageFilter !== 'all' && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200 text-[#EA580C]">
+                  <span>Etapa: {ORDER_STAGES.find((s) => s.id === stageFilter)?.title}</span>
+                  <button
+                    type="button"
+                    onClick={() => setStageFilter('all')}
+                    className="hover:text-rose-600 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+
+              {ordersColumnFilters.origins.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                  <span>Canal: {ordersColumnFilters.origins.map((o) => getOriginBadge(o).label).join(', ')}</span>
+                  <button
+                    type="button"
+                    onClick={() => setOrdersColumnFilters((prev) => ({ ...prev, origins: [] }))}
+                    className="hover:text-rose-600 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+
+              {ordersColumnFilters.vehicles.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                  <span>Veículo: {ordersColumnFilters.vehicles.join(', ')}</span>
+                  <button
+                    type="button"
+                    onClick={() => setOrdersColumnFilters((prev) => ({ ...prev, vehicles: [] }))}
+                    className="hover:text-rose-600 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+
+              {ordersColumnFilters.fulfillments.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                  <span>Modalidade: {ordersColumnFilters.fulfillments.map((f) => getFulfillmentLabel(f)).join(', ')}</span>
+                  <button
+                    type="button"
+                    onClick={() => setOrdersColumnFilters((prev) => ({ ...prev, fulfillments: [] }))}
+                    className="hover:text-rose-600 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+
+              {ordersColumnFilters.stages.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                  <span>Etapa: {ordersColumnFilters.stages.map((st) => ORDER_STAGES.find((s) => s.id === st)?.title || st).join(', ')}</span>
+                  <button
+                    type="button"
+                    onClick={() => setOrdersColumnFilters((prev) => ({ ...prev, stages: [] }))}
+                    className="hover:text-rose-600 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+
+              {ordersColumnFilters.responsibles.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                  <span>Responsável: {ordersColumnFilters.responsibles.join(', ')}</span>
+                  <button
+                    type="button"
+                    onClick={() => setOrdersColumnFilters((prev) => ({ ...prev, responsibles: [] }))}
+                    className="hover:text-rose-600 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+
+              <button
+                type="button"
+                onClick={clearAllOrdersFilters}
+                className="ml-auto inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Limpar todos os filtros</span>
+              </button>
+            </div>
+          )}
+
           {/* Tabela de Pedidos com Scroll Interno */}
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs flex-1 min-h-0 flex flex-col overflow-hidden">
             <div className="overflow-auto flex-1 min-h-0 kanban-col-scroll">
               <table className="w-full text-left border-collapse min-w-[960px]">
-                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur border-b border-slate-200/90">
+                <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur border-b border-slate-200/90">
                   <tr className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     <th className="py-3 px-4 w-24">Pedido</th>
-                    <th className="py-3 px-3">Cliente & Canal</th>
-                    <th className="py-3 px-3">Veículo</th>
-                    <th className="py-3 px-3">Modalidade</th>
-                    <th className="py-3 px-3 w-64">Etapa do Pedido</th>
-                    <th className="py-3 px-3 w-32">Responsável</th>
+
+                    {/* Cliente & Canal com filtro estilo Excel */}
+                    <th className="py-3 px-3 relative">
+                      <div className="flex items-center gap-1.5">
+                        <span>Cliente & Canal</span>
+                        <button
+                          type="button"
+                          data-filter-trigger
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setActiveFilterDropdown((c) => (c === 'pedidos-origin' ? null : 'pedidos-origin'))
+                          }}
+                          title="Filtrar por Canal"
+                          className={`p-1 rounded-md transition-colors cursor-pointer ${
+                            ordersColumnFilters.origins.length > 0
+                              ? 'bg-orange-100 text-[#EA580C] ring-1 ring-orange-400 font-bold'
+                              : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                          }`}
+                        >
+                          <Filter className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <ColumnFilterDropdown
+                        title="Filtrar por Canal"
+                        isOpen={activeFilterDropdown === 'pedidos-origin'}
+                        onClose={() => setActiveFilterDropdown(null)}
+                        options={ordersOriginOptions}
+                        selectedValues={ordersColumnFilters.origins}
+                        onToggleValue={(val) =>
+                          setOrdersColumnFilters((prev) => ({
+                            ...prev,
+                            origins: prev.origins.includes(val)
+                              ? prev.origins.filter((v) => v !== val)
+                              : [...prev.origins, val],
+                          }))
+                        }
+                        onSelectAll={() =>
+                          setOrdersColumnFilters((prev) => ({
+                            ...prev,
+                            origins: ordersOriginOptions.map((o) => o.value),
+                          }))
+                        }
+                        onClearSelection={() =>
+                          setOrdersColumnFilters((prev) => ({ ...prev, origins: [] }))
+                        }
+                      />
+                    </th>
+
+                    {/* Veículo com filtro estilo Excel */}
+                    <th className="py-3 px-3 relative">
+                      <div className="flex items-center gap-1.5">
+                        <span>Veículo</span>
+                        <button
+                          type="button"
+                          data-filter-trigger
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setActiveFilterDropdown((c) => (c === 'pedidos-vehicle' ? null : 'pedidos-vehicle'))
+                          }}
+                          title="Filtrar por Veículo"
+                          className={`p-1 rounded-md transition-colors cursor-pointer ${
+                            ordersColumnFilters.vehicles.length > 0
+                              ? 'bg-orange-100 text-[#EA580C] ring-1 ring-orange-400 font-bold'
+                              : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                          }`}
+                        >
+                          <Filter className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <ColumnFilterDropdown
+                        title="Filtrar por Veículo"
+                        isOpen={activeFilterDropdown === 'pedidos-vehicle'}
+                        onClose={() => setActiveFilterDropdown(null)}
+                        options={ordersVehicleOptions}
+                        selectedValues={ordersColumnFilters.vehicles}
+                        onToggleValue={(val) =>
+                          setOrdersColumnFilters((prev) => ({
+                            ...prev,
+                            vehicles: prev.vehicles.includes(val)
+                              ? prev.vehicles.filter((v) => v !== val)
+                              : [...prev.vehicles, val],
+                          }))
+                        }
+                        onSelectAll={() =>
+                          setOrdersColumnFilters((prev) => ({
+                            ...prev,
+                            vehicles: ordersVehicleOptions.map((o) => o.value),
+                          }))
+                        }
+                        onClearSelection={() =>
+                          setOrdersColumnFilters((prev) => ({ ...prev, vehicles: [] }))
+                        }
+                      />
+                    </th>
+
+                    {/* Modalidade com filtro estilo Excel */}
+                    <th className="py-3 px-3 relative">
+                      <div className="flex items-center gap-1.5">
+                        <span>Modalidade</span>
+                        <button
+                          type="button"
+                          data-filter-trigger
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setActiveFilterDropdown((c) => (c === 'pedidos-fulfillment' ? null : 'pedidos-fulfillment'))
+                          }}
+                          title="Filtrar por Modalidade"
+                          className={`p-1 rounded-md transition-colors cursor-pointer ${
+                            ordersColumnFilters.fulfillments.length > 0
+                              ? 'bg-orange-100 text-[#EA580C] ring-1 ring-orange-400 font-bold'
+                              : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                          }`}
+                        >
+                          <Filter className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <ColumnFilterDropdown
+                        title="Filtrar por Modalidade"
+                        isOpen={activeFilterDropdown === 'pedidos-fulfillment'}
+                        onClose={() => setActiveFilterDropdown(null)}
+                        options={ordersFulfillmentOptions}
+                        selectedValues={ordersColumnFilters.fulfillments}
+                        onToggleValue={(val) =>
+                          setOrdersColumnFilters((prev) => ({
+                            ...prev,
+                            fulfillments: prev.fulfillments.includes(val)
+                              ? prev.fulfillments.filter((v) => v !== val)
+                              : [...prev.fulfillments, val],
+                          }))
+                        }
+                        onSelectAll={() =>
+                          setOrdersColumnFilters((prev) => ({
+                            ...prev,
+                            fulfillments: ordersFulfillmentOptions.map((o) => o.value),
+                          }))
+                        }
+                        onClearSelection={() =>
+                          setOrdersColumnFilters((prev) => ({ ...prev, fulfillments: [] }))
+                        }
+                      />
+                    </th>
+
+                    {/* Etapa do Pedido com filtro estilo Excel */}
+                    <th className="py-3 px-3 w-64 relative">
+                      <div className="flex items-center gap-1.5">
+                        <span>Etapa do Pedido</span>
+                        <button
+                          type="button"
+                          data-filter-trigger
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setActiveFilterDropdown((c) => (c === 'pedidos-stage' ? null : 'pedidos-stage'))
+                          }}
+                          title="Filtrar por Etapa"
+                          className={`p-1 rounded-md transition-colors cursor-pointer ${
+                            ordersColumnFilters.stages.length > 0
+                              ? 'bg-orange-100 text-[#EA580C] ring-1 ring-orange-400 font-bold'
+                              : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                          }`}
+                        >
+                          <Filter className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <ColumnFilterDropdown
+                        title="Filtrar por Etapa"
+                        isOpen={activeFilterDropdown === 'pedidos-stage'}
+                        onClose={() => setActiveFilterDropdown(null)}
+                        options={ordersStageOptions}
+                        selectedValues={ordersColumnFilters.stages}
+                        onToggleValue={(val) =>
+                          setOrdersColumnFilters((prev) => ({
+                            ...prev,
+                            stages: prev.stages.includes(val)
+                              ? prev.stages.filter((v) => v !== val)
+                              : [...prev.stages, val],
+                          }))
+                        }
+                        onSelectAll={() =>
+                          setOrdersColumnFilters((prev) => ({
+                            ...prev,
+                            stages: ordersStageOptions.map((o) => o.value),
+                          }))
+                        }
+                        onClearSelection={() =>
+                          setOrdersColumnFilters((prev) => ({ ...prev, stages: [] }))
+                        }
+                      />
+                    </th>
+
+                    {/* Responsável com filtro estilo Excel */}
+                    <th className="py-3 px-3 w-36 relative">
+                      <div className="flex items-center gap-1.5">
+                        <span>Responsável</span>
+                        <button
+                          type="button"
+                          data-filter-trigger
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setActiveFilterDropdown((c) => (c === 'pedidos-responsible' ? null : 'pedidos-responsible'))
+                          }}
+                          title="Filtrar por Responsável"
+                          className={`p-1 rounded-md transition-colors cursor-pointer ${
+                            ordersColumnFilters.responsibles.length > 0
+                              ? 'bg-orange-100 text-[#EA580C] ring-1 ring-orange-400 font-bold'
+                              : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                          }`}
+                        >
+                          <Filter className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <ColumnFilterDropdown
+                        title="Filtrar por Responsável"
+                        isOpen={activeFilterDropdown === 'pedidos-responsible'}
+                        onClose={() => setActiveFilterDropdown(null)}
+                        options={ordersResponsibleOptions}
+                        selectedValues={ordersColumnFilters.responsibles}
+                        onToggleValue={(val) =>
+                          setOrdersColumnFilters((prev) => ({
+                            ...prev,
+                            responsibles: prev.responsibles.includes(val)
+                              ? prev.responsibles.filter((v) => v !== val)
+                              : [...prev.responsibles, val],
+                          }))
+                        }
+                        onSelectAll={() =>
+                          setOrdersColumnFilters((prev) => ({
+                            ...prev,
+                            responsibles: ordersResponsibleOptions.map((o) => o.value),
+                          }))
+                        }
+                        onClearSelection={() =>
+                          setOrdersColumnFilters((prev) => ({ ...prev, responsibles: [] }))
+                        }
+                        alignRight
+                      />
+                    </th>
+
                     <th className="py-3 px-3 w-32 text-right">Valor</th>
                     <th className="py-3 px-4 w-28 text-right">Ações</th>
                   </tr>
@@ -1826,17 +2923,17 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             </div>
                           </td>
 
-                          {/* Etapa do Pedido (Select + Avançar 1 clique) */}
+                          {/* Etapa do Pedido com Ícone Font Awesome e Confirmação (sem botão setinha) */}
                           <td className="py-3 px-3 align-middle" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center gap-1.5">
-                              <span
-                                className="w-2.5 h-2.5 rounded-full shrink-0"
-                                style={{ backgroundColor: stageCfg.stripeColor }}
+                            <div className="flex items-center gap-2">
+                              <stageCfg.Icon
+                                className="w-3.5 h-3.5 shrink-0"
+                                style={{ color: stageCfg.stripeColor }}
                               />
                               <select
                                 value={normStatus}
                                 disabled={!onUpdateOrderStatus}
-                                onChange={(e) => onUpdateOrderStatus?.(ord.id, e.target.value as OrderStatus)}
+                                onChange={(e) => requestChangeOrderStatus(ord, e.target.value as OrderStatus)}
                                 aria-label="Alterar etapa do pedido"
                                 className="flex-1 min-w-[160px] bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-800 outline-none cursor-pointer transition-colors disabled:opacity-60"
                               >
@@ -1846,16 +2943,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                   </option>
                                 ))}
                               </select>
-                              {canAdvance && onUpdateOrderStatus && (
-                                <button
-                                  type="button"
-                                  onClick={() => onUpdateOrderStatus(ord.id, ORDER_STAGES[stageIdx + 1].id)}
-                                  title={`Avançar para ${ORDER_STAGES[stageIdx + 1].title}`}
-                                  className="p-1.5 rounded-lg bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white border border-orange-200/80 hover:border-[#EA580C] transition-colors cursor-pointer shrink-0"
-                                >
-                                  <ArrowRight className="w-3.5 h-3.5" />
-                                </button>
-                              )}
                             </div>
                           </td>
 
@@ -1892,6 +2979,51 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* MODAL: CONFIRMAR MUDANÇA DE ETAPA (Vendas e Pedidos) */}
+      <CustomAlertModal
+        isOpen={!!pendingStageChange}
+        onClose={handleCancelStageChange}
+        type="warning"
+        title={
+          pendingStageChange?.type === 'opportunity'
+            ? 'Confirmar Mudança de Etapa da Oportunidade'
+            : 'Confirmar Mudança de Etapa do Pedido'
+        }
+        message={
+          pendingStageChange ? (
+            <div className="space-y-3">
+              <p className="text-slate-600 text-sm">
+                Deseja alterar a etapa de{' '}
+                <strong className="text-slate-900 font-bold">
+                  {pendingStageChange.code} — {pendingStageChange.clientName}
+                </strong>{' '}
+                de:
+              </p>
+              <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl">
+                <span className="font-bold text-slate-700 text-xs px-2.5 py-1 rounded-xl bg-slate-200/80">
+                  {pendingStageChange.fromStageTitle}
+                </span>
+                <ArrowRight className="w-4 h-4 text-slate-400 shrink-0" />
+                <span
+                  className="font-bold text-white text-xs px-2.5 py-1 rounded-xl shadow-2xs"
+                  style={{
+                    backgroundColor: pendingStageChange.toColor,
+                  }}
+                >
+                  {pendingStageChange.toStageTitle}
+                </span>
+              </div>
+            </div>
+          ) : (
+            ''
+          )
+        }
+        primaryButtonText="Confirmar Mudança"
+        onPrimaryAction={handleConfirmStageChange}
+        secondaryButtonText="Cancelar"
+        onSecondaryAction={handleCancelStageChange}
+      />
     </div>
   )
 }
