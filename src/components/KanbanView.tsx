@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import type { Opportunity, OpportunityStage, Order, OrderStatus } from '../types'
-import { formatOrderCode } from '../utils/formatters'
+import { formatOrderCode, formatBRPhone } from '../utils/formatters'
 import { CustomAlertModal } from './CustomAlertModal'
 import { 
   Search, 
@@ -77,42 +77,42 @@ interface OrderStageConfig {
   Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>
 }
 
-// 6 Etapas com ícones representativos do Font Awesome para o Funil de Vendas
+// 6 Etapas com ícones representativos do Font Awesome para o Funil de Vendas (Cores 100% distintas)
 const SALES_STAGES: SalesStageConfig[] = [
   { 
     id: 'novo_lead', 
     title: 'Novo lead', 
-    stripeColor: '#6366F1',
+    stripeColor: '#8B5CF6', // Roxo / Violeta
     Icon: FaUserPlus
   },
   { 
     id: 'em_qualificacao', 
     title: 'Em qualificação', 
-    stripeColor: '#0EA5E9',
+    stripeColor: '#0284C7', // Azul Claro / Sky
     Icon: FaMagnifyingGlass
   },
   { 
     id: 'aguardando_cotacao', 
     title: 'Aguardando Cotação', 
-    stripeColor: '#2563EB',
+    stripeColor: '#0D9488', // Verde Petróleo / Teal
     Icon: FaCalculator
   },
   { 
     id: 'orcamento_enviado', 
     title: 'Orçamento enviado', 
-    stripeColor: '#EA580C',
+    stripeColor: '#EA580C', // Laranja Robusty
     Icon: FaPaperPlane
   },
   { 
     id: 'em_negociacao', 
     title: 'Em negociação', 
-    stripeColor: '#F59E0B',
+    stripeColor: '#D97706', // Âmbar / Ouro
     Icon: FaComments
   },
   { 
     id: 'aguardando_pagamento', 
     title: 'Aguardando Pagamento', 
-    stripeColor: '#EAB308',
+    stripeColor: '#DB2777', // Rosa Magenta / Fúcsia
     Icon: FaCreditCard
   },
 ]
@@ -162,14 +162,14 @@ interface VehicleInfo {
   iconType: 'kombi' | 'large_van' | 'medium_van' | 'small_van' | 'truck' | 'default'
 }
 
-interface ColumnFilterOption {
+export interface ColumnFilterOption {
   value: string
   label: string
   count: number
   icon?: React.ReactNode
 }
 
-interface ColumnFilterDropdownProps {
+export interface ColumnFilterDropdownProps {
   title: string
   isOpen: boolean
   onClose: () => void
@@ -181,7 +181,7 @@ interface ColumnFilterDropdownProps {
   alignRight?: boolean
 }
 
-const ColumnFilterDropdown: React.FC<ColumnFilterDropdownProps> = ({
+export const ColumnFilterDropdown: React.FC<ColumnFilterDropdownProps> = ({
   title,
   isOpen,
   onClose,
@@ -1977,13 +1977,12 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     </th>
 
                     <th className="py-3 px-3 w-32 text-right">Valor</th>
-                    <th className="py-3 px-4 w-28 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
                   {listOpportunities.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-16 text-center text-slate-400 font-medium">
+                      <td colSpan={6} className="py-16 text-center text-slate-400 font-medium">
                         Nenhuma oportunidade encontrada para os filtros selecionados.
                       </td>
                     </tr>
@@ -1995,7 +1994,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       const vehicle = getVehicleModelInfo(opp.vehicle?.model || opp.vehicle_model_year)
                       const originBadge = getOriginBadge(opp.contact?.origin)
                       const OriginIcon = originBadge.Icon
-                      const isWonStage = normStage === 'venda_ganha'
                       const pendingTasks = (opp.tasks || []).filter((t) => !t.completed)
 
                       return (
@@ -2012,38 +2010,46 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </td>
 
                           {/* Cliente + Origem + Social */}
-                          <td className="py-3 px-3 align-middle">
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors text-[13px]">
-                                  {opp.contact?.full_name || 'Cliente sem nome'}
-                                </span>
+                          <td className="py-3 px-3 align-middle max-w-[340px]">
+                            <div className="flex flex-col gap-1 min-w-0">
+                              <span 
+                                className="font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors text-xs truncate max-w-[280px] sm:max-w-[340px] block"
+                                title={opp.contact?.full_name || 'Cliente sem nome'}
+                              >
+                                {opp.contact?.full_name || 'Cliente sem nome'}
+                              </span>
+                              <div className="flex items-center gap-2 min-w-0 flex-wrap">
                                 <span
-                                  className={`text-xs font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${originBadge.bgClasses}`}
+                                  className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border inline-flex items-center gap-1 shrink-0 ${originBadge.bgClasses}`}
                                   title={getOriginTitle(opp.contact?.origin)}
                                 >
                                   <OriginIcon className={`w-2.5 h-2.5 ${originBadge.iconColor}`} />
-                                  {originBadge.label}
+                                  <span>{originBadge.label}</span>
                                 </span>
+                                {opp.contact?.phone_e164 && (
+                                  <span className="text-[11px] font-mono text-slate-500 shrink-0">
+                                    {formatBRPhone(opp.contact.phone_e164.replace('+55', ''))}
+                                  </span>
+                                )}
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {renderSocialDock({
+                                    phone: opp.contact?.phone_e164,
+                                    instagram: opp.instagram_url || opp.contact?.instagram_url,
+                                    facebook: opp.facebook_url || opp.contact?.facebook_url,
+                                    website: opp.website_url || opp.contact?.website_url,
+                                    clientName: opp.contact?.full_name,
+                                    isCompact: true,
+                                  })}
+                                </div>
                                 {pendingTasks.length > 0 && (
                                   <span
-                                    className="inline-flex items-center gap-1 text-xs font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200"
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0"
                                     title={`${pendingTasks.length} tarefa(s) pendente(s)`}
                                   >
                                     <Clock className="w-2.5 h-2.5" />
                                     {pendingTasks.length}
                                   </span>
                                 )}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {renderSocialDock({
-                                  phone: opp.contact?.phone_e164,
-                                  instagram: opp.instagram_url || opp.contact?.instagram_url,
-                                  facebook: opp.facebook_url || opp.contact?.facebook_url,
-                                  website: opp.website_url || opp.contact?.website_url,
-                                  clientName: opp.contact?.full_name,
-                                  isCompact: true,
-                                })}
                               </div>
                             </div>
                           </td>
@@ -2088,41 +2094,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             <span className="inline-block font-mono font-bold text-[12px] text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg">
                               {formatCurrency(opp.final_total || 0)}
                             </span>
-                          </td>
-
-                          {/* Ações */}
-                          <td className="py-2.5 px-4 align-middle text-right w-36 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                            <div className="inline-flex items-center justify-end gap-1.5">
-                              {onConvertToOrder && (
-                                <button
-                                  type="button"
-                                  onClick={() => onConvertToOrder(opp)}
-                                  title="Gerar Pedido a partir desta oportunidade"
-                                  className="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
-                                >
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  <span>Pedido</span>
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => onSelectOpportunity?.(opp)}
-                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-[#EA580C] text-slate-700 hover:text-white text-xs font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
-                              >
-                                <span>Abrir</span>
-                                <ChevronRight className="w-3.5 h-3.5" />
-                              </button>
-                              {onCloseOpportunity && (
-                                <button
-                                  type="button"
-                                  onClick={() => setOppToClose(opp)}
-                                  title="Encerrar Negociação (Oportunidade Perdida)"
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                                >
-                                  <ArchiveX className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
                           </td>
                         </tr>
                       )

@@ -120,15 +120,16 @@ interface PipelineStageOption {
 }
 
 const SALES_PIPELINE_STAGES: PipelineStageOption[] = [
-  { id: 'novo_lead', title: 'Novo lead', color: '#6366F1', Icon: FaUserPlus },
-  { id: 'em_qualificacao', title: 'Em qualificação', color: '#0EA5E9', Icon: FaMagnifyingGlass },
-  { id: 'aguardando_cotacao', title: 'Aguardando Cotação', color: '#2563EB', Icon: FaCalculator },
+  { id: 'novo_lead', title: 'Novo lead', color: '#8B5CF6', Icon: FaUserPlus },
+  { id: 'em_qualificacao', title: 'Em qualificação', color: '#0284C7', Icon: FaMagnifyingGlass },
+  { id: 'aguardando_cotacao', title: 'Aguardando Cotação', color: '#0D9488', Icon: FaCalculator },
   { id: 'orcamento_enviado', title: 'Orçamento enviado', color: '#EA580C', Icon: FaPaperPlane },
-  { id: 'em_negociacao', title: 'Em negociação', color: '#F59E0B', Icon: FaComments },
-  { id: 'aguardando_pagamento', title: 'Aguardando Pagamento', color: '#EAB308', Icon: FaCreditCard },
+  { id: 'em_negociacao', title: 'Em negociação', color: '#D97706', Icon: FaComments },
+  { id: 'aguardando_pagamento', title: 'Aguardando Pagamento', color: '#DB2777', Icon: FaCreditCard },
 ]
 
 const normalizePipelineStage = (rawStage?: string): OpportunityStage => {
+  if (rawStage === 'venda_perdida' || rawStage === 'venda_ganha') return rawStage
   if (rawStage === 'aguardando_cotacao_frete' || rawStage === 'preparacao_orcamento') return 'aguardando_cotacao'
   if (rawStage === 'aguardando_atendimento') return 'em_qualificacao'
   if (rawStage && SALES_PIPELINE_STAGES.some((s) => s.id === rawStage)) {
@@ -207,6 +208,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [stage, setStage] = useState<OpportunityStage>(() =>
     normalizePipelineStage(initialOpportunity?.stage || 'novo_lead')
   )
+  const isReadOnly = stage === 'venda_perdida'
   const [stageToConfirm, setStageToConfirm] = useState<OpportunityStage | null>(null)
   const [isUpdatingStage, setIsUpdatingStage] = useState(false)
 
@@ -577,11 +579,15 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     setLoadingCep(false)
     if (res.error) {
       setCepError(res.error)
+      setStreet('')
+      setNeighborhood('')
+      setCity('')
+      setState('')
     } else {
-      if (res.street) setStreet(res.street)
-      if (res.neighborhood) setNeighborhood(res.neighborhood)
-      if (res.city) setCity(res.city)
-      if (res.state) setState(res.state)
+      setStreet(res.street || '')
+      setNeighborhood(res.neighborhood || '')
+      setCity(res.city || '')
+      setState(res.state || '')
     }
   }
 
@@ -597,11 +603,15 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         setLoadingCep(false)
         if (res.error) {
           setCepError(res.error)
+          setStreet('')
+          setNeighborhood('')
+          setCity('')
+          setState('')
         } else {
-          if (res.street) setStreet(res.street)
-          if (res.neighborhood) setNeighborhood(res.neighborhood)
-          if (res.city) setCity(res.city)
-          if (res.state) setState(res.state)
+          setStreet(res.street || '')
+          setNeighborhood(res.neighborhood || '')
+          setCity(res.city || '')
+          setState(res.state || '')
         }
       })
     }
@@ -615,10 +625,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     setCnpjFeedback(null)
     const res = await lookupCnpj(raw)
     setLoadingCnpj(false)
-    if (res.error) {
-      setCnpjFeedback(res.error)
+    if (res.error || !res.companyName) {
+      setCnpjFeedback(res.error || 'CNPJ não encontrado na base da Receita Federal.')
+      setPjCompanyName('')
     } else {
-      if (res.companyName) setPjCompanyName(res.companyName)
+      setPjCompanyName(res.companyName)
       setCnpjFeedback('Razão social localizada com sucesso!')
       setTimeout(() => setCnpjFeedback(null), 4000)
     }
@@ -1435,11 +1446,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       try {
         await onMarkLost(opportunityId, reason, details)
         setLostModalOpen(false)
+        onClose?.()
       } finally {
         setIsClosingOpportunity(false)
       }
     } else {
       setLostModalOpen(false)
+      onClose?.()
     }
   }
 
@@ -1496,12 +1509,16 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               <button
                 type="button"
                 key={resp}
-                onClick={() => setAssignedTo(assignedTo === resp ? '' : resp)}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                disabled={isReadOnly}
+                onClick={() => {
+                  if (isReadOnly) return
+                  setAssignedTo(assignedTo === resp ? '' : resp)
+                }}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
                   isSelected
                     ? 'bg-[#EA580C] text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                }`}
+                } ${isReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
               >
                 {resp === 'Loja' ? <FaStore className="w-3 h-3" /> : <FaUser className="w-2.5 h-2.5" />}
                 <span>{resp}</span>
@@ -1608,7 +1625,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold uppercase tracking-wider text-rose-800">
-                  Negociação Encerrada (Oportunidade Perdida)
+                  Oportunidade Perdida (Encerrada)
                 </span>
                 {initialOpportunity?.lost_reason && (
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-200/90 text-rose-900 border border-rose-300">
@@ -1616,9 +1633,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-rose-700 mt-0.5 font-medium">
-                {initialOpportunity?.lost_reason_details || 'Esta oportunidade está arquivada no menu de Oportunidades Perdidas e pode ser reativada a qualquer momento.'}
-              </p>
             </div>
           </div>
           {onReopenOpportunity && opportunityId && (
@@ -1629,7 +1643,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>{isReopeningOpportunity ? 'Reativando...' : 'Reativar Negociação'}</span>
+              <span>{isReopeningOpportunity ? 'Reativando...' : 'Reativar Oportunidade'}</span>
             </button>
           )}
         </div>
@@ -1654,18 +1668,21 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               <button
                 key={st.id}
                 type="button"
-                disabled={isUpdatingStage}
-                onClick={() => void handleSelectStage(st.id)}
-                title={`Mover lead para: ${st.title}`}
+                disabled={isReadOnly || isUpdatingStage}
+                onClick={() => {
+                  if (isReadOnly) return
+                  void handleSelectStage(st.id)
+                }}
+                title={isReadOnly ? `Etapa: ${st.title} (somente leitura)` : `Mover lead para: ${st.title}`}
                 style={{
                   clipPath,
                   ...(isActive ? { backgroundColor: st.color } : {}),
                 }}
-                className={`group relative flex-1 min-w-[130px] py-2.5 px-3.5 flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap select-none disabled:opacity-60 ${
+                className={`group relative flex-1 min-w-[130px] py-2.5 px-3.5 flex items-center justify-center gap-1.5 text-xs font-bold transition-all whitespace-nowrap select-none disabled:opacity-60 ${
                   isActive
                     ? 'text-white shadow-xs'
                     : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                }`}
+                } ${isReadOnly ? 'cursor-default' : 'cursor-pointer'}`}
               >
                 <st.Icon
                   className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-white' : ''}`}
@@ -1681,7 +1698,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       {/* Main 2-Column Layout: Left = Active Tab Content | Right = Persistent Sticky Summary & Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Active Tab Content */}
-        <div className="lg:col-span-7 space-y-5">
+        <fieldset disabled={isReadOnly} className={`lg:col-span-7 space-y-5 border-none p-0 m-0 ${isReadOnly ? 'opacity-95' : ''}`}>
           {/* =========================================================================
               ABA 1: 1. CONTATO & REDES
              ========================================================================= */}
@@ -3334,7 +3351,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               </div>
             </>
           )}
-        </div>
+        </fieldset>
 
         {/* Right Column: Persistent Sticky Official Quotation Sheet & Quick Actions */}
         <div className="lg:col-span-5 space-y-4">
@@ -3885,31 +3902,56 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               )}
             </div>
 
-            {/* Botões Principais: Salvar + Gerar Pedido */}
+            {/* Botões Principais: Se somente leitura, exibe Reativar e Voltar; caso contrário, Salvar e Gerar Pedido */}
             <div className="space-y-2.5">
-              <div className="grid grid-cols-2 gap-2">
-                {/* Botão Salvar (Cria/atualiza o card no Funil de Vendas) */}
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="py-3 px-3 rounded-xl text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
-                >
-                  {isSaving ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Save className="w-4 h-4 shrink-0" />}
-                  <span>{isSaving ? 'Salvando...' : 'Salvar'}</span>
-                </button>
+              {isReadOnly ? (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    disabled={isReopeningOpportunity}
+                    onClick={() => void handleConfirmReopenOpportunity()}
+                    className="w-full py-3 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+                  >
+                    <RotateCcw className="w-4 h-4 shrink-0" />
+                    <span>{isReopeningOpportunity ? 'Reativando...' : 'Reativar Oportunidade'}</span>
+                  </button>
 
-                {/* Botão Gerar Pedido (Integra diretamente com o Funil de Pedidos) */}
-                <button
-                  type="button"
-                  onClick={handleGenerateOrderAction}
-                  disabled={isSaving}
-                  className="py-3 px-3 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
-                >
-                  {isSaving ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Truck className="w-4 h-4 shrink-0" />}
-                  <span>Gerar Pedido</span>
-                </button>
-              </div>
+                  {onClose && (
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="w-full py-2.5 px-3 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <ArrowLeft className="w-4 h-4 shrink-0" />
+                      <span>Voltar</span>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Botão Salvar (Cria/atualiza o card no Funil de Vendas) */}
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="py-3 px-3 rounded-xl text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+                  >
+                    {isSaving ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Save className="w-4 h-4 shrink-0" />}
+                    <span>{isSaving ? 'Salvando...' : 'Salvar'}</span>
+                  </button>
+
+                  {/* Botão Gerar Pedido (Integra diretamente com o Funil de Pedidos) */}
+                  <button
+                    type="button"
+                    onClick={handleGenerateOrderAction}
+                    disabled={isSaving}
+                    className="py-3 px-3 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+                  >
+                    {isSaving ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Truck className="w-4 h-4 shrink-0" />}
+                    <span>Gerar Pedido</span>
+                  </button>
+                </div>
+              )}
 
               {savedSuccess && (
                 <div className="text-center text-xs text-emerald-700 py-1 font-bold animate-fade-in bg-emerald-50 rounded-lg p-2 border border-emerald-200">
@@ -3926,17 +3968,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               {/* Ações Secundárias com Modal Padronizado */}
               {isOpportunitySaved && (
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                  {stage === 'venda_perdida' ? (
-                    <button
-                      type="button"
-                      disabled={isReopeningOpportunity}
-                      onClick={() => void handleConfirmReopenOpportunity()}
-                      className="text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg border border-emerald-200 transition-colors cursor-pointer flex items-center gap-1 font-bold disabled:opacity-50"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>{isReopeningOpportunity ? 'Reativando...' : 'Reativar Oportunidade'}</span>
-                    </button>
-                  ) : (
+                  {!isReadOnly && (
                     <button
                       type="button"
                       onClick={() => setLostModalOpen(true)}
@@ -3950,7 +3982,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setDeleteModalOpen(true)}
-                    className="text-slate-400 hover:text-red-600 transition-colors cursor-pointer flex items-center gap-1 font-medium"
+                    className="text-slate-400 hover:text-red-600 transition-colors cursor-pointer flex items-center gap-1 font-medium ml-auto"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Apagar Orçamento</span>

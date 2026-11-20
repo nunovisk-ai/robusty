@@ -580,8 +580,9 @@ export function App() {
       const updated = await closeOpportunityInSupabase(oppId, reason, details, authorName)
       setOpportunities((prev) => prev.map((o) => (o.id === oppId ? updated : o)))
       if (editingOpportunity?.id === oppId) {
-        setEditingOpportunity(updated)
+        setEditingOpportunity(null)
       }
+      setActiveTab('lost_opportunities')
       showToast('success', 'Negociação encerrada com sucesso.')
     } catch (err) {
       showToast(

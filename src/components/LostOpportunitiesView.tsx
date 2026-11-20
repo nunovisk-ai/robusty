@@ -1,29 +1,59 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { 
   ArchiveX, 
   Search, 
   RotateCcw, 
-  Eye, 
   Calendar, 
   Car, 
-  Phone, 
   Filter, 
-  UserCheck, 
-  ArrowRight,
   TrendingDown,
   Sparkles,
-  Info
+  X
 } from 'lucide-react'
 import { FaWhatsapp, FaInstagram, FaFacebook, FaGlobe, FaUser } from 'react-icons/fa6'
 import type { Opportunity } from '../types'
 import { formatCurrency, formatOrderCode, formatBRPhone } from '../utils/formatters'
-import { COMMON_LOSS_REASONS } from './CloseOpportunityModal'
 import { CustomAlertModal } from './CustomAlertModal'
+import { ColumnFilterDropdown, type ColumnFilterOption } from './KanbanView'
 
 interface LostOpportunitiesViewProps {
   opportunities: Opportunity[]
   onOpenOpportunity: (opp: Opportunity) => void
   onReopenOpportunity: (oppId: string) => Promise<void> | void
+}
+
+const getWhatsAppLink = (phone?: string) => {
+  if (!phone) return null
+  const digits = phone.replace(/\D/g, '')
+  if (digits.length < 10) return null
+  const fullNumber = digits.startsWith('55') ? digits : `55${digits}`
+  return `https://wa.me/${fullNumber}`
+}
+
+const getInstagramUrl = (val?: string) => {
+  if (!val) return null
+  const clean = val.trim()
+  if (!clean) return null
+  if (clean.startsWith('http://') || clean.startsWith('https://')) return clean
+  if (clean.startsWith('@')) return `https://instagram.com/${clean.substring(1)}`
+  return `https://instagram.com/${clean}`
+}
+
+const getFacebookUrl = (val?: string) => {
+  if (!val) return null
+  const clean = val.trim()
+  if (!clean) return null
+  if (clean.startsWith('http://') || clean.startsWith('https://')) return clean
+  if (clean.startsWith('facebook.com/')) return `https://${clean}`
+  return `https://facebook.com/${clean}`
+}
+
+const getWebsiteUrl = (val?: string) => {
+  if (!val) return null
+  const clean = val.trim()
+  if (!clean) return null
+  if (clean.startsWith('http://') || clean.startsWith('https://')) return clean
+  return `https://${clean}`
 }
 
 export const LostOpportunitiesView: React.FC<LostOpportunitiesViewProps> = ({
@@ -32,8 +62,17 @@ export const LostOpportunitiesView: React.FC<LostOpportunitiesViewProps> = ({
   onReopenOpportunity
 }) => {
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedReasonFilter, setSelectedReasonFilter] = useState<string>('all')
-  const [selectedResponsibleFilter, setSelectedResponsibleFilter] = useState<string>('all')
+  const [activeFilterDropdown, setActiveFilterDropdown] = useState<string | null>(null)
+  const [columnFilters, setColumnFilters] = useState<{
+    vehicles: string[]
+    reasons: string[]
+    responsibles: string[]
+  }>({
+    vehicles: [],
+    reasons: [],
+    responsibles: [],
+  })
+
   const [oppToReactivate, setOppToReactivate] = useState<Opportunity | null>(null)
   const [isReactivating, setIsReactivating] = useState(false)
 
@@ -44,33 +83,104 @@ export const LostOpportunitiesView: React.FC<LostOpportunitiesViewProps> = ({
     )
   }, [opportunities])
 
-  // Filtragem
+  // Fechar popover ao clicar fora
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null
+      if (
+        !target?.closest('[data-filter-popover]') &&
+        !target?.closest('[data-filter-trigger]')
+      ) {
+        setActiveFilterDropdown(null)
+      }
+    }
+    document.addEventListener('click', handleOutsideClick)
+    return () => {
+      document.removeEventListener('click', handleOutsideClick)
+    }
+  }, [])
+
+  // Opções para filtro de Veículo
+  const vehicleOptions: ColumnFilterOption[] = useMemo(() => {
+    const counts: Record<string, number> = {}
+    lostOpps.forEach((o) => {
+      const v = o.vehicle?.model || o.vehicle_model_year || 'Utilitário'
+      counts[v] = (counts[v] || 0) + 1
+    })
+    return Object.entries(counts).map(([value, count]) => ({
+      value,
+      label: value,
+      count,
+    }))
+  }, [lostOpps])
+
+  // Opções para filtro de Motivo
+  const reasonOptions: ColumnFilterOption[] = useMemo(() => {
+    const counts: Record<string, number> = {}
+    lostOpps.forEach((o) => {
+      const r = o.lost_reason || 'Encerrado sem motivo'
+      counts[r] = (counts[r] || 0) + 1
+    })
+    return Object.entries(counts).map(([value, count]) => ({
+      value,
+      label: value,
+      count,
+    }))
+  }, [lostOpps])
+
+  // Opções para filtro de Responsável
+  const responsibleOptions: ColumnFilterOption[] = useMemo(() => {
+    const counts: Record<string, number> = {}
+    lostOpps.forEach((o) => {
+      const resp = o.assigned_to || 'Equipe'
+      counts[resp] = (counts[resp] || 0) + 1
+    })
+    return Object.entries(counts).map(([value, count]) => ({
+      value,
+      label: value,
+      count,
+    }))
+  }, [lostOpps])
+
+  // Filtragem completa
   const filteredOpps = useMemo(() => {
     return lostOpps.filter((opp) => {
       const q = searchTerm.toLowerCase().trim()
+      const vModel = opp.vehicle?.model || opp.vehicle_model_year || 'Utilitário'
+      const oppReason = opp.lost_reason || 'Encerrado sem motivo'
+      const oppResp = opp.assigned_to || 'Equipe'
+
       const matchesSearch =
         !q ||
         (opp.contact?.full_name || '').toLowerCase().includes(q) ||
         (opp.contact?.phone_e164 || '').includes(q) ||
-        (opp.vehicle_model_year || opp.vehicle?.model || '').toLowerCase().includes(q) ||
-        (opp.lost_reason || '').toLowerCase().includes(q) ||
-        (opp.lost_reason_details || '').toLowerCase().includes(q) ||
+        vModel.toLowerCase().includes(q) ||
+        oppReason.toLowerCase().includes(q) ||
+        oppResp.toLowerCase().includes(q) ||
         (opp.order_number?.toString() || '').includes(q)
 
+      const matchesVehicle =
+        columnFilters.vehicles.length === 0 || columnFilters.vehicles.includes(vModel)
+
       const matchesReason =
-        selectedReasonFilter === 'all' || opp.lost_reason === selectedReasonFilter
+        columnFilters.reasons.length === 0 || columnFilters.reasons.includes(oppReason)
 
       const matchesResponsible =
-        selectedResponsibleFilter === 'all' || opp.assigned_to === selectedResponsibleFilter
+        columnFilters.responsibles.length === 0 || columnFilters.responsibles.includes(oppResp)
 
-      return matchesSearch && matchesReason && matchesResponsible
+      return matchesSearch && matchesVehicle && matchesReason && matchesResponsible
     })
-  }, [lostOpps, searchTerm, selectedReasonFilter, selectedResponsibleFilter])
+  }, [lostOpps, searchTerm, columnFilters])
 
   // Métricas
   const totalLostValue = useMemo(() => {
     return filteredOpps.reduce((acc, curr) => acc + (curr.final_total || 0), 0)
   }, [filteredOpps])
+
+  const totalActiveColumnFilters =
+    columnFilters.vehicles.length +
+    columnFilters.reasons.length +
+    columnFilters.responsibles.length
 
   const handleConfirmReactivate = async () => {
     if (!oppToReactivate) return
@@ -83,8 +193,68 @@ export const LostOpportunitiesView: React.FC<LostOpportunitiesViewProps> = ({
     }
   }
 
+  const renderSocialDock = (opp: Opportunity) => {
+    const waUrl = getWhatsAppLink(opp.contact?.phone_e164)
+    const igUrl = getInstagramUrl(opp.instagram_url || opp.contact?.instagram_url || opp.contact?.instagram_handle)
+    const fbUrl = getFacebookUrl(opp.facebook_url || opp.contact?.facebook_url)
+    const webUrl = getWebsiteUrl(opp.website_url || opp.contact?.website_url)
+
+    return (
+      <div className="flex items-center gap-1 shrink-0">
+        {waUrl && (
+          <a
+            href={waUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            title={`WhatsApp: Conversar com ${opp.contact?.full_name || 'cliente'}`}
+            className="p-1 rounded-md text-emerald-600 hover:text-white hover:bg-emerald-600 transition-colors bg-emerald-50 border border-emerald-200"
+          >
+            <FaWhatsapp className="w-2.5 h-2.5" />
+          </a>
+        )}
+        {igUrl && (
+          <a
+            href={igUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            title="Abrir Instagram"
+            className="p-1 rounded-md text-pink-600 hover:text-white hover:bg-pink-600 transition-colors bg-pink-50 border border-pink-200"
+          >
+            <FaInstagram className="w-2.5 h-2.5" />
+          </a>
+        )}
+        {fbUrl && (
+          <a
+            href={fbUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            title="Abrir Facebook"
+            className="p-1 rounded-md text-blue-600 hover:text-white hover:bg-blue-600 transition-colors bg-blue-50 border border-blue-200"
+          >
+            <FaFacebook className="w-2.5 h-2.5" />
+          </a>
+        )}
+        {webUrl && (
+          <a
+            href={webUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            title="Abrir Site"
+            className="p-1 rounded-md text-slate-600 hover:text-white hover:bg-slate-700 transition-colors bg-slate-100 border border-slate-200"
+          >
+            <FaGlobe className="w-2.5 h-2.5" />
+          </a>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className="space-y-5 max-w-7xl mx-auto pb-12">
       {/* Top Banner & Header */}
       <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-100 shadow-nexo flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
@@ -101,7 +271,7 @@ export const LostOpportunitiesView: React.FC<LostOpportunitiesViewProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Registro completo de negociações encerradas para acompanhamento, follow-up e reativação comercial.
+              Registro de negociações encerradas para acompanhamento, follow-up e reativação comercial.
             </p>
           </div>
         </div>
@@ -110,7 +280,7 @@ export const LostOpportunitiesView: React.FC<LostOpportunitiesViewProps> = ({
         <div className="bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200/80 flex items-center gap-3 shrink-0">
           <TrendingDown className="w-5 h-5 text-rose-500 shrink-0" />
           <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
               Valor Potencial em Recuperação:
             </span>
             <span className="font-mono text-base font-bold text-slate-900">
@@ -120,8 +290,8 @@ export const LostOpportunitiesView: React.FC<LostOpportunitiesViewProps> = ({
         </div>
       </div>
 
-      {/* Barra de Filtros e Busca */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-nexo flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      {/* Barra de Busca e Ações Rápidas */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-nexo flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         {/* Campo de Busca */}
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -134,33 +304,17 @@ export const LostOpportunitiesView: React.FC<LostOpportunitiesViewProps> = ({
           />
         </div>
 
-        {/* Filtro por Motivo de Encerramento */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <select
-            value={selectedReasonFilter}
-            onChange={(e) => setSelectedReasonFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-[#EA580C] cursor-pointer"
+        {/* Botão para limpar filtros de coluna */}
+        {totalActiveColumnFilters > 0 && (
+          <button
+            type="button"
+            onClick={() => setColumnFilters({ vehicles: [], reasons: [], responsibles: [] })}
+            className="px-3 py-2 rounded-xl text-xs font-bold text-[#EA580C] bg-orange-50 hover:bg-orange-100 border border-orange-200 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
           >
-            <option value="all">Todos os Motivos</option>
-            {COMMON_LOSS_REASONS.map((r) => (
-              <option key={r} value={r === 'Outro motivo (especificar)' ? 'Outro motivo' : r}>
-                {r}
-              </option>
-            ))}
-          </select>
-
-          {/* Filtro por Responsável */}
-          <select
-            value={selectedResponsibleFilter}
-            onChange={(e) => setSelectedResponsibleFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-[#EA580C] cursor-pointer"
-          >
-            <option value="all">Todos os Responsáveis</option>
-            <option value="Norlando">Norlando</option>
-            <option value="Igor">Igor</option>
-            <option value="Loja">Loja</option>
-          </select>
-        </div>
+            <X className="w-3.5 h-3.5" />
+            <span>Limpar filtros de coluna ({totalActiveColumnFilters})</span>
+          </button>
+        )}
       </div>
 
       {/* Lista / Tabela de Oportunidades Perdidas */}
@@ -181,22 +335,163 @@ export const LostOpportunitiesView: React.FC<LostOpportunitiesViewProps> = ({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[900px]">
+            <table className="w-full text-left border-collapse min-w-[880px]">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-500">
-                  <th className="py-3 px-4 w-28">Código</th>
-                  <th className="py-3 px-4">Cliente & Contato</th>
-                  <th className="py-3 px-4">Veículo</th>
-                  <th className="py-3 px-4">Motivo do Encerramento</th>
-                  <th className="py-3 px-4">Data Encerramento</th>
-                  <th className="py-3 px-4">Responsável</th>
-                  <th className="py-3 px-4 text-right">Valor Orçado</th>
-                  <th className="py-3 px-4 text-center w-36">Ações</th>
+                  <th className="py-3 px-3 w-24">Código</th>
+                  <th className="py-3 px-3">Cliente & Contato</th>
+                  
+                  {/* Veículo com filtro estilo Excel */}
+                  <th className="py-3 px-3 relative w-44">
+                    <div className="flex items-center gap-1.5">
+                      <span>Veículo</span>
+                      <button
+                        type="button"
+                        data-filter-trigger
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setActiveFilterDropdown((c) => (c === 'lost-vehicle' ? null : 'lost-vehicle'))
+                        }}
+                        title="Filtrar por Veículo"
+                        className={`p-1 rounded-md transition-colors cursor-pointer ${
+                          columnFilters.vehicles.length > 0
+                            ? 'bg-orange-100 text-[#EA580C] ring-1 ring-orange-400 font-bold'
+                            : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                        }`}
+                      >
+                        <Filter className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <ColumnFilterDropdown
+                      title="Filtrar por Veículo"
+                      isOpen={activeFilterDropdown === 'lost-vehicle'}
+                      onClose={() => setActiveFilterDropdown(null)}
+                      options={vehicleOptions}
+                      selectedValues={columnFilters.vehicles}
+                      onToggleValue={(val) =>
+                        setColumnFilters((prev) => ({
+                          ...prev,
+                          vehicles: prev.vehicles.includes(val)
+                            ? prev.vehicles.filter((v) => v !== val)
+                            : [...prev.vehicles, val],
+                        }))
+                      }
+                      onSelectAll={() =>
+                        setColumnFilters((prev) => ({
+                          ...prev,
+                          vehicles: vehicleOptions.map((o) => o.value),
+                        }))
+                      }
+                      onClearSelection={() =>
+                        setColumnFilters((prev) => ({ ...prev, vehicles: [] }))
+                      }
+                    />
+                  </th>
+
+                  {/* Motivo do Encerramento com filtro estilo Excel */}
+                  <th className="py-3 px-3 relative w-56">
+                    <div className="flex items-center gap-1.5">
+                      <span>Motivo do Encerramento</span>
+                      <button
+                        type="button"
+                        data-filter-trigger
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setActiveFilterDropdown((c) => (c === 'lost-reason' ? null : 'lost-reason'))
+                        }}
+                        title="Filtrar por Motivo"
+                        className={`p-1 rounded-md transition-colors cursor-pointer ${
+                          columnFilters.reasons.length > 0
+                            ? 'bg-orange-100 text-[#EA580C] ring-1 ring-orange-400 font-bold'
+                            : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                        }`}
+                      >
+                        <Filter className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <ColumnFilterDropdown
+                      title="Filtrar por Motivo"
+                      isOpen={activeFilterDropdown === 'lost-reason'}
+                      onClose={() => setActiveFilterDropdown(null)}
+                      options={reasonOptions}
+                      selectedValues={columnFilters.reasons}
+                      onToggleValue={(val) =>
+                        setColumnFilters((prev) => ({
+                          ...prev,
+                          reasons: prev.reasons.includes(val)
+                            ? prev.reasons.filter((v) => v !== val)
+                            : [...prev.reasons, val],
+                        }))
+                      }
+                      onSelectAll={() =>
+                        setColumnFilters((prev) => ({
+                          ...prev,
+                          reasons: reasonOptions.map((o) => o.value),
+                        }))
+                      }
+                      onClearSelection={() =>
+                        setColumnFilters((prev) => ({ ...prev, reasons: [] }))
+                      }
+                    />
+                  </th>
+
+                  <th className="py-3 px-3 w-32">Data Encerramento</th>
+
+                  {/* Responsável com filtro estilo Excel */}
+                  <th className="py-3 px-3 relative w-36">
+                    <div className="flex items-center gap-1.5">
+                      <span>Responsável</span>
+                      <button
+                        type="button"
+                        data-filter-trigger
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setActiveFilterDropdown((c) => (c === 'lost-resp' ? null : 'lost-resp'))
+                        }}
+                        title="Filtrar por Responsável"
+                        className={`p-1 rounded-md transition-colors cursor-pointer ${
+                          columnFilters.responsibles.length > 0
+                            ? 'bg-orange-100 text-[#EA580C] ring-1 ring-orange-400 font-bold'
+                            : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                        }`}
+                      >
+                        <Filter className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <ColumnFilterDropdown
+                      title="Filtrar por Responsável"
+                      isOpen={activeFilterDropdown === 'lost-resp'}
+                      onClose={() => setActiveFilterDropdown(null)}
+                      options={responsibleOptions}
+                      selectedValues={columnFilters.responsibles}
+                      onToggleValue={(val) =>
+                        setColumnFilters((prev) => ({
+                          ...prev,
+                          responsibles: prev.responsibles.includes(val)
+                            ? prev.responsibles.filter((v) => v !== val)
+                            : [...prev.responsibles, val],
+                        }))
+                      }
+                      onSelectAll={() =>
+                        setColumnFilters((prev) => ({
+                          ...prev,
+                          responsibles: responsibleOptions.map((o) => o.value),
+                        }))
+                      }
+                      onClearSelection={() =>
+                        setColumnFilters((prev) => ({ ...prev, responsibles: [] }))
+                      }
+                      alignRight
+                    />
+                  </th>
+
+                  <th className="py-3 px-3 text-right w-28">Valor Orçado</th>
+                  <th className="py-3 px-4 text-center w-28">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredOpps.map((opp) => {
-                  const clientName = opp.contact?.full_name || 'Cliente'
+                  const clientName = opp.contact?.full_name || 'Cliente sem nome'
                   const rawDate = opp.closed_at || opp.updated_at || opp.created_at
                   const formattedDate = new Date(rawDate).toLocaleDateString('pt-BR', {
                     day: '2-digit',
@@ -207,59 +502,55 @@ export const LostOpportunitiesView: React.FC<LostOpportunitiesViewProps> = ({
                   return (
                     <tr 
                       key={opp.id} 
-                      className="hover:bg-slate-50/80 transition-colors group"
+                      onClick={() => onOpenOpportunity(opp)}
+                      className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
                     >
                       {/* Código */}
-                      <td className="py-3.5 px-4 font-mono font-bold text-slate-700">
-                        <span className="px-2 py-1 bg-slate-100 rounded-lg">
+                      <td className="py-3 px-3 font-mono font-bold text-slate-700 whitespace-nowrap">
+                        <span className="px-2 py-1 bg-slate-100 rounded-lg group-hover:bg-orange-100 group-hover:text-[#EA580C] transition-colors">
                           {formatOrderCode(opp.order_number)}
                         </span>
                       </td>
 
-                      {/* Cliente e Contato */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900 text-xs">
-                          {clientName}
-                        </div>
-                        <div className="flex items-center gap-2 text-slate-500 text-xs mt-0.5">
-                          {opp.contact?.phone_e164 ? (
-                            <span className="font-mono flex items-center gap-1">
-                              <Phone className="w-3 h-3 text-slate-400" />
-                              {formatBRPhone(opp.contact.phone_e164.replace('+55', ''))}
-                            </span>
-                          ) : (
-                            <span className="italic text-slate-400">Sem telefone</span>
-                          )}
-                          {opp.contact?.email && (
-                            <span className="text-slate-400 truncate max-w-[150px]" title={opp.contact.email}>
-                              • {opp.contact.email}
-                            </span>
-                          )}
+                      {/* Cliente e Contato (com botões de contato, truncamento seguro e sem • contato) */}
+                      <td className="py-3 px-3 align-middle max-w-[340px]">
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <span 
+                            className="font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors text-xs truncate max-w-[280px] sm:max-w-[340px] block"
+                            title={clientName}
+                          >
+                            {clientName}
+                          </span>
+                          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                            {opp.contact?.phone_e164 ? (
+                              <span className="text-[11px] font-mono text-slate-500 shrink-0">
+                                {formatBRPhone(opp.contact.phone_e164.replace('+55', ''))}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] italic text-slate-400 shrink-0">Sem telefone</span>
+                            )}
+                            {renderSocialDock(opp)}
+                          </div>
                         </div>
                       </td>
 
                       {/* Veículo */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-3 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-semibold text-xs">
                           <Car className="w-3.5 h-3.5 text-[#EA580C]" />
                           <span>{opp.vehicle?.model || opp.vehicle_model_year || 'Utilitário'}</span>
                         </span>
                       </td>
 
-                      {/* Motivo do Encerramento */}
-                      <td className="py-3.5 px-4 max-w-[250px]">
+                      {/* Motivo do Encerramento (apenas a badge principal) */}
+                      <td className="py-3 px-3 whitespace-nowrap">
                         <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200/80">
                           {opp.lost_reason || 'Encerrado sem motivo'}
                         </span>
-                        {opp.lost_reason_details && (
-                          <p className="text-xs text-slate-500 mt-1 truncate" title={opp.lost_reason_details}>
-                            {opp.lost_reason_details}
-                          </p>
-                        )}
                       </td>
 
                       {/* Data de Encerramento */}
-                      <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
+                      <td className="py-3 px-3 text-slate-600 whitespace-nowrap">
                         <div className="flex items-center gap-1 font-mono text-xs">
                           <Calendar className="w-3.5 h-3.5 text-slate-400" />
                           <span>{formattedDate}</span>
@@ -267,7 +558,7 @@ export const LostOpportunitiesView: React.FC<LostOpportunitiesViewProps> = ({
                       </td>
 
                       {/* Responsável */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      <td className="py-3 px-3 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 font-semibold text-slate-700 text-xs">
                           <FaUser className="w-3 h-3 text-slate-400" />
                           <span>{opp.assigned_to || 'Equipe'}</span>
@@ -275,32 +566,21 @@ export const LostOpportunitiesView: React.FC<LostOpportunitiesViewProps> = ({
                       </td>
 
                       {/* Valor Orçado */}
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
+                      <td className="py-3 px-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
                         {formatCurrency(opp.final_total || 0)}
                       </td>
 
-                      {/* Ações */}
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => onOpenOpportunity(opp)}
-                            title="Ver histórico e proposta anterior"
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 transition-colors cursor-pointer"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setOppToReactivate(opp)}
-                            title="Reativar oportunidade (retorna para Novo Lead)"
-                            className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Reativar</span>
-                          </button>
-                        </div>
+                      {/* Ação (Última coluna: Botão Reativar, sem botão de olho) */}
+                      <td className="py-3 px-4 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => setOppToReactivate(opp)}
+                          title="Reativar oportunidade (retorna para Novo Lead)"
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs active:scale-95"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Reativar</span>
+                        </button>
                       </td>
                     </tr>
                   )
