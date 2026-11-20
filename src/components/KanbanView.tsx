@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import type { Opportunity, OpportunityStage, Order, OrderStatus } from '../types'
+import type { Opportunity, OpportunityStage, Order, OrderStatus, Appointment } from '../types'
 import { formatOrderCode, formatBRPhone } from '../utils/formatters'
 import { CustomAlertModal } from './CustomAlertModal'
 import { 
@@ -52,6 +52,7 @@ import {
 interface KanbanViewProps {
   opportunities: Opportunity[]
   orders?: Order[]
+  appointments?: Appointment[]
   onMoveStage: (id: string, newStage: OpportunityStage) => void
   onUpdateOrderStatus?: (orderId: string, newStatus: OrderStatus) => void
   onConvertToOrder?: (opp: Opportunity) => void
@@ -320,6 +321,7 @@ interface PendingStageChange {
 export const KanbanView: React.FC<KanbanViewProps> = ({ 
   opportunities, 
   orders = [],
+  appointments = [],
   onMoveStage,
   onUpdateOrderStatus,
   onConvertToOrder,
@@ -1353,6 +1355,22 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                 {opp.contact?.full_name || 'Cliente'}
                               </h4>
 
+                              {/* Alerta de Compromisso Não Realizado */}
+                              {(() => {
+                                const missedApt = appointments.find(
+                                  (a) => a.opportunity_id === opp.id && a.status === 'reagendado'
+                                )
+                                if (!missedApt) return null
+                                return (
+                                  <div className="px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[10px] font-bold flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping shrink-0" />
+                                    <span className="truncate">
+                                      ⚠️ {missedApt.event_type === 'coleta' ? 'Coleta não aconteceu' : 'Instalação não aconteceu'} — Reagendar
+                                    </span>
+                                  </div>
+                                )
+                              })()}
+
                               {/* Lembretes e Comentários Compactos */}
                               {(pendingTasks.length > 0 || hasComments) && (
                                 <div className="flex items-center justify-between gap-1 text-[9px]">
@@ -2251,6 +2269,25 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                               >
                                 {ord.contact?.full_name || linkedOpp?.contact?.full_name || 'Cliente'}
                               </h4>
+
+                              {/* Alerta de Compromisso Não Realizado */}
+                              {(() => {
+                                const missedApt = appointments.find(
+                                  (a) =>
+                                    ((ord.opportunity_id && a.opportunity_id === ord.opportunity_id) ||
+                                      a.order_id === ord.id) &&
+                                    a.status === 'reagendado'
+                                )
+                                if (!missedApt) return null
+                                return (
+                                  <div className="px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[10px] font-bold flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping shrink-0" />
+                                    <span className="truncate">
+                                      ⚠️ {missedApt.event_type === 'coleta' ? 'Coleta não aconteceu' : 'Instalação não aconteceu'} — Reagendar
+                                    </span>
+                                  </div>
+                                )
+                              })()}
 
                               {/* Linha 4: Doca Social Compacta + Ações */}
                               <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">

@@ -21,6 +21,7 @@ import type {
   OrderStatus,
   Appointment,
   OpportunityHistoryEvent,
+  OpportunityTask,
 } from './types'
 import {
   fetchOpportunities,
@@ -35,6 +36,9 @@ import {
   updateOrderStatusInSupabase,
   fetchAppointments,
   createAppointmentInSupabase,
+  saveExplicitAppointmentInSupabase,
+  cancelAppointmentInSupabase,
+  updateAppointmentStatusInSupabase,
 } from './services/crmService'
 
 const STAGE_LABELS: Record<string, string> = {
@@ -67,6 +71,7 @@ export function App() {
 
   // State for the opportunity being viewed/edited in Gerador de Orçamento
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null)
+  const [calendarViewingAppointment, setCalendarViewingAppointment] = useState<Appointment | null>(null)
 
   // 100% Supabase-backed CRM state (zero mock data)
   const [opportunities, setOpportunities] = useState<Opportunity[]>([])
@@ -180,6 +185,7 @@ export function App() {
     setReturnTab('kanban')
     setSelectedVehicleForBudget(undefined)
     setEditingOpportunity(null)
+    setCalendarViewingAppointment(null)
     setBudgetInstanceKey(Date.now())
     setActiveTab('budget')
   }
@@ -188,6 +194,16 @@ export function App() {
   const handleSelectOpportunityToEdit = (opp: Opportunity) => {
     setReturnTab(activeTab === 'budget' ? returnTab : activeTab)
     setEditingOpportunity(opp)
+    setCalendarViewingAppointment(null)
+    setBudgetInstanceKey(Date.now())
+    setActiveTab('budget')
+  }
+
+  // Open Opportunity in Read-Only mode from Calendar
+  const handleOpenCalendarLead = (opp: Opportunity, apt: Appointment) => {
+    setReturnTab('calendar')
+    setEditingOpportunity(opp)
+    setCalendarViewingAppointment(apt)
     setBudgetInstanceKey(Date.now())
     setActiveTab('budget')
   }
@@ -624,6 +640,170 @@ export function App() {
     }
   }
 
+  const handleSaveExplicitAppointment = async (params: {
+    opportunityId: string
+    contactId: string
+    orderId?: string | null
+    eventType: 'coleta' | 'instalacao'
+    dateStr: string
+    timeStr: string
+    vehicleDescription?: string
+    productsSummary?: string
+    notes?: string | null
+  }) => {
+    try {
+      const savedApt = await saveExplicitAppointmentInSupabase(params)
+      setAppointments((prev) => {
+        const idx = prev.findIndex((a) => a.id === savedApt.id || a.opportunity_id === params.opportunityId)
+        if (idx >= 0) {
+          const next = [...prev]
+          next[idx] = savedApt
+          return next
+        }
+        return [...prev, savedApt]
+      })
+
+      const dateFields =
+        params.eventType === 'instalacao'
+          ? { installation_date: params.dateStr, installation_time: params.timeStr }
+          : { pickup_date: params.dateStr, pickup_time: params.timeStr }
+
+      setOpportunities((prev) =>
+        prev.map((o) => (o.id === params.opportunityId ? { ...o, ...dateFields } : o))
+      )
+      setOrders((prev) =>
+        prev.map((ord) => (ord.opportunity_id === params.opportunityId ? { ...ord, ...dateFields } : ord))
+      )
+      setEditingOpportunity((prev) =>
+        prev && prev.id === params.opportunityId ? { ...prev, ...dateFields } : prev
+      )
+
+      showToast('success', 'Agendamento confirmado na Agenda!')
+      return savedApt
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Erro ao salvar agendamento na Agenda.'
+      )
+      throw err
+    }
+  }
+
+  const handleCancelExplicitAppointment = async (
+    opportunityId: string,
+    eventType: 'coleta' | 'instalacao'
+  ) => {
+    try {
+      await cancelAppointmentInSupabase(opportunityId, eventType)
+      setAppointments((prev) => prev.filter((a) => a.opportunity_id !== opportunityId))
+
+      const clearFields =
+        eventType === 'instalacao'
+          ? { installation_date: undefined, installation_time: undefined }
+          : { pickup_date: undefined, pickup_time: undefined }
+
+      setOpportunities((prev) =>
+        prev.map((o) => (o.id === opportunityId ? { ...o, ...clearFields } : o))
+      )
+      setOrders((prev) =>
+        prev.map((ord) => (ord.opportunity_id === opportunityId ? { ...ord, ...clearFields } : ord))
+      )
+      setEditingOpportunity((prev) =>
+        prev && prev.id === opportunityId ? { ...prev, ...clearFields } : prev
+      )
+
+      showToast('success', 'Agendamento cancelado e removido da Agenda.')
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Erro ao cancelar agendamento.'
+      )
+      throw err
+    }
+  }
+
+  const handleConfirmAppointmentOutcome = async (
+    appointmentId: string,
+    opportunityId: string,
+    eventType: 'coleta' | 'instalacao',
+    outcome: 'concluido' | 'nao_realizado'
+  ) => {
+    const newAptStatus: Appointment['status'] = outcome === 'concluido' ? 'concluido' : 'reagendado'
+    const targetOpp = opportunities.find((o) => o.id === opportunityId)
+    const authorName = currentUser?.name || 'Loja'
+    const labelType = eventType === 'coleta' ? 'Coleta' : 'Instalação'
+    const nowIso = new Date().toISOString()
+
+    try {
+      await updateAppointmentStatusInSupabase(appointmentId, newAptStatus)
+      setAppointments((prev) =>
+        prev.map((a) => (a.id === appointmentId ? { ...a, status: newAptStatus } : a))
+      )
+
+      if (targetOpp) {
+        const newHistoryEvent: OpportunityHistoryEvent = {
+          id: `hist-apt-${Date.now()}`,
+          opportunity_id: opportunityId,
+          type: 'status_change',
+          description:
+            outcome === 'concluido'
+              ? `${labelType} efetuada (confirmado pela Loja)`
+              : `${labelType} não aconteceu no horário agendado — tarefa de reagendamento criada`,
+          user: authorName,
+          created_at: nowIso,
+        }
+        const updatedHistory = [newHistoryEvent, ...(targetOpp.history || [])]
+        let updatedTasks = [...(targetOpp.tasks || [])]
+
+        if (outcome === 'nao_realizado') {
+          const rescheduleTask: OpportunityTask = {
+            id: `task-reagendar-${Date.now()}`,
+            opportunity_id: opportunityId,
+            order_number: targetOpp.order_number,
+            client_name: targetOpp.contact?.full_name,
+            title: `Reagendar ${eventType === 'coleta' ? 'coleta' : 'instalação'}`,
+            assigned_to: targetOpp.assigned_to || 'Loja',
+            completed: false,
+            created_at: nowIso,
+          }
+          updatedTasks = [rescheduleTask, ...updatedTasks]
+        }
+
+        await updateOpportunityTasks(opportunityId, updatedTasks, updatedHistory)
+
+        setOpportunities((prev) =>
+          prev.map((o) =>
+            o.id === opportunityId
+              ? { ...o, tasks: updatedTasks, history: updatedHistory, updated_at: nowIso }
+              : o
+          )
+        )
+        setEditingOpportunity((prev) =>
+          prev && prev.id === opportunityId
+            ? { ...prev, tasks: updatedTasks, history: updatedHistory, updated_at: nowIso }
+            : prev
+        )
+      }
+
+      setCalendarViewingAppointment((prev) =>
+        prev && prev.id === appointmentId ? { ...prev, status: newAptStatus } : prev
+      )
+
+      showToast(
+        'success',
+        outcome === 'concluido'
+          ? `${labelType} marcada como efetuada!`
+          : `Registrado que a ${labelType.toLowerCase()} não aconteceu. Alerta e tarefa criados no funil.`
+      )
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Erro ao atualizar status do compromisso.'
+      )
+      throw err
+    }
+  }
+
   if (!currentUser) {
     return <LoginView onLoginSuccess={handleLoginSuccess} />
   }
@@ -711,6 +891,7 @@ export function App() {
                   mode="vendas"
                   opportunities={opportunities}
                   orders={orders}
+                  appointments={appointments}
                   onMoveStage={handleMoveStage}
                   onUpdateOrderStatus={handleUpdateOrderStatus}
                   onConvertToOrder={handleConvertToOrder}
@@ -724,12 +905,24 @@ export function App() {
                 <BudgetBuilderView
                   key={budgetInstanceKey}
                   initialVehicleId={selectedVehicleForBudget}
-                  initialOpportunity={editingOpportunity}
+                  initialOpportunity={
+                    editingOpportunity
+                      ? opportunities.find((o) => o.id === editingOpportunity.id) || editingOpportunity
+                      : null
+                  }
                   existingOrderNumber={nextOpportunityNumber}
                   existingOrders={orders}
                   existingOpportunities={opportunities}
                   existingAppointments={appointments}
                   currentUser={currentUser}
+                  calendarReadOnly={Boolean(calendarViewingAppointment)}
+                  activeAppointment={
+                    calendarViewingAppointment
+                      ? appointments.find((a) => a.id === calendarViewingAppointment.id) || calendarViewingAppointment
+                      : editingOpportunity
+                      ? appointments.find((a) => a.opportunity_id === editingOpportunity.id && a.status !== 'cancelado') || null
+                      : null
+                  }
                   onSaveToKanban={handleSaveOpportunity}
                   onAutoSaveOpportunity={handleAutoSaveOpportunity}
                   onChangeStage={handleMoveStage}
@@ -737,7 +930,13 @@ export function App() {
                   onDeleteOpportunity={handleDeleteOpportunity}
                   onMarkLost={handleCloseOpportunity}
                   onReopenOpportunity={handleReopenOpportunity}
-                  onClose={() => setActiveTab(returnTab)}
+                  onSaveSchedule={handleSaveExplicitAppointment}
+                  onCancelSchedule={handleCancelExplicitAppointment}
+                  onConfirmAppointmentOutcome={handleConfirmAppointmentOutcome}
+                  onClose={() => {
+                    setCalendarViewingAppointment(null)
+                    setActiveTab(returnTab)
+                  }}
                 />
               )}
 
@@ -748,6 +947,7 @@ export function App() {
                   mode="pedidos"
                   opportunities={opportunities}
                   orders={orders}
+                  appointments={appointments}
                   onMoveStage={handleMoveStage}
                   onUpdateOrderStatus={handleUpdateOrderStatus}
                   onConvertToOrder={handleConvertToOrder}
@@ -769,6 +969,7 @@ export function App() {
                   opportunities={opportunities}
                   appointments={appointments}
                   onAddAppointment={handleAddAppointment}
+                  onOpenAppointmentLead={handleOpenCalendarLead}
                 />
               )}
 

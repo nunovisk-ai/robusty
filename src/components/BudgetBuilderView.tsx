@@ -149,6 +149,8 @@ interface BudgetBuilderViewProps {
   existingOpportunities?: Opportunity[]
   existingAppointments?: Appointment[]
   currentUser?: CurrentUser | null
+  calendarReadOnly?: boolean
+  activeAppointment?: Appointment | null
   onSaveToKanban?: (opportunityData: any, options?: { stayOnPage?: boolean }) => Promise<Opportunity | null> | void
   onAutoSaveOpportunity?: (opportunityData: any) => Promise<Opportunity | null> | void
   onChangeStage?: (oppId: string, newStage: OpportunityStage) => Promise<void> | void
@@ -156,6 +158,24 @@ interface BudgetBuilderViewProps {
   onDeleteOpportunity?: (oppId: string) => Promise<void> | void
   onMarkLost?: (oppId: string, reason: string, details?: string) => Promise<void> | void
   onReopenOpportunity?: (oppId: string) => Promise<void> | void
+  onSaveSchedule?: (params: {
+    opportunityId: string
+    contactId: string
+    orderId?: string | null
+    eventType: 'coleta' | 'instalacao'
+    dateStr: string
+    timeStr: string
+    vehicleDescription?: string
+    productsSummary?: string
+    notes?: string | null
+  }) => Promise<Appointment>
+  onCancelSchedule?: (opportunityId: string, eventType: 'coleta' | 'instalacao') => Promise<void>
+  onConfirmAppointmentOutcome?: (
+    appointmentId: string,
+    opportunityId: string,
+    eventType: 'coleta' | 'instalacao',
+    outcome: 'concluido' | 'nao_realizado'
+  ) => Promise<void>
   onClose?: () => void
 }
 
@@ -180,6 +200,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   existingOpportunities = [],
   existingAppointments = [],
   currentUser,
+  calendarReadOnly = false,
+  activeAppointment = null,
   onSaveToKanban,
   onAutoSaveOpportunity,
   onChangeStage,
@@ -187,6 +209,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   onDeleteOpportunity,
   onMarkLost,
   onReopenOpportunity,
+  onSaveSchedule,
+  onCancelSchedule,
+  onConfirmAppointmentOutcome,
   onClose
 }) => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
@@ -207,11 +232,17 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [contactId, setContactId] = useState<string | null>(() => initialOpportunity?.contact_id || null)
   const [isSaving, setIsSaving] = useState(false)
 
+  // Controle de Agendamento Explícito (Salvar Agenda / Reagendar / Cancelar)
+  const [isRescheduling, setIsRescheduling] = useState(false)
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false)
+  const [scheduleFeedback, setScheduleFeedback] = useState<string | null>(null)
+  const [isConfirmingOutcome, setIsConfirmingOutcome] = useState(false)
+
   // Etapa atual do Funil de Vendas (sincronizada com o Supabase)
   const [stage, setStage] = useState<OpportunityStage>(() =>
     normalizePipelineStage(initialOpportunity?.stage || 'novo_lead')
   )
-  const isReadOnly = stage === 'venda_perdida'
+  const isReadOnly = stage === 'venda_perdida' || Boolean(calendarReadOnly)
   const [stageToConfirm, setStageToConfirm] = useState<OpportunityStage | null>(null)
   const [isUpdatingStage, setIsUpdatingStage] = useState(false)
 
@@ -865,8 +896,131 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         if (saved.contact_id) setContactId(saved.contact_id)
         if (saved.order_number) setOrderNumber(saved.order_number)
       }
+      return saved
     } catch (err) {
       console.error('Erro no salvamento automático da oportunidade:', err)
+      return null
+    }
+  }
+
+  const currentScheduledAppointment = useMemo(() => {
+    if (activeAppointment && activeAppointment.status !== 'cancelado') {
+      return activeAppointment
+    }
+    if (opportunityId) {
+      return existingAppointments.find((a) => a.opportunity_id === opportunityId && a.status !== 'cancelado') || null
+    }
+    return null
+  }, [activeAppointment, opportunityId, existingAppointments])
+
+  const isScheduleConfirmed = Boolean(currentScheduledAppointment)
+  const isScheduleLocked = isScheduleConfirmed && !isRescheduling
+
+  const handleSaveExplicitSchedule = async () => {
+    const eventType: 'coleta' | 'instalacao' =
+      fulfillment === 'instalacao_loja' ? 'instalacao' : 'coleta'
+    const dateStr = eventType === 'instalacao' ? installationDate : pickupDate
+    const timeStr = eventType === 'instalacao' ? installationTime : pickupTime
+
+    if (!dateStr || !timeStr) {
+      setScheduleFeedback('Selecione a data e o horário antes de salvar na agenda.')
+      return
+    }
+    if (!onSaveSchedule) return
+
+    setIsSavingSchedule(true)
+    setScheduleFeedback(null)
+    try {
+      const authorName = currentUser?.name || assignedTo || 'Equipe'
+      const scheduleHist: OpportunityHistoryEvent = {
+        id: `hist-sched-${Date.now()}`,
+        opportunity_id: opportunityId || undefined,
+        type: 'note',
+        description: `${isRescheduling ? 'Reagendamento' : 'Agendamento'} de ${eventType === 'instalacao' ? 'Instalação' : 'Coleta'} salvo na agenda para ${dateStr.split('-').reverse().join('/')} às ${timeStr}`,
+        user: authorName,
+        created_at: new Date().toISOString(),
+      }
+      const nextHistory = [scheduleHist, ...history]
+      setHistory(nextHistory)
+
+      let targetOppId = opportunityId
+      let targetContactId = contactId
+
+      if (!targetOppId || !targetContactId) {
+        const saved = await autoSaveOpportunity({ history: nextHistory })
+        targetOppId = saved?.id || null
+        targetContactId = saved?.contact_id || null
+      } else {
+        await autoSaveOpportunity({ history: nextHistory })
+      }
+
+      if (!targetOppId || !targetContactId) {
+        setScheduleFeedback('Preencha os dados do cliente e salve o orçamento antes de agendar.')
+        return
+      }
+
+      const linkedOrder = existingOrders.find((o) => o.opportunity_id === targetOppId)
+      const productsSummary =
+        items.length > 0
+          ? items.map((it) => `${it.quantity}x ${it.product.name}`).join(', ')
+          : 'Itens conforme orçamento'
+
+      await onSaveSchedule({
+        opportunityId: targetOppId,
+        contactId: targetContactId,
+        orderId: linkedOrder?.id || null,
+        eventType,
+        dateStr,
+        timeStr,
+        vehicleDescription: selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Veículo Utilitário',
+        productsSummary,
+        notes: initialOpportunity?.notes || null,
+      })
+
+      setIsRescheduling(false)
+      setScheduleFeedback(null)
+    } catch (err) {
+      console.error('Erro ao salvar agendamento:', err)
+      setScheduleFeedback('Não foi possível salvar o agendamento.')
+    } finally {
+      setIsSavingSchedule(false)
+    }
+  }
+
+  const handleCancelExplicitSchedule = async () => {
+    if (!opportunityId || !onCancelSchedule) return
+    const eventType: 'coleta' | 'instalacao' =
+      fulfillment === 'instalacao_loja' ? 'instalacao' : 'coleta'
+
+    setIsSavingSchedule(true)
+    setScheduleFeedback(null)
+    try {
+      await onCancelSchedule(opportunityId, eventType)
+      if (eventType === 'instalacao') {
+        setInstallationDate('')
+        setInstallationTime('')
+      } else {
+        setPickupDate('')
+        setPickupTime('')
+      }
+      const authorName = currentUser?.name || assignedTo || 'Equipe'
+      const cancelHist: OpportunityHistoryEvent = {
+        id: `hist-sched-cancel-${Date.now()}`,
+        opportunity_id: opportunityId,
+        type: 'note',
+        description: `Agendamento de ${eventType === 'instalacao' ? 'Instalação' : 'Coleta'} cancelado e removido da agenda`,
+        user: authorName,
+        created_at: new Date().toISOString(),
+      }
+      const nextHistory = [cancelHist, ...history]
+      setHistory(nextHistory)
+      setIsRescheduling(false)
+      await autoSaveOpportunity({ history: nextHistory })
+    } catch (err) {
+      console.error('Erro ao cancelar agendamento:', err)
+      setScheduleFeedback('Não foi possível cancelar o agendamento.')
+    } finally {
+      setIsSavingSchedule(false)
     }
   }
 
@@ -1654,6 +1808,35 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>{isReopeningOpportunity ? 'Reativando...' : 'Reativar Oportunidade'}</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Banner de Aviso caso aberto pela Agenda (Modo Somente Leitura) */}
+      {calendarReadOnly && (
+        <div className="bg-sky-50 border border-sky-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-sky-900">
+                Visualização da Agenda — Modo Somente Leitura
+              </div>
+              <div className="text-xs text-sky-800 mt-0.5">
+                Todos os dados do lead são sincronizados automaticamente. A edição cadastral e financeira é bloqueada nesta visualização.
+              </div>
+            </div>
+          </div>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-sky-200 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Voltar à Agenda</span>
             </button>
           )}
         </div>
@@ -2691,12 +2874,20 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     </div>
 
                     {/* Programação da Coleta */}
-                    <div className="pt-2 border-t border-slate-200/80">
-                      <div className="text-xs font-bold text-slate-600 mb-2 flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-[#EA580C]" />
-                        <span>Programação da Coleta:</span>
+                    <div className="pt-2 border-t border-slate-200/80 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-[#EA580C]" />
+                          <span>Programação da Coleta:</span>
+                        </div>
+                        {isScheduleConfirmed && currentScheduledAppointment?.event_type === 'coleta' && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <Lock className="w-3 h-3" />
+                            <span>Salvo na Agenda</span>
+                          </span>
+                        )}
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${isScheduleLocked ? 'pointer-events-none opacity-70 select-none' : ''}`}>
                         <CustomDatePicker
                           label="Data da Coleta:"
                           value={pickupDate}
@@ -2711,6 +2902,64 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                           placeholder="Selecione horário da coleta"
                         />
                       </div>
+
+                      {!isReadOnly && (
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          {isScheduleLocked ? (
+                            <>
+                              <button
+                                type="button"
+                                disabled={isSavingSchedule}
+                                onClick={() => {
+                                  setIsRescheduling(true)
+                                  setScheduleFeedback(null)
+                                }}
+                                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                                <span>Reagendar</span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isSavingSchedule}
+                                onClick={() => void handleCancelExplicitSchedule()}
+                                title="Cancelar agendamento"
+                                className="p-2 rounded-xl bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                disabled={isSavingSchedule || !pickupDate || !pickupTime}
+                                onClick={() => void handleSaveExplicitSchedule()}
+                                className="px-4 py-2 rounded-xl text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                              >
+                                {isSavingSchedule ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                <span>{isSavingSchedule ? 'Salvando...' : 'Salvar Agenda'}</span>
+                              </button>
+                              {isRescheduling && (
+                                <button
+                                  type="button"
+                                  disabled={isSavingSchedule}
+                                  onClick={() => {
+                                    setIsRescheduling(false)
+                                    setScheduleFeedback(null)
+                                  }}
+                                  className="px-3 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors cursor-pointer"
+                                >
+                                  Cancelar edição
+                                </button>
+                              )}
+                            </>
+                          )}
+                          {scheduleFeedback && (
+                            <span className="text-xs font-semibold text-rose-600">{scheduleFeedback}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2743,12 +2992,20 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     </div>
 
                     {/* Data e Horário da Instalação */}
-                    <div className="pt-2 border-t border-slate-200/80">
-                      <div className="text-xs font-bold text-slate-600 mb-2 flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-[#EA580C]" />
-                        <span>Agendamento da Instalação na Loja:</span>
+                    <div className="pt-2 border-t border-slate-200/80 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-[#EA580C]" />
+                          <span>Agendamento da Instalação na Loja:</span>
+                        </div>
+                        {isScheduleConfirmed && currentScheduledAppointment?.event_type === 'instalacao' && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <Lock className="w-3 h-3" />
+                            <span>Salvo na Agenda</span>
+                          </span>
+                        )}
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${isScheduleLocked ? 'pointer-events-none opacity-70 select-none' : ''}`}>
                         <CustomDatePicker
                           label="Data da Instalação:"
                           value={installationDate}
@@ -2762,6 +3019,67 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                           onChange={setInstallationTime}
                           placeholder="Selecione horário da instalação"
                         />
+                      </div>
+
+                      {!isReadOnly && (
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          {isScheduleLocked ? (
+                            <>
+                              <button
+                                type="button"
+                                disabled={isSavingSchedule}
+                                onClick={() => {
+                                  setIsRescheduling(true)
+                                  setScheduleFeedback(null)
+                                }}
+                                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                                <span>Reagendar</span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isSavingSchedule}
+                                onClick={() => void handleCancelExplicitSchedule()}
+                                title="Cancelar agendamento"
+                                className="p-2 rounded-xl bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                disabled={isSavingSchedule || !installationDate || !installationTime}
+                                onClick={() => void handleSaveExplicitSchedule()}
+                                className="px-4 py-2 rounded-xl text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                              >
+                                {isSavingSchedule ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                <span>{isSavingSchedule ? 'Salvando...' : 'Salvar Agenda'}</span>
+                              </button>
+                              {isRescheduling && (
+                                <button
+                                  type="button"
+                                  disabled={isSavingSchedule}
+                                  onClick={() => {
+                                    setIsRescheduling(false)
+                                    setScheduleFeedback(null)
+                                  }}
+                                  className="px-3 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors cursor-pointer"
+                                >
+                                  Cancelar edição
+                                </button>
+                              )}
+                            </>
+                          )}
+                          {scheduleFeedback && (
+                            <span className="text-xs font-semibold text-rose-600">{scheduleFeedback}</span>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
                         {installationConflict && (
                           <div className="sm:col-span-2 p-3.5 rounded-2xl bg-amber-50 border border-amber-300/80 text-amber-900 text-xs flex items-start gap-3 shadow-2xs">
@@ -3423,40 +3741,162 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       <div className="flex-1 min-w-0 pr-2">
                         <div className="font-bold text-slate-900 truncate">{i.product.name}</div>
                         <div className="text-xs text-slate-500 font-mono">
-                          {i.quantity}x {formatCurrency(i.product.base_price_10x)}
+                          {calendarReadOnly ? `${i.quantity}x` : `${i.quantity}x ${formatCurrency(i.product.base_price_10x)}`}
                           {i.product.weight_kg ? ` • ${i.product.weight_kg * i.quantity} kg` : ''}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleQuantityChange(i.product.id, -1)}
-                          className="w-5 h-5 rounded bg-white text-slate-600 hover:bg-slate-200 flex items-center justify-center font-mono border border-slate-200 cursor-pointer"
-                        >
-                          -
-                        </button>
-                        <span className="text-xs font-mono font-bold text-slate-900 px-1">{i.quantity}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleQuantityChange(i.product.id, 1)}
-                          className="w-5 h-5 rounded bg-white text-slate-600 hover:bg-slate-200 flex items-center justify-center font-mono border border-slate-200 cursor-pointer"
-                        >
-                          +
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(i.product.id)}
-                          className="ml-1 text-slate-400 hover:text-red-500 p-0.5 cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      {!isReadOnly && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityChange(i.product.id, -1)}
+                            className="w-5 h-5 rounded bg-white text-slate-600 hover:bg-slate-200 flex items-center justify-center font-mono border border-slate-200 cursor-pointer"
+                          >
+                            -
+                          </button>
+                          <span className="text-xs font-mono font-bold text-slate-900 px-1">{i.quantity}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityChange(i.product.id, 1)}
+                            className="w-5 h-5 rounded bg-white text-slate-600 hover:bg-slate-200 flex items-center justify-center font-mono border border-slate-200 cursor-pointer"
+                          >
+                            +
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(i.product.id)}
+                            className="ml-1 text-slate-400 hover:text-red-500 p-0.5 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
+            {calendarReadOnly ? (
+              <div className="pt-3 border-t border-slate-100 space-y-4">
+                <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-[#EA580C]" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Confirmação do Compromisso (Loja)
+                    </span>
+                  </div>
+                </div>
+
+                {currentScheduledAppointment ? (() => {
+                  const apt = currentScheduledAppointment
+                  const eventType: 'coleta' | 'instalacao' = apt.event_type === 'coleta' ? 'coleta' : 'instalacao'
+                  const isColeta = eventType === 'coleta'
+                  const datePart = apt.scheduled_start.split('T')[0]
+                  const timePart = apt.scheduled_start.split('T')[1]?.slice(0, 5) || '09:00'
+                  const scheduledDateTime = new Date(apt.scheduled_start)
+                  const isAfterScheduledTime = !isNaN(scheduledDateTime.getTime()) && new Date() >= scheduledDateTime
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1.5 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Modalidade:</span>
+                          <span className="font-bold text-slate-900">{isColeta ? 'Coleta Transportadora' : 'Instalação na Loja'}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Horário Agendado:</span>
+                          <span className="font-mono font-bold text-slate-900">
+                            {datePart.split('-').reverse().join('/')} às {timePart}
+                          </span>
+                        </div>
+                      </div>
+
+                      {apt.status === 'concluido' ? (
+                        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>{isColeta ? 'Coleta Efetuada' : 'Instalação Efetuada'}</span>
+                        </div>
+                      ) : apt.status === 'reagendado' ? (
+                        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                          <div>
+                            <div>{isColeta ? 'Coleta não aconteceu' : 'Instalação não aconteceu'}</div>
+                            <div className="font-normal text-rose-700 mt-0.5">
+                              Alerta e tarefa de reagendamento enviados para o funil.
+                            </div>
+                          </div>
+                        </div>
+                      ) : isAfterScheduledTime ? (
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold text-slate-600">
+                            O compromisso já passou do horário agendado. Informe o resultado:
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              disabled={isConfirmingOutcome || !onConfirmAppointmentOutcome || !opportunityId}
+                              onClick={async () => {
+                                if (!onConfirmAppointmentOutcome || !opportunityId) return
+                                setIsConfirmingOutcome(true)
+                                try {
+                                  await onConfirmAppointmentOutcome(apt.id, opportunityId, eventType, 'concluido')
+                                } finally {
+                                  setIsConfirmingOutcome(false)
+                                }
+                              }}
+                              className="py-2.5 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <CheckCircle2 className="w-4 h-4 shrink-0" />
+                              <span>{isColeta ? 'Coleta Efetuada' : 'Instalação Efetuada'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={isConfirmingOutcome || !onConfirmAppointmentOutcome || !opportunityId}
+                              onClick={async () => {
+                                if (!onConfirmAppointmentOutcome || !opportunityId) return
+                                setIsConfirmingOutcome(true)
+                                try {
+                                  await onConfirmAppointmentOutcome(apt.id, opportunityId, eventType, 'nao_realizado')
+                                } finally {
+                                  setIsConfirmingOutcome(false)
+                                }
+                              }}
+                              className="py-2.5 px-3 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <AlertTriangle className="w-4 h-4 shrink-0" />
+                              <span>Não Aconteceu</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
+                          <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                          <span>
+                            A confirmação ({isColeta ? 'Coleta Efetuada' : 'Instalação Efetuada'} ou Não Aconteceu) ficará disponível após o horário agendado.
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })() : (
+                  <div className="text-xs text-slate-500">Nenhum agendamento ativo localizado.</div>
+                )}
+
+                {onClose && (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full py-2.5 px-3 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-4 h-4 shrink-0" />
+                    <span>Voltar à Agenda</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
             {/* Condição de Pagamento (Forma Padrão Direta com botão Combinar 2 Meios) */}
             <div className="pt-3 border-t border-slate-100 mb-4 space-y-3">
               <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
@@ -3964,17 +4404,21 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                     </button>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={() => setDeleteModalOpen(true)}
-                    className="text-slate-400 hover:text-red-600 transition-colors cursor-pointer flex items-center gap-1 font-medium ml-auto"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Apagar Orçamento</span>
-                  </button>
+                  {!isReadOnly && (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteModalOpen(true)}
+                      className="text-slate-400 hover:text-red-600 transition-colors cursor-pointer flex items-center gap-1 font-medium ml-auto"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Apagar Orçamento</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
+              </>
+            )}
           </div>
         </div>
       </div>

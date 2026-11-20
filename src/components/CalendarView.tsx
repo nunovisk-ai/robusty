@@ -61,6 +61,8 @@ export interface CalendarEvent {
   status: string
   sourceType: 'order' | 'opportunity' | 'appointment'
   notes?: string
+  opportunityRef?: Opportunity
+  appointmentRef?: Appointment
 }
 
 interface CalendarViewProps {
@@ -68,6 +70,7 @@ interface CalendarViewProps {
   opportunities?: Opportunity[]
   appointments?: Appointment[]
   onAddAppointment?: (apt: Omit<Appointment, 'id'>) => boolean | Promise<boolean>
+  onOpenAppointmentLead?: (opp: Opportunity, apt: Appointment) => void
 }
 
 // Helpers para limpeza de modelos de veículos (sem VW, Fiat, Renault, etc.)
@@ -130,7 +133,8 @@ const renderOriginIcon = (origin?: LeadOrigin) => {
 export const CalendarView: React.FC<CalendarViewProps> = ({
   orders = [],
   opportunities = [],
-  appointments = []
+  appointments = [],
+  onOpenAppointmentLead
 }) => {
   // Navigation State
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day' | 'list'>('month')
@@ -141,168 +145,69 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date())
   const [selectedEventModal, setSelectedEventModal] = useState<CalendarEvent | null>(null)
 
-  // Unify and integrate all events from Orders, Opportunities, and Appointments
+  const handleSelectEvent = (ev: CalendarEvent) => {
+    if (onOpenAppointmentLead && ev.opportunityRef && ev.appointmentRef) {
+      onOpenAppointmentLead(ev.opportunityRef, ev.appointmentRef)
+      return
+    }
+    setSelectedEventModal(ev)
+  }
+
+  // Unify and integrate ONLY confirmed appointments, enriched with latest Order/Opportunity data
   const allEvents = useMemo(() => {
     const list: CalendarEvent[] = []
-    const seenOrderKeys = new Set<string>()
 
-    const seenOpportunityIds = new Set<string>()
-    const seenOrderIds = new Set<string>()
-
-    // 1. Integrar dos Pedidos (Orders) vindos do Supabase
-    orders.forEach((ord) => {
-      if (ord.status === 'pedido_cancelado') return
-      const opp = ord.opportunity || opportunities.find((o) => o.id === ord.opportunity_id)
-      const vehicleRaw = opp?.vehicle_model_year || opp?.vehicle?.model || 'Utilitário'
-      const { modelName } = cleanVehicleName(vehicleRaw)
-      const productsSummary = opp?.items?.length
-        ? opp.items.map((it) => `${it.quantity}x ${it.product?.name || 'Produto'}`).join(', ')
-        : 'Itens não especificados'
-
-      // Se tiver agendamento de Coleta (Transportadora)
-      if (ord.pickup_date) {
-        list.push({
-          id: `ord-coleta-${ord.id}`,
-          type: 'coleta',
-          date: ord.pickup_date,
-          time: ord.pickup_time || '10:00',
-          orderNumber: ord.order_number,
-          orderCode: ord.order_code || formatOrderCode(ord.order_number),
-          clientName: ord.contact?.full_name || opp?.contact?.full_name || 'Cliente',
-          clientPhone: ord.contact?.phone_e164 || opp?.contact?.phone_e164,
-          clientEmail: ord.customer_email || ord.contact?.email || opp?.contact?.email,
-          origin: ord.contact?.origin || opp?.contact?.origin,
-          vehicleModel: modelName,
-          itemsSummary: productsSummary,
-          totalWeightKg: ord.total_weight_kg || opp?.total_weight_kg,
-          shippingCarrierName: ord.shipping_carrier_name || opp?.shipping_carrier_name || 'Aguardando transportadora (Igor)',
-          shippingTrackingCode: ord.shipping_tracking_code || opp?.shipping_tracking_code,
-          shippingAddress: opp?.address,
-          status: ord.status,
-          sourceType: 'order',
-          notes: ord.internal_notes || opp?.notes
-        })
-        seenOrderIds.add(ord.id)
-      }
-
-      // Se tiver agendamento de Instalação (Loja)
-      if (ord.installation_date) {
-        list.push({
-          id: `ord-inst-${ord.id}`,
-          type: 'instalacao',
-          date: ord.installation_date,
-          time: ord.installation_time || '14:00',
-          orderNumber: ord.order_number,
-          orderCode: ord.order_code || formatOrderCode(ord.order_number),
-          clientName: ord.contact?.full_name || opp?.contact?.full_name || 'Cliente',
-          clientPhone: ord.contact?.phone_e164 || opp?.contact?.phone_e164,
-          clientEmail: ord.customer_email || ord.contact?.email || opp?.contact?.email,
-          origin: ord.contact?.origin || opp?.contact?.origin,
-          vehicleModel: modelName,
-          itemsSummary: productsSummary,
-          totalWeightKg: ord.total_weight_kg || opp?.total_weight_kg,
-          status: ord.status,
-          sourceType: 'order',
-          notes: ord.internal_notes || opp?.notes
-        })
-        seenOrderIds.add(ord.id)
-      }
-
-      if (ord.opportunity_id) {
-        seenOrderKeys.add(ord.opportunity_id)
-        if (ord.pickup_date || ord.installation_date) {
-          seenOpportunityIds.add(ord.opportunity_id)
-        }
-      }
-      if (ord.order_number) seenOrderKeys.add(String(ord.order_number))
-    })
-
-    // 2. Integrar de Oportunidades salvas no Funil que ainda não viraram pedidos
-    opportunities.forEach((opp) => {
-      if (opp.stage === 'venda_perdida') return
-      if (seenOrderKeys.has(opp.id) || (opp.order_number && seenOrderKeys.has(String(opp.order_number)))) {
-        return // Já integrado através do Order
-      }
-
-      const { modelName } = cleanVehicleName(opp.vehicle_model_year || opp.vehicle?.model)
-      const productsSummary = opp.items?.length
-        ? opp.items.map((it) => `${it.quantity}x ${it.product?.name || 'Produto'}`).join(', ')
-        : 'Itens não especificados'
-
-      // Se tiver agendamento de Coleta
-      if (opp.pickup_date) {
-        list.push({
-          id: `opp-coleta-${opp.id}`,
-          type: 'coleta',
-          date: opp.pickup_date,
-          time: opp.pickup_time || '10:00',
-          orderNumber: opp.order_number,
-          orderCode: opp.order_code || formatOrderCode(opp.order_number),
-          clientName: opp.contact?.full_name || 'Cliente',
-          clientPhone: opp.contact?.phone_e164,
-          clientEmail: opp.customer_email || opp.contact?.email,
-          origin: opp.contact?.origin,
-          vehicleModel: modelName,
-          itemsSummary: productsSummary,
-          totalWeightKg: opp.total_weight_kg,
-          shippingCarrierName: opp.shipping_carrier_name || 'Pendente (Aguardando fechamento)',
-          shippingTrackingCode: opp.shipping_tracking_code,
-          shippingAddress: opp.address,
-          status: opp.stage,
-          sourceType: 'opportunity',
-          notes: opp.notes
-        })
-        seenOpportunityIds.add(opp.id)
-      }
-
-      // Se tiver agendamento de Instalação
-      if (opp.installation_date) {
-        list.push({
-          id: `opp-inst-${opp.id}`,
-          type: 'instalacao',
-          date: opp.installation_date,
-          time: opp.installation_time || '14:00',
-          orderNumber: opp.order_number,
-          orderCode: opp.order_code || formatOrderCode(opp.order_number),
-          clientName: opp.contact?.full_name || 'Cliente',
-          clientPhone: opp.contact?.phone_e164,
-          clientEmail: opp.customer_email || opp.contact?.email,
-          origin: opp.contact?.origin,
-          vehicleModel: modelName,
-          itemsSummary: productsSummary,
-          totalWeightKg: opp.total_weight_kg,
-          status: opp.stage,
-          sourceType: 'opportunity',
-          notes: opp.notes
-        })
-        seenOpportunityIds.add(opp.id)
-      }
-    })
-
-    // 3. Integrar compromissos da tabela appointments do Supabase que ainda não apareceram via order/opportunity
     appointments.forEach((apt) => {
       if (apt.status === 'cancelado') return
-      if (apt.order_id && seenOrderIds.has(apt.order_id)) return
-      if (apt.opportunity_id && seenOpportunityIds.has(apt.opportunity_id)) return
 
-      const datePart = apt.scheduled_start.split('T')[0]
-      const timePart = apt.scheduled_start.split('T')[1]?.slice(0, 5) || '09:30'
-      const { modelName } = cleanVehicleName(apt.vehicle_description)
+      const ord = orders.find(
+        (o) => (apt.order_id && o.id === apt.order_id) || (apt.opportunity_id && o.opportunity_id === apt.opportunity_id)
+      )
+      const opp =
+        opportunities.find((o) => apt.opportunity_id && o.id === apt.opportunity_id) ||
+        ord?.opportunity
+
+      if (opp?.stage === 'venda_perdida') return
+      if (ord?.status === 'pedido_cancelado') return
+
+      const eventType: 'coleta' | 'instalacao' = apt.event_type === 'coleta' ? 'coleta' : 'instalacao'
+      const datePart =
+        (eventType === 'coleta' ? ord?.pickup_date || opp?.pickup_date : ord?.installation_date || opp?.installation_date) ||
+        apt.scheduled_start.split('T')[0]
+      const timePart =
+        (eventType === 'coleta' ? ord?.pickup_time || opp?.pickup_time : ord?.installation_time || opp?.installation_time) ||
+        apt.scheduled_start.split('T')[1]?.slice(0, 5) ||
+        '09:30'
+
+      const vehicleRaw = opp?.vehicle_model_year || opp?.vehicle?.model || apt.vehicle_description || 'Utilitário'
+      const { modelName } = cleanVehicleName(vehicleRaw)
+      const productsSummary =
+        opp?.items?.length
+          ? opp.items.map((it) => `${it.quantity}x ${it.product?.name || 'Produto'}`).join(', ')
+          : apt.products_summary || 'Itens não especificados'
 
       list.push({
         id: `apt-${apt.id}`,
-        type: apt.event_type === 'coleta' ? 'coleta' : 'instalacao',
+        type: eventType,
         date: datePart,
         time: timePart,
-        clientName: apt.contact?.full_name || 'Agendamento Direto',
-        clientPhone: apt.contact?.phone_e164,
-        clientEmail: apt.contact?.email,
-        origin: apt.contact?.origin || 'loja_presencial',
+        orderNumber: ord?.order_number || opp?.order_number,
+        orderCode: ord?.order_code || opp?.order_code || formatOrderCode(ord?.order_number || opp?.order_number),
+        clientName: ord?.contact?.full_name || opp?.contact?.full_name || apt.contact?.full_name || 'Cliente',
+        clientPhone: ord?.contact?.phone_e164 || opp?.contact?.phone_e164 || apt.contact?.phone_e164,
+        clientEmail: ord?.customer_email || opp?.customer_email || opp?.contact?.email || apt.contact?.email,
+        origin: ord?.contact?.origin || opp?.contact?.origin || apt.contact?.origin || 'loja_presencial',
         vehicleModel: modelName,
-        itemsSummary: apt.products_summary || 'Itens não especificados',
+        itemsSummary: productsSummary,
+        totalWeightKg: ord?.total_weight_kg || opp?.total_weight_kg,
+        shippingCarrierName: ord?.shipping_carrier_name || opp?.shipping_carrier_name,
+        shippingTrackingCode: ord?.shipping_tracking_code || opp?.shipping_tracking_code,
+        shippingAddress: opp?.address,
         status: apt.status,
-        sourceType: 'appointment',
-        notes: apt.notes
+        sourceType: ord ? 'order' : opp ? 'opportunity' : 'appointment',
+        notes: ord?.internal_notes || opp?.notes || apt.notes,
+        opportunityRef: opp,
+        appointmentRef: apt,
       })
     })
 
@@ -751,7 +656,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     return (
                       <div
                         key={ev.id}
-                        onClick={() => setSelectedEventModal(ev)}
+                        onClick={() => handleSelectEvent(ev)}
                         title={`${isColeta ? 'Coleta' : 'Instalação'} - ${ev.clientName} (${ev.vehicleModel}) às ${ev.time}`}
                         className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer truncate flex items-center gap-1.5 ${
                           isColeta
@@ -824,7 +729,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       return (
                         <div
                           key={ev.id}
-                          onClick={() => setSelectedEventModal(ev)}
+                          onClick={() => handleSelectEvent(ev)}
                           className={`p-2.5 rounded-xl border text-xs transition-all cursor-pointer hover:shadow-xs ${
                             isColeta
                               ? 'bg-sky-50/80 border-sky-200 text-sky-900 border-l-4 border-l-sky-500'
@@ -917,7 +822,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                           return (
                             <div
                               key={ev.id}
-                              onClick={() => setSelectedEventModal(ev)}
+                              onClick={() => handleSelectEvent(ev)}
                               className={`p-4 rounded-xl border cursor-pointer transition-all hover:shadow-xs ${
                                 isColeta
                                   ? 'bg-sky-50/80 border-sky-200 text-sky-900 border-l-4 border-l-sky-500'
@@ -988,7 +893,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               return (
                 <div
                   key={ev.id}
-                  onClick={() => setSelectedEventModal(ev)}
+                  onClick={() => handleSelectEvent(ev)}
                   className={`bg-white p-5 rounded-2xl border transition-all cursor-pointer hover:shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4 ${
                     isColeta
                       ? 'border-slate-200/80 hover:border-sky-300 border-l-4 border-l-sky-500'
@@ -1067,7 +972,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        setSelectedEventModal(ev)
+                        handleSelectEvent(ev)
                       }}
                       className="px-4 py-2 rounded-full border border-slate-200 hover:border-[#EA580C] hover:text-[#EA580C] text-slate-700 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
                     >

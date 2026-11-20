@@ -629,14 +629,17 @@ async function syncAppointmentForOpportunity(opp: Opportunity, orderId?: string 
 
   const { data: existing } = await supabase
     .from('appointments')
-    .select('id')
+    .select('id, status')
     .eq('opportunity_id', opp.id)
     .maybeSingle()
 
+  // Só sincroniza automaticamente se já existir um agendamento explícito na tabela appointments
+  if (!existing?.id) {
+    return
+  }
+
   if (!isInstalacao && !isColeta) {
-    if (existing?.id) {
-      await supabase.from('appointments').delete().eq('id', existing.id)
-    }
+    await supabase.from('appointments').delete().eq('id', existing.id)
     return
   }
 
@@ -651,7 +654,7 @@ async function syncAppointmentForOpportunity(opp: Opportunity, orderId?: string 
       ? opp.items.map((it) => `${it.quantity}x ${it.product?.name || 'Produto'}`).join(', ')
       : 'Itens conforme orçamento'
 
-  const status = opp.stage === 'venda_perdida' ? 'cancelado' : 'agendado'
+  const status = opp.stage === 'venda_perdida' ? 'cancelado' : (existing.status === 'cancelado' ? 'cancelado' : existing.status || 'agendado')
 
   const aptPayload = {
     opportunity_id: opp.id,
@@ -667,11 +670,7 @@ async function syncAppointmentForOpportunity(opp: Opportunity, orderId?: string 
     updated_at: new Date().toISOString(),
   }
 
-  if (existing?.id) {
-    await supabase.from('appointments').update(aptPayload).eq('id', existing.id)
-  } else {
-    await supabase.from('appointments').insert(aptPayload)
-  }
+  await supabase.from('appointments').update(aptPayload).eq('id', existing.id)
 }
 
 export async function saveOpportunityToSupabase(
@@ -1035,14 +1034,18 @@ export async function reopenOpportunityInSupabase(
 
 export async function updateOpportunityTasks(
   oppId: string,
-  tasks: OpportunityTask[]
+  tasks: OpportunityTask[],
+  history?: OpportunityHistoryEvent[]
 ): Promise<void> {
   if (!isValidUuid(oppId)) return
 
   const now = new Date().toISOString()
+  const payload: Record<string, any> = { tasks, updated_at: now }
+  if (history) payload.history = history
+
   const { error } = await supabase
     .from('opportunities')
-    .update({ tasks, updated_at: now })
+    .update(payload)
     .eq('id', oppId)
 
   if (error) {
@@ -1273,3 +1276,118 @@ export async function createAppointmentInSupabase(
 
   return mapAppointmentRow(data)
 }
+
+export async function saveExplicitAppointmentInSupabase(params: {
+  opportunityId: string
+  contactId: string
+  orderId?: string | null
+  eventType: 'coleta' | 'instalacao'
+  dateStr: string
+  timeStr: string
+  vehicleDescription?: string
+  productsSummary?: string
+  notes?: string | null
+}): Promise<Appointment> {
+  if (!isValidUuid(params.opportunityId) || !isValidUuid(params.contactId)) {
+    throw new Error('Dados inválidos para salvar agendamento na agenda.')
+  }
+
+  const { start, end } = buildEndIso(
+    params.dateStr,
+    params.timeStr,
+    params.eventType === 'instalacao' ? 90 : 60
+  )
+
+  const { data: existing } = await supabase
+    .from('appointments')
+    .select('id')
+    .eq('opportunity_id', params.opportunityId)
+    .maybeSingle()
+
+  const now = new Date().toISOString()
+  const aptPayload = {
+    opportunity_id: params.opportunityId,
+    order_id: isValidUuid(params.orderId) ? params.orderId : null,
+    contact_id: params.contactId,
+    event_type: params.eventType,
+    vehicle_description: (params.vehicleDescription || 'Veículo Utilitário').slice(0, 150),
+    products_summary: params.productsSummary || 'Itens conforme orçamento',
+    scheduled_start: start,
+    scheduled_end: end,
+    status: 'agendado',
+    notes: params.notes || null,
+    updated_at: now,
+  }
+
+  let savedRow: any = null
+  if (existing?.id) {
+    const { data, error } = await supabase
+      .from('appointments')
+      .update(aptPayload)
+      .eq('id', existing.id)
+      .select(`*, contact:contacts(*)`)
+      .single()
+    if (error || !data) {
+      throw new Error(`Erro ao atualizar agendamento na agenda: ${error?.message || 'falha'}`)
+    }
+    savedRow = data
+  } else {
+    const { data, error } = await supabase
+      .from('appointments')
+      .insert(aptPayload)
+      .select(`*, contact:contacts(*)`)
+      .single()
+    if (error || !data) {
+      throw new Error(`Erro ao criar agendamento na agenda: ${error?.message || 'falha'}`)
+    }
+    savedRow = data
+  }
+
+  // Garante sincronia das datas na oportunidade e no pedido vinculado
+  const dateFields =
+    params.eventType === 'instalacao'
+      ? { installation_date: params.dateStr, installation_time: params.timeStr, updated_at: now }
+      : { pickup_date: params.dateStr, pickup_time: params.timeStr, updated_at: now }
+
+  await supabase.from('opportunities').update(dateFields).eq('id', params.opportunityId)
+  await supabase.from('orders').update(dateFields).eq('opportunity_id', params.opportunityId)
+
+  return mapAppointmentRow(savedRow)
+}
+
+export async function cancelAppointmentInSupabase(
+  opportunityId: string,
+  eventType: 'coleta' | 'instalacao'
+): Promise<void> {
+  if (!isValidUuid(opportunityId)) return
+
+  const now = new Date().toISOString()
+  await supabase.from('appointments').delete().eq('opportunity_id', opportunityId)
+
+  const clearFields =
+    eventType === 'instalacao'
+      ? { installation_date: null, installation_time: null, updated_at: now }
+      : { pickup_date: null, pickup_time: null, updated_at: now }
+
+  await supabase.from('opportunities').update(clearFields).eq('id', opportunityId)
+  await supabase.from('orders').update(clearFields).eq('opportunity_id', opportunityId)
+}
+
+export async function updateAppointmentStatusInSupabase(
+  appointmentId: string,
+  status: Appointment['status']
+): Promise<void> {
+  if (!isValidUuid(appointmentId)) {
+    throw new Error('ID de agendamento inválido.')
+  }
+
+  const { error } = await supabase
+    .from('appointments')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', appointmentId)
+
+  if (error) {
+    throw new Error(`Erro ao atualizar status do agendamento: ${error.message}`)
+  }
+}
+
