@@ -10,17 +10,19 @@ import {
   SlidersHorizontal,
   Filter,
   Bot,
-  LogOut
+  LogOut,
+  ArchiveX
 } from 'lucide-react'
 import type { CurrentUser } from './LoginView'
 
-export type ActiveTab = 'kanban' | 'budget' | 'catalog' | 'orders' | 'calendar' | 'settings'
+export type ActiveTab = 'kanban' | 'budget' | 'catalog' | 'orders' | 'lost_opportunities' | 'calendar' | 'settings'
 
 interface SidebarProps {
   activeTab: ActiveTab
   setActiveTab: (tab: ActiveTab) => void
   leadCount: number
   orderCount: number
+  lostCount?: number
   isMobileOpen: boolean
   setIsMobileOpen: (open: boolean) => void
   currentUser?: CurrentUser
@@ -32,6 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveTab, 
   leadCount,
   orderCount,
+  lostCount = 0,
   isMobileOpen,
   setIsMobileOpen,
   currentUser,
@@ -47,6 +50,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'orders' as ActiveTab,
       label: 'Pedidos & Coleta',
       icon: <Truck className="w-5 h-5" />,
+    },
+    {
+      id: 'lost_opportunities' as ActiveTab,
+      label: 'Oportunidades Perdidas',
+      icon: <ArchiveX className="w-5 h-5" />,
+      badge: lostCount > 0 ? lostCount : undefined,
     },
     {
       id: 'catalog' as ActiveTab,
@@ -101,13 +110,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   : 'text-slate-600 hover:text-[#EA580C] hover:bg-[#FFF3EA]'
               }`}
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <span className={`${isActive ? 'text-white' : 'text-slate-400'}`}>
-                  {item.icon}
-                </span>
-                <span className="text-xs tracking-tight truncate">
-                  {item.label}
-                </span>
+              <div className="flex items-center justify-between w-full min-w-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`${isActive ? 'text-white' : 'text-slate-400'}`}>
+                    {item.icon}
+                  </span>
+                  <span className="text-xs tracking-tight truncate">
+                    {item.label}
+                  </span>
+                </div>
+                {item.badge !== undefined && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {item.badge}
+                  </span>
+                )}
               </div>
             </button>
           )

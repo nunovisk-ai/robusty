@@ -17,8 +17,10 @@ import {
   Clock,
   Calendar,
   MessageSquare,
-  RotateCcw
+  RotateCcw,
+  ArchiveX
 } from 'lucide-react'
+import { CloseOpportunityModal } from './CloseOpportunityModal'
 import { 
   FaWhatsapp, 
   FaInstagram, 
@@ -29,7 +31,8 @@ import {
   FaTruck, 
   FaVanShuttle, 
   FaCarSide, 
-  FaTruckPickup,
+  FaTruckPickup, 
+  FaWeightHanging,
   FaUserPlus,
   FaMagnifyingGlass,
   FaCalculator,
@@ -52,6 +55,7 @@ interface KanbanViewProps {
   onMoveStage: (id: string, newStage: OpportunityStage) => void
   onUpdateOrderStatus?: (orderId: string, newStatus: OrderStatus) => void
   onConvertToOrder?: (opp: Opportunity) => void
+  onCloseOpportunity?: (oppId: string, reason: string, details?: string) => Promise<void> | void
   onOpenNewBudget?: () => void
   onSelectOpportunity?: (opp: Opportunity) => void
   mode?: 'vendas' | 'pedidos'
@@ -73,7 +77,7 @@ interface OrderStageConfig {
   Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>
 }
 
-// 8 Etapas com ícones representativos do Font Awesome para o Funil de Vendas
+// 6 Etapas com ícones representativos do Font Awesome para o Funil de Vendas
 const SALES_STAGES: SalesStageConfig[] = [
   { 
     id: 'novo_lead', 
@@ -110,18 +114,6 @@ const SALES_STAGES: SalesStageConfig[] = [
     title: 'Aguardando Pagamento', 
     stripeColor: '#EAB308',
     Icon: FaCreditCard
-  },
-  { 
-    id: 'venda_ganha', 
-    title: 'Venda Ganha', 
-    stripeColor: '#10B981',
-    Icon: FaDollarSign
-  },
-  { 
-    id: 'venda_perdida', 
-    title: 'Venda Perdida', 
-    stripeColor: '#EF4444',
-    Icon: FaCircleXmark
   },
 ]
 
@@ -331,6 +323,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   onMoveStage,
   onUpdateOrderStatus,
   onConvertToOrder,
+  onCloseOpportunity,
   onOpenNewBudget,
   onSelectOpportunity,
   mode = 'vendas'
@@ -340,6 +333,24 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   const [stageFilter, setStageFilter] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const density: 'detailed' | 'compact' = 'compact'
+
+  // Estado para Encerramento de Negociação com Motivo
+  const [oppToClose, setOppToClose] = useState<Opportunity | null>(null)
+  const [isClosingOpportunity, setIsClosingOpportunity] = useState(false)
+
+  const handleConfirmClose = async (reason: string, details?: string) => {
+    if (oppToClose && onCloseOpportunity) {
+      setIsClosingOpportunity(true)
+      try {
+        await onCloseOpportunity(oppToClose.id, reason, details)
+        setOppToClose(null)
+      } finally {
+        setIsClosingOpportunity(false)
+      }
+    } else {
+      setOppToClose(null)
+    }
+  }
 
   useEffect(() => {
     setStageFilter('all')
@@ -744,6 +755,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 
   // Filtrar Oportunidades de Vendas (Nome, Telefone, Veículo, Número do Pedido, Transportadora)
   const filteredOpportunities = opportunities.filter((opp) => {
+    // Negociações encerradas/perdidas pertencem exclusivamente à tela "Oportunidades Perdidas"
+    if (opp.stage === 'venda_perdida') return false
     const q = searchTerm.toLowerCase().trim()
     if (!q) return true
     return (
@@ -1272,9 +1285,9 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                   ) : (
                     colOpps.map((opp) => {
                       const vehicle = getVehicleModelInfo(opp.vehicle?.model || opp.vehicle_model_year)
-                      const isWonStage = col.id === 'venda_ganha'
+                      const isLastStage = colIdx === SALES_STAGES.length - 1
                       const canMovePrev = colIdx > 0
-                      const canMoveNext = colIdx < SALES_STAGES.length - 1 && !isWonStage && col.id !== 'venda_perdida'
+                      const canMoveNext = colIdx < SALES_STAGES.length - 1
                       const originBadge = getOriginBadge(opp.contact?.origin)
                       const OriginIcon = originBadge.Icon
                       const pendingTasks = (opp.tasks || []).filter((t) => !t.completed)
@@ -1383,8 +1396,23 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                 })}
 
                                 <div className="flex items-center gap-1">
+                                  {onCloseOpportunity && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setOppToClose(opp)
+                                      }}
+                                      title="Encerrar negociação (Oportunidade Perdida)"
+                                      className="p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                    >
+                                      <ArchiveX className="w-3 h-3" />
+                                    </button>
+                                  )}
+
                                   {canMovePrev && (
                                     <button 
+                                      type="button"
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         requestChangeOpportunityStage(opp, SALES_STAGES[colIdx - 1].id)
@@ -1396,19 +1424,9 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                     </button>
                                   )}
 
-                                  {isWonStage ? (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        onConvertToOrder && onConvertToOrder(opp)
-                                      }}
-                                      className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
-                                    >
-                                      <CheckCircle2 className="w-2.5 h-2.5" />
-                                      <span>Pedido</span>
-                                    </button>
-                                  ) : canMoveNext ? (
+                                  {canMoveNext ? (
                                     <button 
+                                      type="button"
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         requestChangeOpportunityStage(opp, SALES_STAGES[colIdx + 1].id)
@@ -1417,6 +1435,19 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                       className="p-1 bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white rounded transition-colors cursor-pointer"
                                     >
                                       <ArrowRight className="w-3 h-3" />
+                                    </button>
+                                  ) : isLastStage && onConvertToOrder ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onConvertToOrder(opp)
+                                      }}
+                                      title="Gerar Pedido a partir desta oportunidade"
+                                      className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                                    >
+                                      <CheckCircle2 className="w-2.5 h-2.5" />
+                                      <span>Pedido</span>
                                     </button>
                                   ) : null}
                                 </div>
@@ -1535,8 +1566,23 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                 })}
 
                                 <div className="flex items-center gap-1">
+                                  {onCloseOpportunity && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setOppToClose(opp)
+                                      }}
+                                      title="Encerrar negociação (Oportunidade Perdida)"
+                                      className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                    >
+                                      <ArchiveX className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+
                                   {canMovePrev && (
                                     <button 
+                                      type="button"
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         requestChangeOpportunityStage(opp, SALES_STAGES[colIdx - 1].id)
@@ -1548,19 +1594,9 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                     </button>
                                   )}
 
-                                  {isWonStage ? (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        onConvertToOrder && onConvertToOrder(opp)
-                                      }}
-                                      className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
-                                    >
-                                      <CheckCircle2 className="w-3 h-3" />
-                                      <span>Gerar Pedido</span>
-                                    </button>
-                                  ) : canMoveNext ? (
+                                  {canMoveNext ? (
                                     <button 
+                                      type="button"
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         requestChangeOpportunityStage(opp, SALES_STAGES[colIdx + 1].id)
@@ -1569,6 +1605,19 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                       className="p-1 bg-orange-50 hover:bg-[#EA580C] text-[#EA580C] hover:text-white rounded-lg transition-colors cursor-pointer"
                                     >
                                       <ArrowRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  ) : isLastStage && onConvertToOrder ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onConvertToOrder(opp)
+                                      }}
+                                      title="Gerar Pedido a partir desta oportunidade"
+                                      className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                                    >
+                                      <CheckCircle2 className="w-3 h-3" />
+                                      <span>Gerar Pedido</span>
                                     </button>
                                   ) : null}
                                 </div>
@@ -2042,14 +2091,14 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </td>
 
                           {/* Ações */}
-                          <td className="py-2.5 px-4 align-middle text-right w-28 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <td className="py-2.5 px-4 align-middle text-right w-36 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <div className="inline-flex items-center justify-end gap-1.5">
-                              {isWonStage && onConvertToOrder && (
+                              {onConvertToOrder && (
                                 <button
                                   type="button"
                                   onClick={() => onConvertToOrder(opp)}
-                                  title="Gerar Pedido"
-                                  className="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                                  title="Gerar Pedido a partir desta oportunidade"
+                                  className="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
                                 >
                                   <CheckCircle2 className="w-3 h-3" />
                                   <span>Pedido</span>
@@ -2063,6 +2112,16 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                 <span>Abrir</span>
                                 <ChevronRight className="w-3.5 h-3.5" />
                               </button>
+                              {onCloseOpportunity && (
+                                <button
+                                  type="button"
+                                  onClick={() => setOppToClose(opp)}
+                                  title="Encerrar Negociação (Oportunidade Perdida)"
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                >
+                                  <ArchiveX className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -2966,6 +3025,16 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         onPrimaryAction={handleConfirmStageChange}
         secondaryButtonText="Cancelar"
         onSecondaryAction={handleCancelStageChange}
+      />
+
+      {/* MODAL: ENCERRAR NEGOCIAÇÃO (OPORTUNIDADE PERDIDA) */}
+      <CloseOpportunityModal
+        isOpen={Boolean(oppToClose)}
+        clientName={oppToClose?.contact?.full_name || 'Cliente'}
+        orderCode={oppToClose?.order_number ? formatOrderCode(oppToClose.order_number) : undefined}
+        onClose={() => setOppToClose(null)}
+        onConfirm={handleConfirmClose}
+        isSubmitting={isClosingOpportunity}
       />
     </div>
   )

@@ -7,6 +7,7 @@ import { BudgetBuilderView } from './components/BudgetBuilderView'
 import { KanbanView } from './components/KanbanView'
 import { CalendarView } from './components/CalendarView'
 import { SettingsView } from './components/SettingsView'
+import { LostOpportunitiesView } from './components/LostOpportunitiesView'
 import { LoginView, type CurrentUser } from './components/LoginView'
 import {
   KanbanSkeleton,
@@ -25,6 +26,8 @@ import {
   fetchOpportunities,
   saveOpportunityToSupabase,
   updateOpportunityStage,
+  closeOpportunityInSupabase,
+  reopenOpportunityInSupabase,
   updateOpportunityTasks,
   deleteOpportunityFromSupabase,
   fetchOrders,
@@ -79,6 +82,12 @@ export function App() {
       setToast((prev) => (prev?.message === message ? null : prev))
     }, 4500)
   }, [])
+
+  const lostOpportunitiesCount = useMemo(() => {
+    return opportunities.filter(
+      (o) => o.stage === 'venda_perdida' || Boolean(o.closed_at) || Boolean(o.lost_reason)
+    ).length
+  }, [opportunities])
 
   const loadCrmData = useCallback(async () => {
     setIsLoadingCrm(true)
@@ -564,17 +573,38 @@ export function App() {
     }
   }
 
-  // 4. Marcar Oportunidade Não Concluída (Venda Perdida no Supabase)
-  const handleMarkOpportunityLost = async (oppId: string) => {
+  // 4. Encerrar Oportunidade com Motivo (Oportunidade Perdida no Supabase)
+  const handleCloseOpportunity = async (oppId: string, reason: string, details?: string) => {
     try {
-      await handleMoveStage(oppId, 'venda_perdida')
-      setEditingOpportunity(null)
-      setActiveTab(returnTab)
-      showToast('success', 'Oportunidade marcada como Venda Perdida no Supabase.')
+      const authorName = currentUser?.name || 'Equipe'
+      const updated = await closeOpportunityInSupabase(oppId, reason, details, authorName)
+      setOpportunities((prev) => prev.map((o) => (o.id === oppId ? updated : o)))
+      if (editingOpportunity?.id === oppId) {
+        setEditingOpportunity(updated)
+      }
+      showToast('success', 'Negociação encerrada com sucesso.')
     } catch (err) {
       showToast(
         'error',
-        err instanceof Error ? err.message : 'Erro ao atualizar oportunidade no Supabase.'
+        err instanceof Error ? err.message : 'Erro ao encerrar oportunidade no Supabase.'
+      )
+    }
+  }
+
+  // 5. Reativar Oportunidade (retorna para 1. Novo Lead preservando todos os dados)
+  const handleReopenOpportunity = async (oppId: string) => {
+    try {
+      const authorName = currentUser?.name || 'Equipe'
+      const updated = await reopenOpportunityInSupabase(oppId, authorName)
+      setOpportunities((prev) => prev.map((o) => (o.id === oppId ? updated : o)))
+      if (editingOpportunity?.id === oppId) {
+        setEditingOpportunity(updated)
+      }
+      showToast('success', 'Oportunidade reativada! Retornou para Novo Lead no Funil de Vendas.')
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Erro ao reativar oportunidade no Supabase.'
       )
     }
   }
@@ -609,6 +639,7 @@ export function App() {
         }}
         leadCount={opportunities.length}
         orderCount={orders.length}
+        lostCount={lostOpportunitiesCount}
         isMobileOpen={isMobileSidebarOpen}
         setIsMobileOpen={setIsMobileSidebarOpen}
         currentUser={currentUser}
@@ -683,6 +714,7 @@ export function App() {
                   onMoveStage={handleMoveStage}
                   onUpdateOrderStatus={handleUpdateOrderStatus}
                   onConvertToOrder={handleConvertToOrder}
+                  onCloseOpportunity={handleCloseOpportunity}
                   onOpenNewBudget={handleOpenNewOpportunity}
                   onSelectOpportunity={handleSelectOpportunityToEdit}
                 />
@@ -703,7 +735,8 @@ export function App() {
                   onChangeStage={handleMoveStage}
                   onGenerateOrder={handleGenerateOrderFromBudget}
                   onDeleteOpportunity={handleDeleteOpportunity}
-                  onMarkLost={handleMarkOpportunityLost}
+                  onMarkLost={handleCloseOpportunity}
+                  onReopenOpportunity={handleReopenOpportunity}
                   onClose={() => setActiveTab(returnTab)}
                 />
               )}
@@ -719,6 +752,14 @@ export function App() {
                   onUpdateOrderStatus={handleUpdateOrderStatus}
                   onConvertToOrder={handleConvertToOrder}
                   onSelectOpportunity={handleSelectOpportunityToEdit}
+                />
+              )}
+
+              {activeTab === 'lost_opportunities' && (
+                <LostOpportunitiesView
+                  opportunities={opportunities}
+                  onOpenOpportunity={handleSelectOpportunityToEdit}
+                  onReopenOpportunity={handleReopenOpportunity}
                 />
               )}
 

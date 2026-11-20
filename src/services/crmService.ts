@@ -199,6 +199,8 @@ function mapOpportunityRow(row: any): Opportunity {
     payment_splits: Array.isArray(row.payment_splits) ? row.payment_splits : [],
     address: extractPrimaryAddress(row.address, row.contact?.addresses),
     lost_reason: row.lost_reason || undefined,
+    lost_reason_details: row.lost_reason_details || undefined,
+    closed_at: row.closed_at || undefined,
     notes: row.notes || undefined,
     items: mapItemsRows(row.items),
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
@@ -401,6 +403,9 @@ export interface SaveOpportunityPayload {
   history?: OpportunityHistoryEvent[]
   tasks?: OpportunityTask[]
   notes?: string
+  lostReason?: string
+  lostReasonDetails?: string
+  closedAt?: string
 }
 
 async function executeWithSchemaFallback<T = any>(
@@ -727,6 +732,9 @@ export async function saveOpportunityToSupabase(
     history: payload.history ?? [],
     tasks: payload.tasks ?? [],
     notes: payload.notes ?? null,
+    lost_reason: payload.lostReason ?? null,
+    lost_reason_details: payload.lostReasonDetails ?? null,
+    closed_at: payload.closedAt ?? null,
     updated_at: now,
   }
 
@@ -874,6 +882,153 @@ export async function updateOpportunityStage(
       .update({ status: 'cancelado', updated_at: now })
       .eq('opportunity_id', oppId)
   }
+}
+
+export async function closeOpportunityInSupabase(
+  oppId: string,
+  reason: string,
+  details?: string,
+  authorName?: string
+): Promise<Opportunity> {
+  if (!isValidUuid(oppId)) {
+    throw new Error('ID de oportunidade inválido para encerramento no Supabase.')
+  }
+
+  const now = new Date().toISOString()
+
+  // Buscar histórico atual da oportunidade
+  const { data: currentOppData } = await supabase
+    .from('opportunities')
+    .select('history')
+    .eq('id', oppId)
+    .single()
+
+  const existingHistory = Array.isArray(currentOppData?.history) ? currentOppData.history : []
+
+  const closeHistoryEvent: OpportunityHistoryEvent = {
+    id: `hist-close-${Date.now()}`,
+    opportunity_id: oppId,
+    type: 'stage_change',
+    description: `Negociação encerrada. Motivo: "${reason}"${details ? ` — Detalhes: ${details}` : ''}`,
+    user: authorName || 'Equipe',
+    created_at: now,
+  }
+
+  const updatedHistory = [closeHistoryEvent, ...existingHistory]
+
+  const updateFields: Record<string, any> = {
+    stage: 'venda_perdida',
+    lost_reason: reason,
+    lost_reason_details: details || null,
+    closed_at: now,
+    history: updatedHistory,
+    updated_at: now,
+  }
+
+  const { error } = await executeWithSchemaFallback<{ id: string }>(
+    (fields) =>
+      supabase
+        .from('opportunities')
+        .update(fields)
+        .eq('id', oppId)
+        .select('id')
+        .single(),
+    updateFields
+  )
+
+  if (error) {
+    throw new Error(`Erro ao encerrar oportunidade no Supabase: ${error.message}`)
+  }
+
+  // Cancelar pedidos e agendamentos vinculados se existirem
+  await supabase
+    .from('orders')
+    .update({ status: 'pedido_cancelado', updated_at: now })
+    .eq('opportunity_id', oppId)
+
+  await supabase
+    .from('appointments')
+    .update({ status: 'cancelado', updated_at: now })
+    .eq('opportunity_id', oppId)
+
+  // Retornar a oportunidade atualizada
+  const { data: freshOppData, error: fetchErr } = await supabase
+    .from('opportunities')
+    .select(OPPORTUNITY_SELECT)
+    .eq('id', oppId)
+    .single()
+
+  if (fetchErr || !freshOppData) {
+    throw new Error(`Erro ao buscar oportunidade após encerramento: ${fetchErr?.message || 'dados indisponíveis'}`)
+  }
+
+  return mapOpportunityRow(freshOppData)
+}
+
+export async function reopenOpportunityInSupabase(
+  oppId: string,
+  authorName?: string
+): Promise<Opportunity> {
+  if (!isValidUuid(oppId)) {
+    throw new Error('ID de oportunidade inválido para reativação no Supabase.')
+  }
+
+  const now = new Date().toISOString()
+
+  // Buscar histórico atual da oportunidade
+  const { data: currentOppData } = await supabase
+    .from('opportunities')
+    .select('history')
+    .eq('id', oppId)
+    .single()
+
+  const existingHistory = Array.isArray(currentOppData?.history) ? currentOppData.history : []
+
+  const reopenHistoryEvent: OpportunityHistoryEvent = {
+    id: `hist-reopen-${Date.now()}`,
+    opportunity_id: oppId,
+    type: 'stage_change',
+    description: 'Oportunidade reativada comercialmente. Retornada para a etapa: 1. Novo lead.',
+    user: authorName || 'Equipe',
+    created_at: now,
+  }
+
+  const updatedHistory = [reopenHistoryEvent, ...existingHistory]
+
+  const updateFields: Record<string, any> = {
+    stage: 'novo_lead',
+    closed_at: null,
+    history: updatedHistory,
+    updated_at: now,
+  }
+
+  const { error } = await executeWithSchemaFallback<{ id: string }>(
+    (fields) =>
+      supabase
+        .from('opportunities')
+        .update(fields)
+        .eq('id', oppId)
+        .select('id')
+        .single(),
+    updateFields
+  )
+
+  if (error) {
+    throw new Error(`Erro ao reativar oportunidade no Supabase: ${error.message}`)
+  }
+
+  // Retornar a oportunidade atualizada
+  const { data: freshOppData, error: fetchErr } = await supabase
+    .from('opportunities')
+    .select(OPPORTUNITY_SELECT)
+    .eq('id', oppId)
+    .single()
+
+  if (fetchErr || !freshOppData) {
+    throw new Error(`Erro ao buscar oportunidade após reativação: ${fetchErr?.message || 'dados indisponíveis'}`)
+  }
+
+  return mapOpportunityRow(freshOppData)
 }
 
 export async function updateOpportunityTasks(

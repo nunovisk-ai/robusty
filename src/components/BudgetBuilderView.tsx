@@ -85,8 +85,11 @@ import {
   Save,
   Percent,
   Split,
-  Palette
+  Palette,
+  ArchiveX,
+  RotateCcw
 } from 'lucide-react'
+import { CloseOpportunityModal } from './CloseOpportunityModal'
 import { 
   FaWhatsapp, 
   FaInstagram, 
@@ -97,16 +100,14 @@ import {
   FaVanShuttle, 
   FaTruck, 
   FaCarSide, 
-  FaTruckPickup,
+  FaTruckPickup, 
   FaWeightHanging,
   FaUserPlus,
   FaMagnifyingGlass,
   FaCalculator,
   FaPaperPlane,
   FaComments,
-  FaCreditCard,
-  FaDollarSign,
-  FaCircleXmark
+  FaCreditCard
 } from 'react-icons/fa6'
 
 type BudgetFormTab = 'contact' | 'products' | 'fulfillment' | 'history' | 'attachments'
@@ -125,8 +126,6 @@ const SALES_PIPELINE_STAGES: PipelineStageOption[] = [
   { id: 'orcamento_enviado', title: 'Orçamento enviado', color: '#EA580C', Icon: FaPaperPlane },
   { id: 'em_negociacao', title: 'Em negociação', color: '#F59E0B', Icon: FaComments },
   { id: 'aguardando_pagamento', title: 'Aguardando Pagamento', color: '#EAB308', Icon: FaCreditCard },
-  { id: 'venda_ganha', title: 'Venda Ganha', color: '#10B981', Icon: FaDollarSign },
-  { id: 'venda_perdida', title: 'Venda Perdida', color: '#EF4444', Icon: FaCircleXmark },
 ]
 
 const normalizePipelineStage = (rawStage?: string): OpportunityStage => {
@@ -151,7 +150,8 @@ interface BudgetBuilderViewProps {
   onChangeStage?: (oppId: string, newStage: OpportunityStage) => Promise<void> | void
   onGenerateOrder?: (opportunityData: any) => Promise<void> | void
   onDeleteOpportunity?: (oppId: string) => Promise<void> | void
-  onMarkLost?: (oppId: string) => Promise<void> | void
+  onMarkLost?: (oppId: string, reason: string, details?: string) => Promise<void> | void
+  onReopenOpportunity?: (oppId: string) => Promise<void> | void
   onClose?: () => void
 }
 
@@ -182,6 +182,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   onGenerateOrder,
   onDeleteOpportunity,
   onMarkLost,
+  onReopenOpportunity,
   onClose
 }) => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
@@ -208,7 +209,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   )
   const [stageToConfirm, setStageToConfirm] = useState<OpportunityStage | null>(null)
   const [isUpdatingStage, setIsUpdatingStage] = useState(false)
-  const [stageFeedback, setStageFeedback] = useState<string | null>(null)
 
   // Responsável: Igor, Norlando ou Loja (por padrão vazio para nova oportunidade)
   const [assignedTo, setAssignedTo] = useState<'Igor' | 'Norlando' | 'Loja' | ''>(() => {
@@ -874,17 +874,12 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       setIsUpdatingStage(true)
       try {
         await onChangeStage(opportunityId, nextStage)
-        setStageFeedback(`Etapa alterada para "${newLabel}"`)
-        setTimeout(() => setStageFeedback(null), 2800)
       } catch (err) {
         console.error('Erro ao atualizar etapa da oportunidade:', err)
         setStage(prevStage)
       } finally {
         setIsUpdatingStage(false)
       }
-    } else {
-      setStageFeedback(`Etapa definida: "${newLabel}"`)
-      setTimeout(() => setStageFeedback(null), 2500)
     }
   }
 
@@ -1430,12 +1425,34 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     setDeleteModalOpen(false)
   }
 
-  // 4. Marcar Oportunidade Perdida / Venda Não Concluída
-  const handleMarkLost = async () => {
+  const [isClosingOpportunity, setIsClosingOpportunity] = useState(false)
+  const [isReopeningOpportunity, setIsReopeningOpportunity] = useState(false)
+
+  // 4. Marcar Oportunidade Perdida / Venda Não Concluída com Motivo
+  const handleConfirmCloseOpportunity = async (reason: string, details?: string) => {
     if (opportunityId && onMarkLost) {
-      await onMarkLost(opportunityId)
+      setIsClosingOpportunity(true)
+      try {
+        await onMarkLost(opportunityId, reason, details)
+        setLostModalOpen(false)
+      } finally {
+        setIsClosingOpportunity(false)
+      }
+    } else {
+      setLostModalOpen(false)
     }
-    setLostModalOpen(false)
+  }
+
+  const handleConfirmReopenOpportunity = async () => {
+    if (opportunityId && onReopenOpportunity) {
+      setIsReopeningOpportunity(true)
+      try {
+        await onReopenOpportunity(opportunityId)
+        setStage('novo_lead')
+      } finally {
+        setIsReopeningOpportunity(false)
+      }
+    }
   }
 
   const maxAllowedDiscount = getMaxDiscountForPaymentMethod(paymentMethod)
@@ -1581,48 +1598,48 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         </div>
       </div>
 
-      {/* Barra de Progresso do Funil de Vendas (Pipeline Chevrons com Setas de Avanço) */}
-      <div className="bg-white p-3 sm:px-4 sm:py-3.5 rounded-2xl border border-slate-100 shadow-nexo space-y-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Etapa do Funil:
-            </span>
-            <span
-              className="text-xs font-bold px-2.5 py-0.5 rounded-full"
-              style={{
-                color: SALES_PIPELINE_STAGES.find((s) => s.id === stage)?.color || '#6366F1',
-                backgroundColor: `${SALES_PIPELINE_STAGES.find((s) => s.id === stage)?.color || '#6366F1'}18`,
-              }}
-            >
-              {SALES_PIPELINE_STAGES.find((s) => s.id === stage)?.title || stage}
-            </span>
-          </div>
-
-          {(isUpdatingStage || stageFeedback) && (
-            <div className="flex items-center gap-2 text-xs">
-              {isUpdatingStage && (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#EA580C]" />
-                  Salvando etapa...
-                </span>
-              )}
-              {stageFeedback && !isUpdatingStage && (
-                <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                  <Check className="w-3.5 h-3.5" />
-                  {stageFeedback}
-                </span>
-              )}
+      {/* Banner de Aviso caso Oportunidade Perdida / Encerrada */}
+      {stage === 'venda_perdida' && (
+        <div className="bg-rose-50 border border-rose-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+              <ArchiveX className="w-5 h-5" />
             </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold uppercase tracking-wider text-rose-800">
+                  Negociação Encerrada (Oportunidade Perdida)
+                </span>
+                {initialOpportunity?.lost_reason && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-200/90 text-rose-900 border border-rose-300">
+                    Motivo: {initialOpportunity.lost_reason}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-rose-700 mt-0.5 font-medium">
+                {initialOpportunity?.lost_reason_details || 'Esta oportunidade está arquivada no menu de Oportunidades Perdidas e pode ser reativada a qualquer momento.'}
+              </p>
+            </div>
+          </div>
+          {onReopenOpportunity && opportunityId && (
+            <button
+              type="button"
+              disabled={isReopeningOpportunity}
+              onClick={() => void handleConfirmReopenOpportunity()}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>{isReopeningOpportunity ? 'Reativando...' : 'Reativar Negociação'}</span>
+            </button>
           )}
         </div>
+      )}
 
-        {/* Setas conectadas em formato Chevron indicando avanço linear */}
+      {/* Barra de Progresso do Funil de Vendas (Chevron linear limpo) */}
+      <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-100 shadow-nexo">
         <div className="flex items-stretch overflow-x-auto no-scrollbar rounded-xl border border-slate-200/80 bg-slate-100/70 p-1 gap-0.5">
           {SALES_PIPELINE_STAGES.map((st, idx) => {
-            const currentIdx = SALES_PIPELINE_STAGES.findIndex((s) => s.id === stage)
             const isActive = st.id === stage
-            const isPast = idx < currentIdx && stage !== 'venda_perdida'
 
             // Clip-path de Chevron que conecta perfeitamente cada etapa
             const isFirst = idx === 0
@@ -1647,9 +1664,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 className={`group relative flex-1 min-w-[130px] py-2.5 px-3.5 flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap select-none disabled:opacity-60 ${
                   isActive
                     ? 'text-white shadow-xs'
-                    : isPast
-                    ? 'bg-slate-200/90 text-slate-700 hover:bg-slate-300'
-                    : 'bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                    : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
                 <st.Icon
@@ -3911,14 +3926,26 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               {/* Ações Secundárias com Modal Padronizado */}
               {isOpportunitySaved && (
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setLostModalOpen(true)}
-                    className="text-slate-500 hover:text-amber-600 transition-colors cursor-pointer flex items-center gap-1 font-medium"
-                  >
-                    <XCircle className="w-3.5 h-3.5" />
-                    <span>Encerrar Negociação</span>
-                  </button>
+                  {stage === 'venda_perdida' ? (
+                    <button
+                      type="button"
+                      disabled={isReopeningOpportunity}
+                      onClick={() => void handleConfirmReopenOpportunity()}
+                      className="text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg border border-emerald-200 transition-colors cursor-pointer flex items-center gap-1 font-bold disabled:opacity-50"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>{isReopeningOpportunity ? 'Reativando...' : 'Reativar Oportunidade'}</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setLostModalOpen(true)}
+                      className="text-slate-500 hover:text-rose-600 transition-colors cursor-pointer flex items-center gap-1 font-medium"
+                    >
+                      <ArchiveX className="w-3.5 h-3.5" />
+                      <span>Encerrar Negociação</span>
+                    </button>
+                  )}
 
                   <button
                     type="button"
@@ -3987,16 +4014,14 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         isDangerAction={true}
       />
 
-      {/* MODAL 4: CONFIRMAÇÃO PADRONIZADA DE VENDA PERDIDA */}
-      <CustomAlertModal
+      {/* MODAL 4: ENCERRAMENTO COM REGISTRO DE MOTIVO */}
+      <CloseOpportunityModal
         isOpen={lostModalOpen}
+        clientName={customerName || 'Cliente'}
+        orderCode={formatOrderCode(orderNumber)}
         onClose={() => setLostModalOpen(false)}
-        type="warning"
-        title="Encerrar Negociação (Venda Perdida)"
-        message="Deseja mover esta oportunidade para a etapa de Venda Perdida no Funil Comercial? O lead permanecerá no histórico para futuras abordagens."
-        primaryButtonText="Confirmar Venda Perdida"
-        onPrimaryAction={handleMarkLost}
-        secondaryButtonText="Voltar"
+        onConfirm={handleConfirmCloseOpportunity}
+        isSubmitting={isClosingOpportunity}
       />
 
       {/* MODAL 5: CONFIRMAÇÃO PADRONIZADA DE REMOÇÃO DE ANEXO */}

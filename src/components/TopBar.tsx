@@ -36,6 +36,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       case 'budget': return 'Gerador de Orçamento'
       case 'catalog': return 'Catálogo Oficial Fev/2026'
       case 'orders': return 'Pedidos & Coleta'
+      case 'lost_opportunities': return 'Oportunidades Perdidas'
       case 'calendar': return 'Agenda'
       case 'settings': return 'Configurações & Parâmetros'
     }

@@ -237,6 +237,8 @@ export interface Opportunity {
   payment_splits?: PaymentSplit[]
   address?: Partial<Address>
   lost_reason?: string
+  lost_reason_details?: string
+  closed_at?: string
   notes?: string
   items?: OpportunityItem[]
   attachments?: AttachedDocument[]
