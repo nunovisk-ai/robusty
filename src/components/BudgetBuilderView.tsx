@@ -988,7 +988,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const buildProposalPayload = (): ProposalPayload => {
     return {
       orderNumber,
-      customerName: customerName || 'Cliente',
+      customerName: customerName.trim(),
       customerPhone,
       commercialPhone: personType === 'juridica' ? commercialPhone : undefined,
       customerEmail,
@@ -998,7 +998,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       stateRegistration: personType === 'juridica' ? stateRegistration : undefined,
       municipalRegistration: personType === 'juridica' ? municipalRegistration : undefined,
       tradeName: personType === 'juridica' ? tradeName : undefined,
-      vehicleModel: selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Utilitário',
+      vehicleModel: selectedVehicle
+        ? getCleanVehicleModel(selectedVehicle.model)
+        : (initialOpportunity?.vehicle_model_year || ''),
       items,
       budget,
       fulfillment,
