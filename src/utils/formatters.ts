@@ -92,3 +92,60 @@ export function formatIE(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 14)
   return digits || value.slice(0, 14)
 }
+
+export function formatCurrencyInput(val: number): string {
+  if (!val || isNaN(val)) return ''
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(val)
+}
+
+export function parseCurrencyInput(raw: string): number {
+  const digits = raw.replace(/\D/g, '')
+  if (!digits) return 0
+  return parseInt(digits, 10) / 100
+}
+
+/**
+ * Calcula a maior dimensão (C x L x A) considerando todos os produtos do orçamento.
+ * Se houver apenas 1 produto, retorna a dimensão cadastrada nele.
+ * Se houver múltiplos, compara cada eixo (ou maior comprimento/volume) e retorna o maior.
+ */
+export function getLargestPackageDimensions(
+  items: Array<{ product: { dimensions?: string } }>
+): string {
+  const dimsList = items
+    .map((i) => i.product.dimensions?.trim())
+    .filter((d): d is string => Boolean(d))
+
+  if (dimsList.length === 0) return ''
+  if (dimsList.length === 1) return dimsList[0]
+
+  let bestDim = dimsList[0]
+  let bestScore = -1
+
+  for (const dimStr of dimsList) {
+    const nums = dimStr
+      .replace(/,/g, '.')
+      .match(/\d+(?:\.\d+)?/g)
+      ?.map((n) => parseFloat(n))
+      .filter((n) => !isNaN(n))
+
+    if (!nums || nums.length === 0) continue
+
+    const maxAxis = Math.max(...nums)
+    const volume = nums.reduce((acc, n) => acc * n, 1)
+    const score = maxAxis * 10000 + volume
+
+    if (score > bestScore) {
+      bestScore = score
+      bestDim = dimStr
+    }
+  }
+
+  return bestDim
+}
+

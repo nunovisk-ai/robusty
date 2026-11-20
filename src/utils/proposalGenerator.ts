@@ -1,5 +1,5 @@
 import { ROBUSTY_LOGO_BASE64, MIXFER_LOGO_BASE64 } from '../assets/logoBase64'
-import { formatOrderCode, formatCurrency, formatCPF, formatCNPJ, formatBRPhone } from './formatters'
+import { formatOrderCode, formatCurrency, formatCPF, formatCNPJ, formatBRPhone, getLargestPackageDimensions } from './formatters'
 import type { PaymentSplit, PersonType, DocumentType } from '../types'
 
 export interface ProposalPayload {
@@ -438,13 +438,6 @@ export function generateProposalHtml(data: ProposalPayload): string {
         <tbody>
           ${itemsRows}
         </tbody>
-        <tfoot>
-          <tr class="bg-slate-50 border-t border-slate-200 text-[10.5px]">
-            <td colspan="3" class="py-1.5 px-2.5 text-right font-semibold text-slate-500">Peso Total Estimado:</td>
-            <td class="py-1.5 px-2.5 text-center font-mono font-bold text-slate-800">${totalWeightKg > 0 ? `${totalWeightKg.toFixed(1).replace(/\.0$/, '')} kg` : '-'}</td>
-            <td colspan="2" class="py-1.5 px-2.5"></td>
-          </tr>
-        </tfoot>
       </table>
     </section>
 
@@ -459,7 +452,7 @@ export function generateProposalHtml(data: ProposalPayload): string {
 
       <div class="p-3">
         ${data.fulfillment === 'transportadora_envio' ? `
-          <div class="grid grid-cols-4 gap-x-3 gap-y-2">
+          <div class="grid grid-cols-3 gap-x-3 gap-y-2">
             <div>
               <div class="text-[9.5px] uppercase font-semibold text-slate-400">Transportadora</div>
               <div class="font-semibold text-slate-900 truncate">${valOrDash(data.shippingCarrierName)}</div>
@@ -469,32 +462,40 @@ export function generateProposalHtml(data: ProposalPayload): string {
               <div class="font-mono font-semibold text-slate-800">${valOrDash(data.shippingQuoteNumber)}</div>
             </div>
             <div>
+              <div class="text-[9.5px] uppercase font-semibold text-slate-400">Contato Transportadora</div>
+              <div class="text-slate-800 truncate">${valOrDash(data.shippingCarrierContact)}</div>
+            </div>
+            <div>
               <div class="text-[9.5px] uppercase font-semibold text-slate-400">Prazo de Produção</div>
-              <div class="font-semibold text-slate-800">${valOrDash(data.productionLeadTime)}</div>
+              <div class="font-mono font-semibold text-slate-800">${formatIsoDate(data.productionLeadTime)}</div>
             </div>
             <div>
               <div class="text-[9.5px] uppercase font-semibold text-slate-400">Prazo de Entrega</div>
-              <div class="font-semibold text-slate-800">${valOrDash(data.deliveryLeadTime)}</div>
-            </div>
-            <div>
-              <div class="text-[9.5px] uppercase font-semibold text-slate-400">Dimensões do Volume</div>
-              <div class="font-mono text-slate-800">${valOrDash(data.shippingPackageDimensions)}</div>
-            </div>
-            <div>
-              <div class="text-[9.5px] uppercase font-semibold text-slate-400">Contato Transportadora</div>
-              <div class="text-slate-800 truncate">${valOrDash(data.shippingCarrierContact)}</div>
+              <div class="font-mono font-semibold text-slate-800">${formatIsoDate(data.deliveryLeadTime)}</div>
             </div>
             <div>
               <div class="text-[9.5px] uppercase font-semibold text-slate-400">Previsão de Coleta</div>
               <div class="font-mono text-slate-800">${pickupDisplay}</div>
             </div>
             <div>
-              <div class="text-[9.5px] uppercase font-semibold text-slate-400">Rastreio / NF</div>
+              <div class="text-[9.5px] uppercase font-semibold text-slate-400">Peso Total Estimado</div>
+              <div class="font-mono font-bold text-slate-800">${totalWeightKg > 0 ? `${totalWeightKg.toFixed(1).replace(/\.0$/, '')} kg` : '-'}</div>
+            </div>
+            <div>
+              <div class="text-[9.5px] uppercase font-semibold text-slate-400">Dimensões Volume (C x L x A)</div>
+              <div class="font-mono text-slate-800">${valOrDash(data.shippingPackageDimensions?.trim() || getLargestPackageDimensions(data.items))}</div>
+            </div>
+            <div>
+              <div class="text-[9.5px] uppercase font-semibold text-slate-400">Cód. Rastreio</div>
               <div class="font-mono text-slate-800">${valOrDash(data.shippingTrackingCode)}</div>
             </div>
           </div>
         ` : `
-          <div class="grid grid-cols-3 gap-x-3 gap-y-2">
+          <div class="grid grid-cols-4 gap-x-3 gap-y-2">
+            <div>
+              <div class="text-[9.5px] uppercase font-semibold text-slate-400">Prazo de Produção</div>
+              <div class="font-mono font-semibold text-slate-900">${formatIsoDate(data.productionLeadTime)}</div>
+            </div>
             <div>
               <div class="text-[9.5px] uppercase font-semibold text-slate-400">Data da Instalação</div>
               <div class="font-mono font-semibold text-slate-900">${installationDateFormatted}</div>

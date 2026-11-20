@@ -41,7 +41,10 @@ import {
   formatCNPJ,
   formatRG,
   formatDocumentBy,
-  formatIE
+  formatIE,
+  formatCurrencyInput,
+  parseCurrencyInput,
+  getLargestPackageDimensions
 } from '../utils/formatters'
 import { 
   Truck, 
@@ -305,20 +308,51 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     return 'whatsapp'
   })
 
-  // Cor / Acabamento do Bagageiro / Produto
-  const [productColor, setProductColor] = useState<string>(() => {
-    return initialOpportunity?.product_color || 'Preto Epóxi'
-  })
+  // Cor / Acabamento por Produto (lido de product_color JSON ou string legada)
+  const initialItemColors = useMemo<Record<string, string>>(() => {
+    const raw = initialOpportunity?.product_color?.trim()
+    if (!raw) return {}
+    if (raw.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') return parsed as Record<string, string>
+      } catch {
+        return {}
+      }
+    }
+    return {}
+  }, [initialOpportunity?.product_color])
+
+  const legacyDefaultColor = useMemo(() => {
+    const raw = initialOpportunity?.product_color?.trim()
+    if (!raw || raw.startsWith('{')) return 'Preto Epóxi'
+    return raw
+  }, [initialOpportunity?.product_color])
 
   // 2. Produtos Selecionados
-  const [items, setItems] = useState<{ product: Product; quantity: number }[]>(() => {
+  const [items, setItems] = useState<{ product: Product; quantity: number; color?: string }[]>(() => {
     if (initialOpportunity?.items && initialOpportunity.items.length > 0) {
       return initialOpportunity.items
         .filter((item) => item.product)
-        .map((item) => ({ product: item.product!, quantity: item.quantity }))
+        .map((item) => ({
+          product: item.product!,
+          quantity: item.quantity,
+          color: initialItemColors[item.product!.id] || legacyDefaultColor,
+        }))
     }
     return []
   })
+
+  const serializedProductColor = useMemo(() => {
+    if (items.length === 0) return 'Preto Epóxi'
+    const map: Record<string, string> = {}
+    items.forEach((i) => {
+      map[i.product.id] = i.color?.trim() || 'Preto Epóxi'
+    })
+    return JSON.stringify(map)
+  }, [items])
+
+  const autoLargestDimensions = useMemo(() => getLargestPackageDimensions(items), [items])
 
   // 3. Modalidade de Atendimento
   const [fulfillment, setFulfillment] = useState<FulfillmentType>(() => {
@@ -652,12 +686,18 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           i.product.id === prod.id ? { ...i, quantity: i.quantity + 1 } : i
         )
       }
-      return [...prev, { product: prod, quantity: 1 }]
+      return [...prev, { product: prod, quantity: 1, color: 'Preto Epóxi' }]
     })
   }
 
   const handleRemoveItem = (prodId: string) => {
     setItems((prev) => prev.filter((i) => i.product.id !== prodId))
+  }
+
+  const handleItemColorChange = (prodId: string, color: string) => {
+    setItems((prev) =>
+      prev.map((i) => (i.product.id === prodId ? { ...i, color } : i))
+    )
   }
 
   const handleQuantityChange = (prodId: string, delta: number) => {
@@ -670,12 +710,13 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           }
           return i
         })
-        .filter(Boolean) as { product: Product; quantity: number }[]
+        .filter(Boolean) as { product: Product; quantity: number; color?: string }[]
     )
   }
 
   // WhatsApp Message Generation
   const generateWhatsAppMessage = () => {
+    const resolvedDimensions = shippingPackageDimensions.trim() || autoLargestDimensions
     const lines = [
       `*PROPOSTA COMERCIAL ROBUSTY — BAGAGEIROS AUTOMOTIVOS*`,
       `*Identificador Único:* ${formatOrderCode(orderNumber)}`,
@@ -690,22 +731,21 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       ...(customerEmail ? [`*E-mail:* ${customerEmail}`] : []),
       ``,
       `*Veículo:* ${selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Utilitário'}`,
-      `*Acabamento/Cor:* ${productColor}`,
       `*Modalidade:* ${fulfillment === 'instalacao_loja' ? 'Instalação na Loja Robusty' : 'Envio por Transportadora'}`,
       ...(fulfillment === 'transportadora_envio' && city ? [`*Destino:* ${city}/${state} (CEP: ${cep})`] : []),
       ...(fulfillment === 'transportadora_envio' && shippingCarrierName ? [`*Transportadora:* ${shippingCarrierName}`] : []),
       ...(fulfillment === 'transportadora_envio' && shippingQuoteNumber ? [`*Cotação Frete Nº:* ${shippingQuoteNumber}`] : []),
-      ...(fulfillment === 'transportadora_envio' && deliveryLeadTime ? [`*Prazo de Entrega:* ${deliveryLeadTime}`] : []),
-      ...(fulfillment === 'transportadora_envio' && productionLeadTime ? [`*Prazo de Produção:* ${productionLeadTime}`] : []),
-      ...(fulfillment === 'transportadora_envio' && shippingPackageDimensions ? [`*Dimensões do Volume:* ${shippingPackageDimensions}`] : []),
+      ...(productionLeadTime ? [`*Prazo de Produção:* ${productionLeadTime.split('-').reverse().join('/')}`] : []),
+      ...(fulfillment === 'transportadora_envio' && deliveryLeadTime ? [`*Prazo de Entrega:* ${deliveryLeadTime.split('-').reverse().join('/')}`] : []),
+      ...(fulfillment === 'transportadora_envio' && resolvedDimensions ? [`*Dimensões do Volume:* ${resolvedDimensions}`] : []),
       ...(fulfillment === 'transportadora_envio' && shippingTrackingCode ? [`*Código de Rastreio:* ${shippingTrackingCode}`] : []),
-      ...(fulfillment === 'transportadora_envio' && pickupDate ? [`*Previsão de Coleta:* ${pickupDate}${pickupTime ? ` às ${pickupTime}` : ' (horário a definir)'}`] : []),
-      ...(fulfillment === 'instalacao_loja' && installationDate ? [`*Agendamento Instalação:* ${installationDate} às ${installationTime}`] : []),
+      ...(fulfillment === 'transportadora_envio' && pickupDate ? [`*Previsão de Coleta:* ${pickupDate.split('-').reverse().join('/')}${pickupTime ? ` às ${pickupTime}` : ' (horário a definir)'}`] : []),
+      ...(fulfillment === 'instalacao_loja' && installationDate ? [`*Agendamento Instalação:* ${installationDate.split('-').reverse().join('/')} às ${installationTime}`] : []),
       ``,
       `*ITENS DO ORÇAMENTO:*`,
       ...items.map(
         (i, idx) =>
-          `${idx + 1}. ${i.product.name} (x${i.quantity}) — ${formatCurrency(i.product.base_price_10x * i.quantity)} ${i.product.dimensions ? `(${i.product.dimensions})` : ''} ${i.product.weight_kg ? `[${i.product.weight_kg * i.quantity} kg]` : ''}`
+          `${idx + 1}. ${i.product.name} [${i.color || 'Preto Epóxi'}] (x${i.quantity}) — ${formatCurrency(i.product.base_price_10x * i.quantity)} ${i.product.dimensions ? `(${i.product.dimensions})` : ''} ${i.product.weight_kg ? `[${i.product.weight_kg * i.quantity} kg]` : ''}`
       ),
       ``,
       `*RESUMO FINANCEIRO:*`,
@@ -813,8 +853,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       shippingCarrierContact,
       deliveryLeadTime,
       productionLeadTime,
-      shippingPackageDimensions,
-      productColor,
+      shippingPackageDimensions: shippingPackageDimensions.trim() || autoLargestDimensions,
+      productColor: serializedProductColor,
       pickupDate,
       pickupTime,
       installationDate,
@@ -900,13 +940,19 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     setStageToConfirm(nextStage)
   }
 
-  // Detecção de Conflito de Instalação (Requisito 4)
+  // Detecção de Conflito de Instalação (ignorando o próprio registro/oportunidade)
   const installationConflict = useMemo(() => {
     if (fulfillment !== 'instalacao_loja' || !installationDate || !installationTime) return null
 
+    const currentOppId = opportunityId || initialOpportunity?.id
+    const currentContactId = contactId || initialOpportunity?.contact_id
+
     // 1. Procurar em existingOrders
     const orderConflict = existingOrders.find((ord) => {
-      if (initialOpportunity && (ord.id === initialOpportunity.id || ord.opportunity_id === initialOpportunity.id || ord.order_number === orderNumber)) {
+      if (
+        (currentOppId && (ord.id === currentOppId || ord.opportunity_id === currentOppId)) ||
+        ord.order_number === orderNumber
+      ) {
         return false
       }
       return (
@@ -930,7 +976,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
     // 2. Procurar em existingOpportunities
     const oppConflict = existingOpportunities.find((opp) => {
-      if (initialOpportunity && (opp.id === initialOpportunity.id || opp.order_number === orderNumber)) {
+      if ((currentOppId && opp.id === currentOppId) || opp.order_number === orderNumber) {
         return false
       }
       return (
@@ -952,8 +998,12 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       }
     }
 
-    // 3. Procurar em existingAppointments
+    // 3. Procurar em existingAppointments (ignorando o agendamento do próprio pedido/contato)
     const aptConflict = existingAppointments.find((apt) => {
+      if (currentOppId && apt.opportunity_id === currentOppId) return false
+      if (currentContactId && apt.contact_id === currentContactId && initialOpportunity?.installation_date === installationDate) {
+        return false
+      }
       const start = apt.scheduled_start
       return (
         start.startsWith(installationDate) &&
@@ -982,6 +1032,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     existingOpportunities,
     existingAppointments,
     initialOpportunity,
+    opportunityId,
+    contactId,
     orderNumber
   ])
 
@@ -1026,9 +1078,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       shippingCarrierContact,
       deliveryLeadTime,
       productionLeadTime,
-      shippingPackageDimensions,
+      shippingPackageDimensions: shippingPackageDimensions.trim() || autoLargestDimensions,
       shippingTrackingCode,
-      productColor,
+      productColor: serializedProductColor,
       totalWeightKg: effectiveWeightKg,
       assignedTo: currentUser?.name || assignedTo,
       notes: initialOpportunity?.notes || '',
@@ -1557,13 +1609,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           >
             <Car className={`w-4 h-4 shrink-0 ${activeFormTab === 'products' ? 'text-[#EA580C]' : 'text-slate-400'}`} />
             <span className="truncate">2. Veículo & Produtos</span>
-            {items.length > 0 && (
-              <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${
-                activeFormTab === 'products' ? 'bg-[#EA580C] text-white' : 'bg-orange-50 text-[#EA580C] border border-orange-100'
-              }`}>
-                {items.length}
-              </span>
-            )}
           </button>
 
           <button
@@ -1606,13 +1651,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           >
             <Paperclip className={`w-4 h-4 shrink-0 ${activeFormTab === 'attachments' ? 'text-[#EA580C]' : 'text-slate-400'}`} />
             <span className="truncate">5. Anexos</span>
-            {attachments.length > 0 && (
-              <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${
-                activeFormTab === 'attachments' ? 'bg-[#EA580C] text-white' : 'bg-slate-100 text-slate-600'
-              }`}>
-                {attachments.length}
-              </span>
-            )}
           </button>
         </div>
       </div>
@@ -2205,70 +2243,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 </div>
               </div>
 
-              {/* 2.2 Cor e Acabamento do Bagageiro */}
-              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                    <Palette className="w-4 h-4 text-[#EA580C]" />
-                    <span>Acabamento & Cor do Bagageiro (*COR: PRETO/BRANCO*)</span>
-                  </h3>
-                  <span className="text-xs font-semibold text-slate-500">Padrão Oficial: Preto Epóxi</span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {[
-                    { id: 'Preto Epóxi', label: 'Preto Epóxi', dotClass: 'bg-black border-slate-600' },
-                    { id: 'Branco Epóxi', label: 'Branco Epóxi', dotClass: 'bg-white border-slate-300' },
-                    { id: 'Cinza Alumínio', label: 'Cinza Alumínio', dotClass: 'bg-slate-400 border-slate-500' },
-                    { id: 'Personalizado', label: 'Outro / Especial...', dotClass: 'bg-gradient-to-tr from-amber-500 to-orange-500 border-orange-400' },
-                  ].map((opt) => {
-                    const isSelected =
-                      productColor === opt.id ||
-                      (opt.id === 'Personalizado' &&
-                        !['Preto Epóxi', 'Branco Epóxi', 'Cinza Alumínio'].includes(productColor))
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => {
-                          if (opt.id === 'Personalizado') {
-                            if (['Preto Epóxi', 'Branco Epóxi', 'Cinza Alumínio'].includes(productColor)) {
-                              setProductColor('Sob Medida')
-                            }
-                          } else {
-                            setProductColor(opt.id)
-                          }
-                        }}
-                        className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-orange-50 border-[#EA580C] text-[#EA580C] font-bold shadow-xs'
-                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 font-medium'
-                        }`}
-                      >
-                        <span className={`w-3.5 h-3.5 rounded-full border shadow-xs shrink-0 ${opt.dotClass}`} />
-                        <span className="text-xs truncate">{opt.label}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {!['Preto Epóxi', 'Branco Epóxi', 'Cinza Alumínio'].includes(productColor) && (
-                  <div className="pt-2 animate-in fade-in-50">
-                    <label className="text-xs font-bold text-slate-600 block mb-1">
-                      Especifique a Cor / Acabamento Especial:
-                    </label>
-                    <input
-                      type="text"
-                      value={productColor}
-                      onChange={(e) => setProductColor(e.target.value)}
-                      placeholder="Ex: Grafite Fosco, Amarelo Segurança..."
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-[#EA580C]"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* 2.3 Bagageiros e Acessórios Compatíveis */}
+              {/* 2.2 Bagageiros e Acessórios Compatíveis */}
               <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -2322,7 +2297,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   ))}
                 </div>
 
-                <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
                   {loadingCatalog ? (
                     <BudgetProductListSkeleton />
                   ) : filteredCompatibleProducts.length === 0 ? (
@@ -2332,48 +2307,125 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   ) : (
                     filteredCompatibleProducts.map((p) => {
                       const inBudget = items.find((i) => i.product.id === p.id)
+                      const itemColor = inBudget?.color || 'Preto Epóxi'
+                      const isCustomColor = !['Preto Epóxi', 'Branco Epóxi', 'Cinza Alumínio'].includes(itemColor)
+
                       return (
                         <div
                           key={p.id}
-                          className="p-3 rounded-xl bg-slate-50/80 border border-slate-200/80 hover:border-slate-300 flex items-center justify-between gap-3 transition-colors"
+                          className={`p-3 rounded-xl border transition-colors space-y-2.5 ${
+                            inBudget
+                              ? 'bg-orange-50/40 border-orange-200/90'
+                              : 'bg-slate-50/80 border-slate-200/80 hover:border-slate-300'
+                          }`}
                         >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-slate-900 truncate">{p.name}</span>
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-900 truncate">{p.name}</span>
+                              </div>
+
+                              {/* Dimensões, Peso e Valor do Produto */}
+                              <div className="flex items-center gap-2 flex-wrap text-xs mt-1.5 font-mono text-slate-500">
+                                {p.dimensions && (
+                                  <span className="text-xs text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1.5">
+                                    <span>📏</span>
+                                    <span>{p.dimensions}</span>
+                                  </span>
+                                )}
+                                {p.weight_kg !== undefined && p.weight_kg > 0 && (
+                                  <span className="text-xs text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1.5">
+                                    <FaWeightHanging className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span>{p.weight_kg} kg</span>
+                                  </span>
+                                )}
+                                <span className="text-slate-900 font-bold ml-auto font-sans">
+                                  {formatCurrency(p.base_price_10x)}
+                                </span>
+                              </div>
                             </div>
 
-                            {/* Dimensões, Peso e Valor do Produto */}
-                            <div className="flex items-center gap-2 flex-wrap text-xs mt-1.5 font-mono text-slate-500">
-                              {p.dimensions && (
-                                <span className="text-xs text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1.5">
-                                  <span>📏</span>
-                                  <span>{p.dimensions}</span>
-                                </span>
-                              )}
-                              {p.weight_kg !== undefined && p.weight_kg > 0 && (
-                                <span className="text-xs text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1.5">
-                                  <FaWeightHanging className="w-3 h-3 text-slate-400 shrink-0" />
-                                  <span>{p.weight_kg} kg</span>
-                                </span>
-                              )}
-                              <span className="text-slate-900 font-bold ml-auto font-sans">
-                                {formatCurrency(p.base_price_10x)}
-                              </span>
-                            </div>
+                            {inBudget ? (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddItem(p)}
+                                  title="Adicionar mais uma unidade"
+                                  className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer bg-[#EA580C] hover:bg-[#C2410C] text-white shadow-xs"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>Adicionado ({inBudget.quantity})</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItem(p.id)}
+                                  title="Remover item do orçamento"
+                                  className="p-1.5 rounded-lg bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleAddItem(p)}
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shrink-0 bg-white hover:bg-orange-50 text-slate-700 hover:text-[#EA580C] border border-slate-200"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Adicionar</span>
+                              </button>
+                            )}
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={() => handleAddItem(p)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shrink-0 ${
-                              inBudget
-                                ? 'bg-[#EA580C] text-white shadow-xs'
-                                : 'bg-white hover:bg-orange-50 text-slate-700 hover:text-[#EA580C] border border-slate-200'
-                            }`}
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>{inBudget ? `Adicionado (${inBudget.quantity})` : 'Adicionar'}</span>
-                          </button>
+                          {/* Seletor de Acabamento / Cor individual do produto */}
+                          {inBudget && (
+                            <div className="pt-2 border-t border-orange-200/60 flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-bold text-slate-500 flex items-center gap-1 mr-1">
+                                <Palette className="w-3.5 h-3.5 text-[#EA580C]" />
+                                <span>Cor:</span>
+                              </span>
+                              {[
+                                { id: 'Preto Epóxi', label: 'Preto Epóxi', dotClass: 'bg-black border-slate-600' },
+                                { id: 'Branco Epóxi', label: 'Branco Epóxi', dotClass: 'bg-white border-slate-300' },
+                                { id: 'Cinza Alumínio', label: 'Cinza Alumínio', dotClass: 'bg-slate-400 border-slate-500' },
+                                { id: 'Personalizado', label: 'Outra...', dotClass: 'bg-gradient-to-tr from-amber-500 to-orange-500 border-orange-400' },
+                              ].map((opt) => {
+                                const isSelected =
+                                  itemColor === opt.id || (opt.id === 'Personalizado' && isCustomColor)
+                                return (
+                                  <button
+                                    key={opt.id}
+                                    type="button"
+                                    onClick={() => {
+                                      if (opt.id === 'Personalizado') {
+                                        if (!isCustomColor) handleItemColorChange(p.id, 'Sob Medida')
+                                      } else {
+                                        handleItemColorChange(p.id, opt.id)
+                                      }
+                                    }}
+                                    className={`px-2.5 py-1 rounded-lg border text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                                      isSelected
+                                        ? 'bg-white border-[#EA580C] text-[#EA580C] font-bold shadow-2xs'
+                                        : 'bg-white/70 hover:bg-white border-slate-200 text-slate-600 font-medium'
+                                    }`}
+                                  >
+                                    <span className={`w-2.5 h-2.5 rounded-full border shrink-0 ${opt.dotClass}`} />
+                                    <span>{opt.label}</span>
+                                  </button>
+                                )
+                              })}
+
+                              {isCustomColor && (
+                                <input
+                                  type="text"
+                                  value={itemColor}
+                                  onChange={(e) => handleItemColorChange(p.id, e.target.value)}
+                                  placeholder="Especifique a cor..."
+                                  className="flex-1 min-w-[140px] bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                                />
+                              )}
+                            </div>
+                          )}
                         </div>
                       )
                     })
@@ -2606,10 +2658,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                           Valor do Frete (R$):
                         </label>
                         <input
-                          type="number"
-                          placeholder="0.00"
-                          value={freightValue || ''}
-                          onChange={(e) => setFreightValue(parseFloat(e.target.value) || 0)}
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="R$ 0,00"
+                          value={formatCurrencyInput(freightValue)}
+                          onChange={(e) => setFreightValue(parseCurrencyInput(e.target.value))}
                           className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
                         />
                       </div>
@@ -2657,33 +2710,21 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Prazos de Produção e Entrega & Dimensões do Volume */}
+                    {/* Prazos de Produção e Entrega (formato data) & Dimensões do Volume */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-xs font-bold text-slate-600 block mb-1">
-                          Prazo de Produção:
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Ex: 7 a 10 dias úteis"
-                          value={productionLeadTime}
-                          onChange={(e) => setProductionLeadTime(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
-                        />
-                      </div>
+                      <CustomDatePicker
+                        label="Prazo de Produção:"
+                        value={productionLeadTime}
+                        onChange={setProductionLeadTime}
+                        placeholder="Selecione a data"
+                      />
 
-                      <div>
-                        <label className="text-xs font-bold text-slate-600 block mb-1">
-                          Prazo de Entrega:
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Ex: 3 a 5 dias úteis"
-                          value={deliveryLeadTime}
-                          onChange={(e) => setDeliveryLeadTime(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
-                        />
-                      </div>
+                      <CustomDatePicker
+                        label="Prazo de Entrega:"
+                        value={deliveryLeadTime}
+                        onChange={setDeliveryLeadTime}
+                        placeholder="Selecione a data"
+                      />
 
                       <div>
                         <label className="text-xs font-bold text-slate-600 block mb-1">
@@ -2691,22 +2732,22 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                         </label>
                         <input
                           type="text"
-                          placeholder="Ex: 220 x 140 x 35 cm"
-                          value={shippingPackageDimensions}
+                          placeholder={autoLargestDimensions || 'Ex: 220 x 140 x 35 cm'}
+                          value={shippingPackageDimensions || autoLargestDimensions}
                           onChange={(e) => setShippingPackageDimensions(e.target.value)}
                           className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
                         />
                       </div>
                     </div>
 
-                    {/* Código de Rastreio / NF */}
+                    {/* Código de Rastreio */}
                     <div>
                       <label className="text-xs font-bold text-slate-600 block mb-1">
-                        Código de Rastreio / Nota Fiscal:
+                        Código de Rastreio:
                       </label>
                       <input
                         type="text"
-                        placeholder="Ex: BR123456789 ou NF-0045"
+                        placeholder="Ex: BR123456789"
                         value={shippingTrackingCode}
                         onChange={(e) => setShippingTrackingCode(e.target.value)}
                         className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
@@ -2741,21 +2782,28 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 {/* Se for Instalação na Loja */}
                 {fulfillment === 'instalacao_loja' && (
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3.5">
-                    {/* Custo da Instalação (modificável) */}
-                    <div>
-                      <label className="text-xs font-bold text-slate-600 block mb-1">
-                        Custo da Instalação (R$):
-                      </label>
-                      <input
-                        type="number"
-                        value={installationCost || ''}
-                        onChange={(e) => setInstallationCost(parseFloat(e.target.value) || 0)}
-                        className="w-full sm:w-48 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
-                        placeholder="200.00"
+                    {/* Custo da Instalação & Prazo de Produção */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-slate-600 block mb-1">
+                          Custo da Instalação (R$):
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={formatCurrencyInput(installationCost)}
+                          onChange={(e) => setInstallationCost(parseCurrencyInput(e.target.value))}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C] font-mono"
+                          placeholder="R$ 0,00"
+                        />
+                      </div>
+
+                      <CustomDatePicker
+                        label="Prazo de Produção:"
+                        value={productionLeadTime}
+                        onChange={setProductionLeadTime}
+                        placeholder="Selecione a data"
                       />
-                      <span className="text-xs text-slate-400 block mt-1">
-                        Padrão do catálogo: {formatCurrency(selectedVehicle?.standard_installation_cost || 200)} (Totalmente modificável)
-                      </span>
                     </div>
 
                     {/* Data e Horário da Instalação */}
@@ -3758,13 +3806,12 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                             {/* Valor (R$) */}
                             <div>
                               <input
-                                type="number"
-                                step="0.01"
-                                min="0"
+                                type="text"
+                                inputMode="numeric"
                                 placeholder="R$ 0,00"
-                                value={split.amount || ''}
+                                value={formatCurrencyInput(split.amount || 0)}
                                 onChange={(e) => {
-                                  const val = parseFloat(e.target.value) || 0
+                                  const val = parseCurrencyInput(e.target.value)
                                   setPaymentSplits((prev) =>
                                     prev.map((s, i) => (i === index ? { ...s, amount: val } : s))
                                   )
