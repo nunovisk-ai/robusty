@@ -329,7 +329,23 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   mode = 'vendas'
 }) => {
   const pipelineType: PipelineType = mode
-  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban')
+  const [viewMode, setViewMode] = useState<'kanban' | 'list'>(() => {
+    try {
+      const saved = localStorage.getItem('robusty_pipeline_view_mode')
+      return saved === 'list' || saved === 'kanban' ? saved : 'kanban'
+    } catch {
+      return 'kanban'
+    }
+  })
+
+  const handleSetViewMode = (newMode: 'kanban' | 'list') => {
+    setViewMode(newMode)
+    try {
+      localStorage.setItem('robusty_pipeline_view_mode', newMode)
+    } catch {
+      // ignora erro de armazenamento local
+    }
+  }
   const [stageFilter, setStageFilter] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const density: 'detailed' | 'compact' = 'compact'
@@ -1165,7 +1181,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
           <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 shrink-0">
             <button
               type="button"
-              onClick={() => setViewMode('kanban')}
+              onClick={() => handleSetViewMode('kanban')}
               title="Visualização em Kanban (Colunas)"
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 viewMode === 'kanban'
@@ -1178,7 +1194,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => setViewMode('list')}
+              onClick={() => handleSetViewMode('list')}
               title="Visualização em Lista (Tabela)"
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 viewMode === 'list'
@@ -1678,13 +1694,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 )
               })}
             </div>
-
-            <div className="hidden xl:flex items-center gap-2 shrink-0 pl-3 border-l border-slate-200 text-xs font-mono">
-              <span className="text-slate-400">Total exibido:</span>
-              <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
-                {formatCurrency(listOpportunities.reduce((sum, o) => sum + (o.final_total || 0), 0))}
-              </span>
-            </div>
           </div>
 
           {/* Barra de Filtros Ativos com Botão de Limpar Todos os Filtros */}
@@ -1777,18 +1786,18 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
           {/* Tabela de Oportunidades com Scroll Interno */}
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs flex-1 min-h-0 flex flex-col overflow-hidden">
             <div className="overflow-auto flex-1 min-h-0 kanban-col-scroll">
-              <table className="w-full text-left border-collapse min-w-[920px]">
+              <table className="w-full table-fixed text-left border-collapse min-w-[960px]">
                 <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur border-b border-slate-200/90">
                   <tr className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    <th className="py-3 px-4 w-24">Código</th>
+                    <th className="py-3 px-4 w-[96px]">Código</th>
 
                     {/* Cliente */}
-                    <th className="py-3 px-3 min-w-[190px] max-w-[230px]">
+                    <th className="py-3 px-3">
                       <span>Cliente</span>
                     </th>
 
                     {/* Canal com filtro estilo Excel */}
-                    <th className="py-3 px-3 w-36 relative">
+                    <th className="py-3 px-3 w-[15%] relative">
                       <div className="flex items-center gap-1.5">
                         <span>Canal</span>
                         <button
@@ -1835,7 +1844,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     </th>
 
                     {/* Veículo com filtro estilo Excel */}
-                    <th className="py-3 px-3 w-36 relative">
+                    <th className="py-3 px-3 w-[16%] relative">
                       <div className="flex items-center gap-1.5">
                         <span>Veículo</span>
                         <button
@@ -1881,8 +1890,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       />
                     </th>
 
-                    {/* Etapa do Funil com filtro estilo Excel (largura ampla para leitura completa) */}
-                    <th className="py-3 px-3 w-64 min-w-[250px] relative">
+                    {/* Etapa do Funil com filtro estilo Excel (largura ajustada sem cortes) */}
+                    <th className="py-3 px-3 w-[228px] relative">
                       <div className="flex items-center gap-1.5">
                         <span>Etapa do Funil</span>
                         <button
@@ -1929,7 +1938,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     </th>
 
                     {/* Responsável com filtro estilo Excel */}
-                    <th className="py-3 px-3 w-36 relative">
+                    <th className="py-3 px-3 w-[15%] relative">
                       <div className="flex items-center gap-1.5">
                         <span>Responsável</span>
                         <button
@@ -2008,10 +2017,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </td>
 
                           {/* Cliente */}
-                          <td className="py-3 px-3 align-middle min-w-[190px] max-w-[230px]">
+                          <td className="py-3 px-3 align-middle">
                             <div className="flex flex-col gap-1 min-w-0">
                               <span 
-                                className="font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors text-xs truncate max-w-[180px] sm:max-w-[220px] block"
+                                className="font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors text-xs truncate block w-full"
                                 title={opp.contact?.full_name || 'Cliente sem nome'}
                               >
                                 {opp.contact?.full_name || 'Cliente sem nome'}
@@ -2046,7 +2055,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </td>
 
                           {/* Canal */}
-                          <td className="py-2.5 px-3 align-middle w-36 whitespace-nowrap">
+                          <td className="py-2.5 px-3 align-middle whitespace-nowrap">
                             <span
                               className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border inline-flex items-center gap-1.5 ${originBadge.bgClasses}`}
                               title={getOriginTitle(opp.contact?.origin)}
@@ -2057,16 +2066,16 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </td>
 
                           {/* Veículo */}
-                          <td className="py-2.5 px-3 align-middle w-36 whitespace-nowrap">
+                          <td className="py-2.5 px-3 align-middle whitespace-nowrap">
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-white text-xs font-bold shadow-2xs whitespace-nowrap">
                               {renderVehicleIcon(vehicle.iconType)}
                               <span>{vehicle.modelName}</span>
                             </span>
                           </td>
 
-                          {/* Etapa Interativa com nome completo sem cortes */}
-                          <td className="py-2.5 px-3 align-middle w-64 min-w-[250px]" onClick={(e) => e.stopPropagation()}>
-                            <div className="relative inline-flex items-center w-full max-w-[245px]">
+                          {/* Etapa Interativa ajustada sem cortes */}
+                          <td className="py-2.5 px-3 align-middle" onClick={(e) => e.stopPropagation()}>
+                            <div className="relative inline-flex items-center w-[210px]">
                               <stageCfg.Icon
                                 className="w-3.5 h-3.5 absolute left-2.5 pointer-events-none shrink-0"
                                 style={{ color: stageCfg.stripeColor }}
@@ -2075,7 +2084,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                 value={normStage}
                                 onChange={(e) => requestChangeOpportunityStage(opp, e.target.value as OpportunityStage)}
                                 aria-label="Alterar etapa da oportunidade"
-                                className="w-full pl-8 pr-8 py-1.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg text-xs font-bold text-slate-800 outline-none cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
+                                className="w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg text-xs font-bold text-slate-800 outline-none cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
                               >
                                 {SALES_STAGES.map((st) => (
                                   <option key={st.id} value={st.id}>
@@ -2087,7 +2096,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </td>
 
                           {/* Responsável */}
-                          <td className="py-2.5 px-3 align-middle w-36 whitespace-nowrap">
+                          <td className="py-2.5 px-3 align-middle whitespace-nowrap">
                             {renderResponsibleInfo(opp.assigned_to)}
                           </td>
                         </tr>
@@ -2442,13 +2451,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 )
               })}
             </div>
-
-            <div className="hidden xl:flex items-center gap-2 shrink-0 pl-3 border-l border-slate-200 text-xs font-mono">
-              <span className="text-slate-400">Total exibido:</span>
-              <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
-                {formatCurrency(listOrders.reduce((sum, o) => sum + getOrderTotal(o), 0))}
-              </span>
-            </div>
           </div>
 
           {/* Barra de Filtros Ativos com Botão de Limpar Todos os Filtros */}
@@ -2555,18 +2557,18 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
           {/* Tabela de Pedidos com Scroll Interno */}
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs flex-1 min-h-0 flex flex-col overflow-hidden">
             <div className="overflow-auto flex-1 min-h-0 kanban-col-scroll">
-              <table className="w-full text-left border-collapse min-w-[960px]">
+              <table className="w-full table-fixed text-left border-collapse min-w-[1060px]">
                 <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur border-b border-slate-200/90">
                   <tr className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    <th className="py-3 px-4 w-24">Pedido</th>
+                    <th className="py-3 px-4 w-[90px]">Pedido</th>
 
                     {/* Cliente */}
-                    <th className="py-3 px-3 min-w-[190px] max-w-[230px]">
+                    <th className="py-3 px-3">
                       <span>Cliente</span>
                     </th>
 
                     {/* Canal com filtro estilo Excel */}
-                    <th className="py-3 px-3 w-36 relative">
+                    <th className="py-3 px-3 w-[12%] relative">
                       <div className="flex items-center gap-1.5">
                         <span>Canal</span>
                         <button
@@ -2613,7 +2615,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     </th>
 
                     {/* Modalidade com filtro estilo Excel */}
-                    <th className="py-3 px-3 w-40 relative">
+                    <th className="py-3 px-3 w-[14%] relative">
                       <div className="flex items-center gap-1.5">
                         <span>Modalidade</span>
                         <button
@@ -2660,7 +2662,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     </th>
 
                     {/* Veículo com filtro estilo Excel */}
-                    <th className="py-3 px-3 w-36 relative">
+                    <th className="py-3 px-3 w-[13%] relative">
                       <div className="flex items-center gap-1.5">
                         <span>Veículo</span>
                         <button
@@ -2706,8 +2708,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       />
                     </th>
 
-                    {/* Etapa do Pedido com filtro estilo Excel */}
-                    <th className="py-3 px-3 w-64 min-w-[250px] relative">
+                    {/* Etapa do Pedido com filtro estilo Excel (largura ajustada sem cortes) */}
+                    <th className="py-3 px-3 w-[262px] relative">
                       <div className="flex items-center gap-1.5">
                         <span>Etapa do Pedido</span>
                         <button
@@ -2754,7 +2756,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     </th>
 
                     {/* Responsável com filtro estilo Excel */}
-                    <th className="py-3 px-3 w-36 relative">
+                    <th className="py-3 px-3 w-[12%] relative">
                       <div className="flex items-center gap-1.5">
                         <span>Responsável</span>
                         <button
@@ -2835,10 +2837,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </td>
 
                           {/* Cliente */}
-                          <td className="py-3 px-3 align-middle min-w-[190px] max-w-[230px]">
+                          <td className="py-3 px-3 align-middle">
                             <div className="flex flex-col gap-1 min-w-0">
                               <span
-                                className="font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors text-xs truncate max-w-[180px] sm:max-w-[220px] block"
+                                className="font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors text-xs truncate block w-full"
                                 title={ord.contact?.full_name || linkedOpp?.contact?.full_name || 'Cliente sem nome'}
                               >
                                 {ord.contact?.full_name || linkedOpp?.contact?.full_name || 'Cliente sem nome'}
@@ -2864,7 +2866,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </td>
 
                           {/* Canal */}
-                          <td className="py-2.5 px-3 align-middle w-36 whitespace-nowrap">
+                          <td className="py-2.5 px-3 align-middle whitespace-nowrap">
                             <span
                               className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border inline-flex items-center gap-1.5 ${originBadge.bgClasses}`}
                               title={getOriginTitle(ord.contact?.origin || linkedOpp?.contact?.origin)}
@@ -2875,7 +2877,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </td>
 
                           {/* Modalidade + Agendamento */}
-                          <td className="py-2.5 px-3 align-middle w-40 whitespace-nowrap">
+                          <td className="py-2.5 px-3 align-middle whitespace-nowrap">
                             <div className="flex flex-col gap-0.5">
                               <span className="font-semibold text-slate-700 text-xs whitespace-nowrap">
                                 {getFulfillmentLabel(ord.fulfillment_type)}
@@ -2891,16 +2893,16 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </td>
 
                           {/* Veículo */}
-                          <td className="py-2.5 px-3 align-middle w-36 whitespace-nowrap">
+                          <td className="py-2.5 px-3 align-middle whitespace-nowrap">
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-white text-xs font-bold shadow-2xs whitespace-nowrap">
                               {renderVehicleIcon(vehicle.iconType)}
                               <span>{vehicle.modelName}</span>
                             </span>
                           </td>
 
-                          {/* Etapa do Pedido com Ícone Font Awesome dentro do seletor */}
-                          <td className="py-2.5 px-3 align-middle w-64 min-w-[250px]" onClick={(e) => e.stopPropagation()}>
-                            <div className="relative inline-flex items-center w-full max-w-[245px]">
+                          {/* Etapa do Pedido com Ícone Font Awesome ajustada sem cortes */}
+                          <td className="py-2.5 px-3 align-middle" onClick={(e) => e.stopPropagation()}>
+                            <div className="relative inline-flex items-center w-[244px]">
                               <stageCfg.Icon
                                 className="w-3.5 h-3.5 absolute left-2.5 pointer-events-none shrink-0"
                                 style={{ color: stageCfg.stripeColor }}
@@ -2910,7 +2912,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                 disabled={!onUpdateOrderStatus}
                                 onChange={(e) => requestChangeOrderStatus(ord, e.target.value as OrderStatus)}
                                 aria-label="Alterar etapa do pedido"
-                                className="w-full pl-8 pr-8 py-1.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg text-xs font-bold text-slate-800 outline-none cursor-pointer transition-colors shadow-2xs whitespace-nowrap disabled:opacity-60"
+                                className="w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg text-xs font-bold text-slate-800 outline-none cursor-pointer transition-colors shadow-2xs whitespace-nowrap disabled:opacity-60"
                               >
                                 {ORDER_STAGES.map((st) => (
                                   <option key={st.id} value={st.id}>
@@ -2922,7 +2924,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </td>
 
                           {/* Responsável */}
-                          <td className="py-2.5 px-3 align-middle w-36 whitespace-nowrap">
+                          <td className="py-2.5 px-3 align-middle whitespace-nowrap">
                             {renderResponsibleInfo(ord.assigned_to || linkedOpp?.assigned_to)}
                           </td>
                         </tr>
