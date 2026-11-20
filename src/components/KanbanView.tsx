@@ -1235,7 +1235,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         <div className="flex-1 flex gap-3 overflow-x-auto pb-2 kanban-scroll items-stretch min-h-0">
           {SALES_STAGES.map((col, colIdx) => {
             const colOpps = filteredOpportunities.filter((o) => normalizeOppStage(o.stage) === col.id)
-            const colTotal = colOpps.reduce((sum, o) => sum + (o.final_total || 0), 0)
             const isDragTarget = dragOverStageId === col.id
 
             return (
@@ -1254,7 +1253,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                   style={{ backgroundColor: col.stripeColor }} 
                 />
 
-                {/* Header da Coluna (Print 2 / HTML fornecido) */}
+                {/* Header da Coluna */}
                 <div className="p-3 bg-white border-b border-slate-200/80 shrink-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
@@ -1269,10 +1268,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 shrink-0 font-mono">
                       {colOpps.length}
                     </span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-xs text-slate-500 font-mono">
-                    <span>Total:</span>
-                    <span className="font-bold text-slate-800">{formatCurrency(colTotal)}</span>
                   </div>
                 </div>
 
@@ -1788,7 +1783,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     <th className="py-3 px-4 w-24">Código</th>
 
                     {/* Cliente */}
-                    <th className="py-3 px-3 min-w-[260px]">
+                    <th className="py-3 px-3 min-w-[190px] max-w-[230px]">
                       <span>Cliente</span>
                     </th>
 
@@ -1887,7 +1882,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     </th>
 
                     {/* Etapa do Funil com filtro estilo Excel (largura ampla para leitura completa) */}
-                    <th className="py-3 px-3 w-60 min-w-[220px] relative">
+                    <th className="py-3 px-3 w-64 min-w-[250px] relative">
                       <div className="flex items-center gap-1.5">
                         <span>Etapa do Funil</span>
                         <button
@@ -2013,10 +2008,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </td>
 
                           {/* Cliente */}
-                          <td className="py-3 px-3 align-middle min-w-[260px] max-w-[340px]">
+                          <td className="py-3 px-3 align-middle min-w-[190px] max-w-[230px]">
                             <div className="flex flex-col gap-1 min-w-0">
                               <span 
-                                className="font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors text-xs truncate max-w-[280px] sm:max-w-[340px] block"
+                                className="font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors text-xs truncate max-w-[180px] sm:max-w-[220px] block"
                                 title={opp.contact?.full_name || 'Cliente sem nome'}
                               >
                                 {opp.contact?.full_name || 'Cliente sem nome'}
@@ -2070,8 +2065,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </td>
 
                           {/* Etapa Interativa com nome completo sem cortes */}
-                          <td className="py-2.5 px-3 align-middle w-60 min-w-[220px]" onClick={(e) => e.stopPropagation()}>
-                            <div className="relative inline-flex items-center w-full max-w-[225px]">
+                          <td className="py-2.5 px-3 align-middle w-64 min-w-[250px]" onClick={(e) => e.stopPropagation()}>
+                            <div className="relative inline-flex items-center w-full max-w-[245px]">
                               <stageCfg.Icon
                                 className="w-3.5 h-3.5 absolute left-2.5 pointer-events-none shrink-0"
                                 style={{ color: stageCfg.stripeColor }}
@@ -2080,7 +2075,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                 value={normStage}
                                 onChange={(e) => requestChangeOpportunityStage(opp, e.target.value as OpportunityStage)}
                                 aria-label="Alterar etapa da oportunidade"
-                                className="w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg text-xs font-bold text-slate-800 outline-none cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
+                                className="w-full pl-8 pr-8 py-1.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg text-xs font-bold text-slate-800 outline-none cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
                               >
                                 {SALES_STAGES.map((st) => (
                                   <option key={st.id} value={st.id}>
@@ -2111,7 +2106,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         <div className="flex-1 flex gap-3 overflow-x-auto pb-2 kanban-scroll items-stretch min-h-0">
           {ORDER_STAGES.map((col, colIdx) => {
             const colOrders = filteredOrders.filter((o) => normalizeOrdStatus(o.status) === col.id)
-            const colTotal = colOrders.reduce((sum, o) => sum + getOrderTotal(o), 0)
             const isDragTarget = dragOverStageId === col.id
 
             return (
@@ -2130,7 +2124,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                   style={{ backgroundColor: col.stripeColor }} 
                 />
 
-                {/* Header da Coluna com Total em R$ */}
+                {/* Header da Coluna */}
                 <div className="p-3 bg-white border-b border-slate-200/80 shrink-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
@@ -2145,10 +2139,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 shrink-0 font-mono">
                       {colOrders.length}
                     </span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-xs text-slate-500 font-mono">
-                    <span>Total:</span>
-                    <span className="font-bold text-slate-800">{formatCurrency(colTotal)}</span>
                   </div>
                 </div>
 
@@ -2570,10 +2560,15 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                   <tr className="text-xs font-bold uppercase tracking-wider text-slate-500">
                     <th className="py-3 px-4 w-24">Pedido</th>
 
-                    {/* Cliente & Canal com filtro estilo Excel */}
-                    <th className="py-3 px-3 relative">
+                    {/* Cliente */}
+                    <th className="py-3 px-3 min-w-[190px] max-w-[230px]">
+                      <span>Cliente</span>
+                    </th>
+
+                    {/* Canal com filtro estilo Excel */}
+                    <th className="py-3 px-3 w-36 relative">
                       <div className="flex items-center gap-1.5">
-                        <span>Cliente & Canal</span>
+                        <span>Canal</span>
                         <button
                           type="button"
                           data-filter-trigger
@@ -2613,53 +2608,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         }
                         onClearSelection={() =>
                           setOrdersColumnFilters((prev) => ({ ...prev, origins: [] }))
-                        }
-                      />
-                    </th>
-
-                    {/* Veículo com filtro estilo Excel */}
-                    <th className="py-3 px-3 w-40 relative">
-                      <div className="flex items-center gap-1.5">
-                        <span>Veículo</span>
-                        <button
-                          type="button"
-                          data-filter-trigger
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setActiveFilterDropdown((c) => (c === 'pedidos-vehicle' ? null : 'pedidos-vehicle'))
-                          }}
-                          title="Filtrar por Veículo"
-                          className={`p-1 rounded-md transition-colors cursor-pointer ${
-                            ordersColumnFilters.vehicles.length > 0
-                              ? 'bg-orange-100 text-[#EA580C] ring-1 ring-orange-400 font-bold'
-                              : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
-                          }`}
-                        >
-                          <Filter className="w-3 h-3" />
-                        </button>
-                      </div>
-                      <ColumnFilterDropdown
-                        title="Filtrar por Veículo"
-                        isOpen={activeFilterDropdown === 'pedidos-vehicle'}
-                        onClose={() => setActiveFilterDropdown(null)}
-                        options={ordersVehicleOptions}
-                        selectedValues={ordersColumnFilters.vehicles}
-                        onToggleValue={(val) =>
-                          setOrdersColumnFilters((prev) => ({
-                            ...prev,
-                            vehicles: prev.vehicles.includes(val)
-                              ? prev.vehicles.filter((v) => v !== val)
-                              : [...prev.vehicles, val],
-                          }))
-                        }
-                        onSelectAll={() =>
-                          setOrdersColumnFilters((prev) => ({
-                            ...prev,
-                            vehicles: ordersVehicleOptions.map((o) => o.value),
-                          }))
-                        }
-                        onClearSelection={() =>
-                          setOrdersColumnFilters((prev) => ({ ...prev, vehicles: [] }))
                         }
                       />
                     </th>
@@ -2711,8 +2659,55 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       />
                     </th>
 
+                    {/* Veículo com filtro estilo Excel */}
+                    <th className="py-3 px-3 w-36 relative">
+                      <div className="flex items-center gap-1.5">
+                        <span>Veículo</span>
+                        <button
+                          type="button"
+                          data-filter-trigger
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setActiveFilterDropdown((c) => (c === 'pedidos-vehicle' ? null : 'pedidos-vehicle'))
+                          }}
+                          title="Filtrar por Veículo"
+                          className={`p-1 rounded-md transition-colors cursor-pointer ${
+                            ordersColumnFilters.vehicles.length > 0
+                              ? 'bg-orange-100 text-[#EA580C] ring-1 ring-orange-400 font-bold'
+                              : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                          }`}
+                        >
+                          <Filter className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <ColumnFilterDropdown
+                        title="Filtrar por Veículo"
+                        isOpen={activeFilterDropdown === 'pedidos-vehicle'}
+                        onClose={() => setActiveFilterDropdown(null)}
+                        options={ordersVehicleOptions}
+                        selectedValues={ordersColumnFilters.vehicles}
+                        onToggleValue={(val) =>
+                          setOrdersColumnFilters((prev) => ({
+                            ...prev,
+                            vehicles: prev.vehicles.includes(val)
+                              ? prev.vehicles.filter((v) => v !== val)
+                              : [...prev.vehicles, val],
+                          }))
+                        }
+                        onSelectAll={() =>
+                          setOrdersColumnFilters((prev) => ({
+                            ...prev,
+                            vehicles: ordersVehicleOptions.map((o) => o.value),
+                          }))
+                        }
+                        onClearSelection={() =>
+                          setOrdersColumnFilters((prev) => ({ ...prev, vehicles: [] }))
+                        }
+                      />
+                    </th>
+
                     {/* Etapa do Pedido com filtro estilo Excel */}
-                    <th className="py-3 px-3 w-48 relative">
+                    <th className="py-3 px-3 w-64 min-w-[250px] relative">
                       <div className="flex items-center gap-1.5">
                         <span>Etapa do Pedido</span>
                         <button
@@ -2805,15 +2800,12 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         alignRight
                       />
                     </th>
-
-                    <th className="py-3 px-3 w-32 text-right">Valor</th>
-                    <th className="py-3 px-4 w-28 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
                   {listOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-16 text-center text-slate-400 font-medium">
+                      <td colSpan={7} className="py-16 text-center text-slate-400 font-medium">
                         Nenhum pedido encontrado para os filtros selecionados.
                       </td>
                     </tr>
@@ -2824,10 +2816,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       const stageIdx = ORDER_STAGES.findIndex((s) => s.id === normStatus)
                       const stageCfg = ORDER_STAGES[stageIdx] || ORDER_STAGES[0]
                       const vehicle = getVehicleModelInfo(getOrderVehicleModel(ord))
-                      const ordTotal = getOrderTotal(ord)
                       const originBadge = getOriginBadge(ord.contact?.origin || linkedOpp?.contact?.origin)
                       const OriginIcon = originBadge.Icon
-                      const canAdvance = stageIdx >= 0 && stageIdx < ORDER_STAGES.length - 2
                       const scheduleDate = ord.installation_date || ord.pickup_date
                       const scheduleTime = ord.installation_time || ord.pickup_time
 
@@ -2837,57 +2827,61 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           onClick={() => openOrderDetails(ord)}
                           className="hover:bg-orange-50/40 transition-colors cursor-pointer group"
                         >
-                          {/* Código */}
+                          {/* Pedido */}
                           <td className="py-3 px-4 align-middle">
                             <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg text-xs">
                               {formatOrderCode(ord.order_number)}
                             </span>
                           </td>
 
-                          {/* Cliente + Origem + Social */}
-                          <td className="py-3 px-3 align-middle">
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors text-[13px]">
-                                  {ord.contact?.full_name || linkedOpp?.contact?.full_name || 'Cliente'}
-                                </span>
-                                <span
-                                  className={`text-xs font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${originBadge.bgClasses}`}
-                                  title={getOriginTitle(ord.contact?.origin || linkedOpp?.contact?.origin)}
-                                >
-                                  <OriginIcon className={`w-2.5 h-2.5 ${originBadge.iconColor}`} />
-                                  {originBadge.label}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {renderSocialDock({
-                                  phone: ord.contact?.phone_e164 || linkedOpp?.contact?.phone_e164,
-                                  instagram: ord.instagram_url || ord.contact?.instagram_url || linkedOpp?.instagram_url || linkedOpp?.contact?.instagram_url,
-                                  facebook: ord.facebook_url || ord.contact?.facebook_url || linkedOpp?.facebook_url || linkedOpp?.contact?.facebook_url,
-                                  website: ord.website_url || ord.contact?.website_url || linkedOpp?.website_url || linkedOpp?.contact?.website_url,
-                                  clientName: ord.contact?.full_name || linkedOpp?.contact?.full_name,
-                                  isCompact: true,
-                                })}
+                          {/* Cliente */}
+                          <td className="py-3 px-3 align-middle min-w-[190px] max-w-[230px]">
+                            <div className="flex flex-col gap-1 min-w-0">
+                              <span
+                                className="font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors text-xs truncate max-w-[180px] sm:max-w-[220px] block"
+                                title={ord.contact?.full_name || linkedOpp?.contact?.full_name || 'Cliente sem nome'}
+                              >
+                                {ord.contact?.full_name || linkedOpp?.contact?.full_name || 'Cliente sem nome'}
+                              </span>
+                              <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                {(ord.contact?.phone_e164 || linkedOpp?.contact?.phone_e164) && (
+                                  <span className="text-[11px] font-mono text-slate-500 shrink-0">
+                                    {formatBRPhone((ord.contact?.phone_e164 || linkedOpp?.contact?.phone_e164 || '').replace('+55', ''))}
+                                  </span>
+                                )}
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {renderSocialDock({
+                                    phone: ord.contact?.phone_e164 || linkedOpp?.contact?.phone_e164,
+                                    instagram: ord.instagram_url || ord.contact?.instagram_url || linkedOpp?.instagram_url || linkedOpp?.contact?.instagram_url,
+                                    facebook: ord.facebook_url || ord.contact?.facebook_url || linkedOpp?.facebook_url || linkedOpp?.contact?.facebook_url,
+                                    website: ord.website_url || ord.contact?.website_url || linkedOpp?.website_url || linkedOpp?.contact?.website_url,
+                                    clientName: ord.contact?.full_name || linkedOpp?.contact?.full_name,
+                                    isCompact: true,
+                                  })}
+                                </div>
                               </div>
                             </div>
                           </td>
 
-                          {/* Veículo */}
-                          <td className="py-2.5 px-3 align-middle w-40">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-white text-xs font-bold shadow-2xs whitespace-nowrap">
-                              {renderVehicleIcon(vehicle.iconType)}
-                              <span>{vehicle.modelName}</span>
+                          {/* Canal */}
+                          <td className="py-2.5 px-3 align-middle w-36 whitespace-nowrap">
+                            <span
+                              className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border inline-flex items-center gap-1.5 ${originBadge.bgClasses}`}
+                              title={getOriginTitle(ord.contact?.origin || linkedOpp?.contact?.origin)}
+                            >
+                              <OriginIcon className={`w-3 h-3 ${originBadge.iconColor}`} />
+                              <span>{originBadge.label}</span>
                             </span>
                           </td>
 
                           {/* Modalidade + Agendamento */}
-                          <td className="py-2.5 px-3 align-middle w-40">
+                          <td className="py-2.5 px-3 align-middle w-40 whitespace-nowrap">
                             <div className="flex flex-col gap-0.5">
                               <span className="font-semibold text-slate-700 text-xs whitespace-nowrap">
                                 {getFulfillmentLabel(ord.fulfillment_type)}
                               </span>
                               {scheduleDate && (
-                                <span className="inline-flex items-center gap-1 text-xs font-mono text-slate-500 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-500 whitespace-nowrap">
                                   <Calendar className="w-3 h-3 text-[#EA580C]" />
                                   {scheduleDate.split('-').reverse().join('/')}
                                   {scheduleTime ? ` às ${scheduleTime}` : ''}
@@ -2896,9 +2890,17 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             </div>
                           </td>
 
+                          {/* Veículo */}
+                          <td className="py-2.5 px-3 align-middle w-36 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-white text-xs font-bold shadow-2xs whitespace-nowrap">
+                              {renderVehicleIcon(vehicle.iconType)}
+                              <span>{vehicle.modelName}</span>
+                            </span>
+                          </td>
+
                           {/* Etapa do Pedido com Ícone Font Awesome dentro do seletor */}
-                          <td className="py-2.5 px-3 align-middle w-48" onClick={(e) => e.stopPropagation()}>
-                            <div className="relative inline-flex items-center">
+                          <td className="py-2.5 px-3 align-middle w-64 min-w-[250px]" onClick={(e) => e.stopPropagation()}>
+                            <div className="relative inline-flex items-center w-full max-w-[245px]">
                               <stageCfg.Icon
                                 className="w-3.5 h-3.5 absolute left-2.5 pointer-events-none shrink-0"
                                 style={{ color: stageCfg.stripeColor }}
@@ -2908,7 +2910,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                                 disabled={!onUpdateOrderStatus}
                                 onChange={(e) => requestChangeOrderStatus(ord, e.target.value as OrderStatus)}
                                 aria-label="Alterar etapa do pedido"
-                                className="w-[165px] pl-8 pr-6 py-1.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg text-xs font-bold text-slate-800 outline-none cursor-pointer transition-colors shadow-2xs disabled:opacity-60"
+                                className="w-full pl-8 pr-8 py-1.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#EA580C] rounded-lg text-xs font-bold text-slate-800 outline-none cursor-pointer transition-colors shadow-2xs whitespace-nowrap disabled:opacity-60"
                               >
                                 {ORDER_STAGES.map((st) => (
                                   <option key={st.id} value={st.id}>
@@ -2920,27 +2922,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </td>
 
                           {/* Responsável */}
-                          <td className="py-2.5 px-3 align-middle w-36">
+                          <td className="py-2.5 px-3 align-middle w-36 whitespace-nowrap">
                             {renderResponsibleInfo(ord.assigned_to || linkedOpp?.assigned_to)}
-                          </td>
-
-                          {/* Valor */}
-                          <td className="py-2.5 px-3 align-middle text-right w-32 whitespace-nowrap">
-                            <span className="inline-block font-mono font-bold text-[12px] text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg">
-                              {formatCurrency(ordTotal)}
-                            </span>
-                          </td>
-
-                          {/* Ações */}
-                          <td className="py-2.5 px-4 align-middle text-right w-28 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => openOrderDetails(ord)}
-                              className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-[#EA580C] text-slate-700 hover:text-white text-xs font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
-                            >
-                              <span>Abrir</span>
-                              <ChevronRight className="w-3.5 h-3.5" />
-                            </button>
                           </td>
                         </tr>
                       )
