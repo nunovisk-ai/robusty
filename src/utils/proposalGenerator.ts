@@ -237,7 +237,7 @@ export function generateProposalHtml(data: ProposalPayload): string {
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     body {
       font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
@@ -248,7 +248,8 @@ export function generateProposalHtml(data: ProposalPayload): string {
       -webkit-font-smoothing: antialiased;
     }
     .font-mono {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+      font-variant-numeric: tabular-nums;
     }
     @media print {
       body {

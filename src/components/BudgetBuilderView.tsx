@@ -308,49 +308,24 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
     return 'whatsapp'
   })
 
-  // Cor / Acabamento por Produto (lido de product_color JSON ou string legada)
-  const initialItemColors = useMemo<Record<string, string>>(() => {
-    const raw = initialOpportunity?.product_color?.trim()
-    if (!raw) return {}
-    if (raw.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(raw)
-        if (parsed && typeof parsed === 'object') return parsed as Record<string, string>
-      } catch {
-        return {}
-      }
-    }
-    return {}
-  }, [initialOpportunity?.product_color])
-
-  const legacyDefaultColor = useMemo(() => {
-    const raw = initialOpportunity?.product_color?.trim()
-    if (!raw || raw.startsWith('{')) return 'Preto Epóxi'
-    return raw
-  }, [initialOpportunity?.product_color])
+  // Cor / Acabamento do Pedido (vazio por padrão)
+  const [productColor, setProductColor] = useState<string>(() => {
+    const raw = initialOpportunity?.product_color?.trim() || ''
+    return raw.startsWith('{') ? '' : raw
+  })
 
   // 2. Produtos Selecionados
-  const [items, setItems] = useState<{ product: Product; quantity: number; color?: string }[]>(() => {
+  const [items, setItems] = useState<{ product: Product; quantity: number }[]>(() => {
     if (initialOpportunity?.items && initialOpportunity.items.length > 0) {
       return initialOpportunity.items
         .filter((item) => item.product)
         .map((item) => ({
           product: item.product!,
           quantity: item.quantity,
-          color: initialItemColors[item.product!.id] || legacyDefaultColor,
         }))
     }
     return []
   })
-
-  const serializedProductColor = useMemo(() => {
-    if (items.length === 0) return 'Preto Epóxi'
-    const map: Record<string, string> = {}
-    items.forEach((i) => {
-      map[i.product.id] = i.color?.trim() || 'Preto Epóxi'
-    })
-    return JSON.stringify(map)
-  }, [items])
 
   const autoLargestDimensions = useMemo(() => getLargestPackageDimensions(items), [items])
 
@@ -686,18 +661,12 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           i.product.id === prod.id ? { ...i, quantity: i.quantity + 1 } : i
         )
       }
-      return [...prev, { product: prod, quantity: 1, color: 'Preto Epóxi' }]
+      return [...prev, { product: prod, quantity: 1 }]
     })
   }
 
   const handleRemoveItem = (prodId: string) => {
     setItems((prev) => prev.filter((i) => i.product.id !== prodId))
-  }
-
-  const handleItemColorChange = (prodId: string, color: string) => {
-    setItems((prev) =>
-      prev.map((i) => (i.product.id === prodId ? { ...i, color } : i))
-    )
   }
 
   const handleQuantityChange = (prodId: string, delta: number) => {
@@ -710,7 +679,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           }
           return i
         })
-        .filter(Boolean) as { product: Product; quantity: number; color?: string }[]
+        .filter(Boolean) as { product: Product; quantity: number }[]
     )
   }
 
@@ -731,6 +700,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       ...(customerEmail ? [`*E-mail:* ${customerEmail}`] : []),
       ``,
       `*Veículo:* ${selectedVehicle ? getCleanVehicleModel(selectedVehicle.model) : 'Utilitário'}`,
+      ...(productColor.trim() ? [`*Cor / Acabamento:* ${productColor}`] : []),
       `*Modalidade:* ${fulfillment === 'instalacao_loja' ? 'Instalação na Loja Robusty' : 'Envio por Transportadora'}`,
       ...(fulfillment === 'transportadora_envio' && city ? [`*Destino:* ${city}/${state} (CEP: ${cep})`] : []),
       ...(fulfillment === 'transportadora_envio' && shippingCarrierName ? [`*Transportadora:* ${shippingCarrierName}`] : []),
@@ -745,7 +715,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       `*ITENS DO ORÇAMENTO:*`,
       ...items.map(
         (i, idx) =>
-          `${idx + 1}. ${i.product.name} [${i.color || 'Preto Epóxi'}] (x${i.quantity}) — ${formatCurrency(i.product.base_price_10x * i.quantity)} ${i.product.dimensions ? `(${i.product.dimensions})` : ''} ${i.product.weight_kg ? `[${i.product.weight_kg * i.quantity} kg]` : ''}`
+          `${idx + 1}. ${i.product.name} (x${i.quantity}) — ${formatCurrency(i.product.base_price_10x * i.quantity)} ${i.product.dimensions ? `(${i.product.dimensions})` : ''} ${i.product.weight_kg ? `[${i.product.weight_kg * i.quantity} kg]` : ''}`
       ),
       ``,
       `*RESUMO FINANCEIRO:*`,
@@ -854,7 +824,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       deliveryLeadTime,
       productionLeadTime,
       shippingPackageDimensions: shippingPackageDimensions.trim() || autoLargestDimensions,
-      productColor: serializedProductColor,
+      productColor,
       pickupDate,
       pickupTime,
       installationDate,
@@ -1080,7 +1050,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       productionLeadTime,
       shippingPackageDimensions: shippingPackageDimensions.trim() || autoLargestDimensions,
       shippingTrackingCode,
-      productColor: serializedProductColor,
+      productColor,
       totalWeightKg: effectiveWeightKg,
       assignedTo: currentUser?.name || assignedTo,
       notes: initialOpportunity?.notes || '',
@@ -2243,7 +2213,25 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 </div>
               </div>
 
-              {/* 2.2 Bagageiros e Acessórios Compatíveis */}
+              {/* 2.2 Cor do Pedido (nível de pedido, vazio por padrão) */}
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-2.5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-[#EA580C]" />
+                  <span>Cor</span>
+                </h3>
+                <select
+                  value={productColor}
+                  onChange={(e) => setProductColor(e.target.value)}
+                  aria-label="Cor do pedido"
+                  className="w-full sm:w-64 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-[#EA580C] cursor-pointer"
+                >
+                  <option value=""> </option>
+                  <option value="Preto">Preto</option>
+                  <option value="Branco">Branco</option>
+                </select>
+              </div>
+
+              {/* 2.3 Bagageiros e Acessórios Compatíveis */}
               <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-nexo space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -2307,13 +2295,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   ) : (
                     filteredCompatibleProducts.map((p) => {
                       const inBudget = items.find((i) => i.product.id === p.id)
-                      const itemColor = inBudget?.color || 'Preto Epóxi'
-                      const isCustomColor = !['Preto Epóxi', 'Branco Epóxi', 'Cinza Alumínio'].includes(itemColor)
 
                       return (
                         <div
                           key={p.id}
-                          className={`p-3 rounded-xl border transition-colors space-y-2.5 ${
+                          className={`p-3 rounded-xl border transition-colors ${
                             inBudget
                               ? 'bg-orange-50/40 border-orange-200/90'
                               : 'bg-slate-50/80 border-slate-200/80 hover:border-slate-300'
@@ -2376,56 +2362,6 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                               </button>
                             )}
                           </div>
-
-                          {/* Seletor de Acabamento / Cor individual do produto */}
-                          {inBudget && (
-                            <div className="pt-2 border-t border-orange-200/60 flex flex-wrap items-center gap-2">
-                              <span className="text-xs font-bold text-slate-500 flex items-center gap-1 mr-1">
-                                <Palette className="w-3.5 h-3.5 text-[#EA580C]" />
-                                <span>Cor:</span>
-                              </span>
-                              {[
-                                { id: 'Preto Epóxi', label: 'Preto Epóxi', dotClass: 'bg-black border-slate-600' },
-                                { id: 'Branco Epóxi', label: 'Branco Epóxi', dotClass: 'bg-white border-slate-300' },
-                                { id: 'Cinza Alumínio', label: 'Cinza Alumínio', dotClass: 'bg-slate-400 border-slate-500' },
-                                { id: 'Personalizado', label: 'Outra...', dotClass: 'bg-gradient-to-tr from-amber-500 to-orange-500 border-orange-400' },
-                              ].map((opt) => {
-                                const isSelected =
-                                  itemColor === opt.id || (opt.id === 'Personalizado' && isCustomColor)
-                                return (
-                                  <button
-                                    key={opt.id}
-                                    type="button"
-                                    onClick={() => {
-                                      if (opt.id === 'Personalizado') {
-                                        if (!isCustomColor) handleItemColorChange(p.id, 'Sob Medida')
-                                      } else {
-                                        handleItemColorChange(p.id, opt.id)
-                                      }
-                                    }}
-                                    className={`px-2.5 py-1 rounded-lg border text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-                                      isSelected
-                                        ? 'bg-white border-[#EA580C] text-[#EA580C] font-bold shadow-2xs'
-                                        : 'bg-white/70 hover:bg-white border-slate-200 text-slate-600 font-medium'
-                                    }`}
-                                  >
-                                    <span className={`w-2.5 h-2.5 rounded-full border shrink-0 ${opt.dotClass}`} />
-                                    <span>{opt.label}</span>
-                                  </button>
-                                )
-                              })}
-
-                              {isCustomColor && (
-                                <input
-                                  type="text"
-                                  value={itemColor}
-                                  onChange={(e) => handleItemColorChange(p.id, e.target.value)}
-                                  placeholder="Especifique a cor..."
-                                  className="flex-1 min-w-[140px] bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
-                                />
-                              )}
-                            </div>
-                          )}
                         </div>
                       )
                     })
