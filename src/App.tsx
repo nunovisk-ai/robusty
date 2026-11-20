@@ -726,9 +726,10 @@ export function App() {
     appointmentId: string,
     opportunityId: string,
     eventType: 'coleta' | 'instalacao',
-    outcome: 'concluido' | 'nao_realizado'
+    outcome: 'concluido' | 'nao_realizado' | 'agendado'
   ) => {
-    const newAptStatus: Appointment['status'] = outcome === 'concluido' ? 'concluido' : 'reagendado'
+    const newAptStatus: Appointment['status'] =
+      outcome === 'concluido' ? 'concluido' : outcome === 'nao_realizado' ? 'reagendado' : 'agendado'
     const targetOpp = opportunities.find((o) => o.id === opportunityId)
     const authorName = currentUser?.name || 'Loja'
     const labelType = eventType === 'coleta' ? 'Coleta' : 'Instalação'
@@ -748,7 +749,9 @@ export function App() {
           description:
             outcome === 'concluido'
               ? `${labelType} efetuada (confirmado pela Loja)`
-              : `${labelType} não aconteceu no horário agendado — tarefa de reagendamento criada`,
+              : outcome === 'nao_realizado'
+              ? `${labelType} não aconteceu no horário agendado — tarefa de reagendamento criada`
+              : `Confirmação de ${labelType.toLowerCase()} desfeita pela Loja (voltou para Agendado)`,
           user: authorName,
           created_at: nowIso,
         }
@@ -767,6 +770,9 @@ export function App() {
             created_at: nowIso,
           }
           updatedTasks = [rescheduleTask, ...updatedTasks]
+        } else if (outcome === 'agendado') {
+          const taskTitle = `Reagendar ${eventType === 'coleta' ? 'coleta' : 'instalação'}`
+          updatedTasks = updatedTasks.filter((t) => !(t.title === taskTitle && !t.completed))
         }
 
         await updateOpportunityTasks(opportunityId, updatedTasks, updatedHistory)
@@ -793,7 +799,9 @@ export function App() {
         'success',
         outcome === 'concluido'
           ? `${labelType} marcada como efetuada!`
-          : `Registrado que a ${labelType.toLowerCase()} não aconteceu. Alerta e tarefa criados no funil.`
+          : outcome === 'nao_realizado'
+          ? `Registrado que a ${labelType.toLowerCase()} não aconteceu. Alerta e tarefa criados no funil.`
+          : `Confirmação desfeita! O compromisso voltou para Agendado.`
       )
     } catch (err) {
       showToast(

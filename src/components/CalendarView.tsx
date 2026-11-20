@@ -22,7 +22,10 @@ import {
   List,
   AlertCircle,
   ExternalLink,
-  ShieldAlert
+  ShieldAlert,
+  CheckCircle2,
+  CalendarX2,
+  Hourglass
 } from 'lucide-react'
 import {
   FaWhatsapp,
@@ -137,8 +140,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onOpenAppointmentLead
 }) => {
   // Navigation State
-  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day' | 'list'>('month')
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day' | 'list'>('list')
   const [filterType, setFilterType] = useState<'all' | 'coleta' | 'instalacao'>('all')
+  const [statusFilter, setStatusFilter] = useState<'upcoming' | 'awaiting' | 'completed' | 'missed' | 'all'>('upcoming')
   const [searchQuery, setSearchQuery] = useState('')
 
   // Selected date for day view and reference for month/week navigation
@@ -219,10 +223,39 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     })
   }, [orders, opportunities, appointments])
 
-  // Filtragem por tipo e busca
+  const getEventOperationalStatus = (ev: CalendarEvent): 'upcoming' | 'awaiting' | 'completed' | 'missed' => {
+    if (ev.status === 'concluido') return 'completed'
+    if (ev.status === 'reagendado') return 'missed'
+    const dt = new Date(`${ev.date}T${ev.time || '09:00'}:00`)
+    if (!isNaN(dt.getTime()) && new Date() >= dt) return 'awaiting'
+    return 'upcoming'
+  }
+
+  // Estatísticas operacionais
+  const countUpcoming = useMemo(
+    () => allEvents.filter((e) => getEventOperationalStatus(e) === 'upcoming').length,
+    [allEvents]
+  )
+  const countAwaiting = useMemo(
+    () => allEvents.filter((e) => getEventOperationalStatus(e) === 'awaiting').length,
+    [allEvents]
+  )
+  const countCompleted = useMemo(
+    () => allEvents.filter((e) => getEventOperationalStatus(e) === 'completed').length,
+    [allEvents]
+  )
+  const countMissed = useMemo(
+    () => allEvents.filter((e) => getEventOperationalStatus(e) === 'missed').length,
+    [allEvents]
+  )
+
+  // Filtragem por tipo, status operacional e busca
   const filteredEvents = useMemo(() => {
     return allEvents.filter((ev) => {
       if (filterType !== 'all' && ev.type !== filterType) return false
+      if (viewMode === 'list' && statusFilter !== 'all' && getEventOperationalStatus(ev) !== statusFilter) {
+        return false
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase()
         const matchClient = ev.clientName.toLowerCase().includes(q)
@@ -236,7 +269,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       }
       return true
     })
-  }, [allEvents, filterType, searchQuery])
+  }, [allEvents, filterType, statusFilter, viewMode, searchQuery])
 
   // Estatísticas rápidas
   const countInstalacoes = allEvents.filter((e) => e.type === 'instalacao').length
@@ -405,87 +438,22 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Top Header & Operational Banner */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-nexo flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1.5">
-            <h2 className="text-xl font-bold text-[#121212] tracking-tight">
-              Agenda Operacional
-            </h2>
-            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-              Oficina & Expedição
-            </span>
+    <div className="space-y-5">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-[#EA580C]/10 text-[#EA580C] flex items-center justify-center shrink-0">
+            <CalendarIcon className="w-5 h-5" />
           </div>
-          <p className="text-xs text-slate-500 font-medium max-w-2xl leading-relaxed">
-            Painel unificado para acompanhamento de horários de coleta com transportadoras e agendamentos de instalação na loja física.
-          </p>
+          <h2 className="text-xl font-bold text-[#121212] tracking-tight">
+            Agenda Operacional
+          </h2>
         </div>
 
-        {/* Counter Indicators */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Instalações Loja (Purple) */}
-          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-purple-50/80 border border-purple-200/80">
-            <div className="w-7 h-7 rounded-lg bg-purple-600 text-white flex items-center justify-center shadow-xs">
-              <Wrench className="w-3.5 h-3.5" />
-            </div>
-            <div>
-              <div className="text-[10px] uppercase font-bold text-purple-700 tracking-wider">Instalações Loja</div>
-              <div className="text-sm font-bold text-purple-900">{countInstalacoes}</div>
-            </div>
-          </div>
-
-          {/* Coletas Transportadora (Sky/Blue) */}
-          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-sky-50/80 border border-sky-200/80">
-            <div className="w-7 h-7 rounded-lg bg-sky-600 text-white flex items-center justify-center shadow-xs">
-              <Truck className="w-3.5 h-3.5" />
-            </div>
-            <div>
-              <div className="text-[10px] uppercase font-bold text-sky-700 tracking-wider">Coletas Transportadora</div>
-              <div className="text-sm font-bold text-sky-900">{countColetas}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Control Bar: View Switcher, Type Filters, Search, Navigation */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-nexo flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-        {/* Left: View Mode Switcher */}
-        <div className="flex items-center bg-slate-100/80 p-1 rounded-xl self-start">
+        {/* View Toggle: Lista / Calendário */}
+        <div className="flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200/70 self-start sm:self-auto">
           <button
-            onClick={() => setViewMode('month')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              viewMode === 'month'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <CalendarDays className="w-3.5 h-3.5" />
-            <span>Mês</span>
-          </button>
-          <button
-            onClick={() => setViewMode('week')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              viewMode === 'week'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <CalendarIcon className="w-3.5 h-3.5" />
-            <span>Semana</span>
-          </button>
-          <button
-            onClick={() => setViewMode('day')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              viewMode === 'day'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            <span>Dia</span>
-          </button>
-          <button
+            type="button"
             onClick={() => setViewMode('list')}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               viewMode === 'list'
@@ -494,56 +462,237 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             }`}
           >
             <List className="w-3.5 h-3.5" />
-            <span>Lista de Próximos</span>
+            <span>Lista</span>
           </button>
-        </div>
-
-        {/* Center: Type Filter Pills */}
-        <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-full border border-slate-200/60 self-start md:self-center">
           <button
-            onClick={() => setFilterType('all')}
-            className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-              filterType === 'all'
-                ? 'bg-[#EA580C] text-white shadow-xs'
+            type="button"
+            onClick={() => setViewMode('month')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              viewMode !== 'list'
+                ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Todos ({allEvents.length})
-          </button>
-          <button
-            onClick={() => setFilterType('instalacao')}
-            className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              filterType === 'instalacao'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'text-purple-700 hover:bg-purple-50'
-            }`}
-          >
-            <Wrench className="w-3 h-3" />
-            <span>Instalações ({countInstalacoes})</span>
-          </button>
-          <button
-            onClick={() => setFilterType('coleta')}
-            className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              filterType === 'coleta'
-                ? 'bg-sky-600 text-white shadow-xs'
-                : 'text-sky-700 hover:bg-sky-50'
-            }`}
-          >
-            <Truck className="w-3 h-3" />
-            <span>Coletas ({countColetas})</span>
+            <CalendarDays className="w-3.5 h-3.5" />
+            <span>Calendário</span>
           </button>
         </div>
+      </div>
 
-        {/* Right: Search Box */}
-        <div className="relative min-w-[220px]">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Buscar por cliente, veículo ou código..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200/80 rounded-full pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#EA580C]"
-          />
+      {/* 4 KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter('upcoming')
+            setViewMode('list')
+          }}
+          className={`text-left bg-white p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+            viewMode === 'list' && statusFilter === 'upcoming'
+              ? 'border-blue-400 ring-2 ring-blue-100 shadow-sm'
+              : 'border-slate-200/80 hover:border-blue-300 shadow-nexo'
+          }`}
+        >
+          <div>
+            <div className="text-xs font-semibold text-slate-500">Próximos Compromissos</div>
+            <div className="text-2xl font-bold text-slate-900 mt-1">{countUpcoming}</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">Agendados futuros</div>
+          </div>
+          <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <CalendarIcon className="w-5 h-5" />
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter('awaiting')
+            setViewMode('list')
+          }}
+          className={`text-left bg-white p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+            viewMode === 'list' && statusFilter === 'awaiting'
+              ? 'border-amber-400 ring-2 ring-amber-100 shadow-sm'
+              : 'border-slate-200/80 hover:border-amber-300 shadow-nexo'
+          }`}
+        >
+          <div>
+            <div className="text-xs font-semibold text-slate-500">Aguardando Baixa</div>
+            <div className="text-2xl font-bold text-amber-600 mt-1">{countAwaiting}</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">Pendentes de confirmação</div>
+          </div>
+          <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <Hourglass className="w-5 h-5" />
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter('completed')
+            setViewMode('list')
+          }}
+          className={`text-left bg-white p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+            viewMode === 'list' && statusFilter === 'completed'
+              ? 'border-emerald-400 ring-2 ring-emerald-100 shadow-sm'
+              : 'border-slate-200/80 hover:border-emerald-300 shadow-nexo'
+          }`}
+        >
+          <div>
+            <div className="text-xs font-semibold text-slate-500">Realizados</div>
+            <div className="text-2xl font-bold text-emerald-600 mt-1">{countCompleted}</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">Concluídos com sucesso</div>
+          </div>
+          <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter('missed')
+            setViewMode('list')
+          }}
+          className={`text-left bg-white p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+            viewMode === 'list' && statusFilter === 'missed'
+              ? 'border-rose-400 ring-2 ring-rose-100 shadow-sm'
+              : 'border-slate-200/80 hover:border-rose-300 shadow-nexo'
+          }`}
+        >
+          <div>
+            <div className="text-xs font-semibold text-slate-500">Não Aconteceu</div>
+            <div className="text-2xl font-bold text-rose-600 mt-1">{countMissed}</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">Reagendamento necessário</div>
+          </div>
+          <div className="w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+            <CalendarX2 className="w-5 h-5" />
+          </div>
+        </button>
+      </div>
+
+      {/* Filter & Search Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-nexo space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* Status Filter Pills */}
+          {viewMode === 'list' ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setStatusFilter('upcoming')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  statusFilter === 'upcoming'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Próximos ({countUpcoming})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('awaiting')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  statusFilter === 'awaiting'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+                }`}
+              >
+                Aguardando Baixa ({countAwaiting})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('completed')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  statusFilter === 'completed'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                }`}
+              >
+                Realizados ({countCompleted})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('missed')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  statusFilter === 'missed'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-rose-50 text-rose-800 hover:bg-rose-100'
+                }`}
+              >
+                Não Aconteceu ({countMissed})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  statusFilter === 'all'
+                    ? 'bg-[#EA580C] text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Todos ({allEvents.length})
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center bg-slate-100/80 p-1 rounded-xl self-start">
+              <button
+                type="button"
+                onClick={() => setViewMode('month')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === 'month' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <CalendarDays className="w-3.5 h-3.5" />
+                <span>Mês</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('week')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === 'week' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <CalendarIcon className="w-3.5 h-3.5" />
+                <span>Semana</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('day')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === 'day' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Dia</span>
+              </button>
+            </div>
+          )}
+
+          {/* Right: Search + Modality Select */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <div className="relative min-w-[240px]">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Buscar cliente, código, veículo..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#EA580C]"
+              />
+            </div>
+
+            <div className="relative">
+              <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value as 'all' | 'coleta' | 'instalacao')}
+                className="bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-7 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#EA580C] cursor-pointer"
+              >
+                <option value="all">Todas as Modalidades ({allEvents.length})</option>
+                <option value="instalacao">Instalação na Loja ({countInstalacoes})</option>
+                <option value="coleta">Coleta Transportadora ({countColetas})</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -879,105 +1028,187 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {viewMode === 'list' && (
         <div className="space-y-3">
           {filteredEvents.length === 0 ? (
-            <div className="bg-white p-12 text-center rounded-2xl border border-slate-100 shadow-nexo">
+            <div className="bg-white p-12 text-center rounded-2xl border border-slate-200/80 shadow-nexo">
               <CalendarIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <h3 className="text-base font-bold text-slate-800">Nenhum agendamento encontrado</h3>
+              <h3 className="text-base font-bold text-slate-800">Nenhum compromisso encontrado</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Tente ajustar os filtros de busca ou verifique se os orçamentos/pedidos possuem datas de coleta ou instalação definidas.
+                Tente ajustar o filtro de status, modalidade ou busca para visualizar outros agendamentos.
               </p>
             </div>
           ) : (
             filteredEvents.map((ev) => {
               const isColeta = ev.type === 'coleta'
               const { iconType } = cleanVehicleName(ev.vehicleModel)
+              const opStatus = getEventOperationalStatus(ev)
+
+              const [yStr, mStr, dStr] = ev.date.split('-')
+              const dateObj = new Date(Number(yStr), Number(mStr) - 1, Number(dStr))
+              const monthShort = dateObj
+                .toLocaleDateString('pt-BR', { month: 'short' })
+                .replace('.', '')
+                .toUpperCase()
+              const weekdayFull = dateObj.toLocaleDateString('pt-BR', {
+                weekday: 'long',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+              })
+
+              const dateBoxTheme =
+                opStatus === 'completed'
+                  ? 'bg-emerald-600 text-white'
+                  : opStatus === 'missed'
+                    ? 'bg-rose-600 text-white'
+                    : opStatus === 'awaiting'
+                      ? 'bg-amber-500 text-white'
+                      : isColeta
+                        ? 'bg-sky-600 text-white'
+                        : 'bg-purple-600 text-white'
+
+              const statusBadge =
+                opStatus === 'completed' ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>{isColeta ? 'Coleta Efetuada' : 'Instalação Efetuada'}</span>
+                  </span>
+                ) : opStatus === 'missed' ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                    <CalendarX2 className="w-3 h-3" />
+                    <span>Não Aconteceu</span>
+                  </span>
+                ) : opStatus === 'awaiting' ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                    <Hourglass className="w-3 h-3" />
+                    <span>Aguardando Baixa</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                    <Clock className="w-3 h-3" />
+                    <span>Agendado</span>
+                  </span>
+                )
+
+              const cleanPhoneDigits = (ev.clientPhone || '').replace(/\D/g, '')
+              const whatsappUrl = cleanPhoneDigits
+                ? `https://wa.me/${cleanPhoneDigits.startsWith('55') ? cleanPhoneDigits : `55${cleanPhoneDigits}`}`
+                : null
+
               return (
                 <div
                   key={ev.id}
                   onClick={() => handleSelectEvent(ev)}
-                  className={`bg-white p-5 rounded-2xl border transition-all cursor-pointer hover:shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-                    isColeta
-                      ? 'border-slate-200/80 hover:border-sky-300 border-l-4 border-l-sky-500'
-                      : 'border-slate-200/80 hover:border-purple-300 border-l-4 border-l-purple-500'
-                  }`}
+                  className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 hover:border-[#EA580C]/60 transition-all cursor-pointer hover:shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4"
                 >
-                  {/* Left: Event Type, Date & Time */}
-                  <div className="flex items-start gap-4 min-w-[240px]">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                      isColeta ? 'bg-sky-50 text-sky-700' : 'bg-purple-50 text-purple-700'
-                    }`}>
-                      {isColeta ? <Truck className="w-6 h-6" /> : <Wrench className="w-6 h-6" />}
+                  {/* Left: Colored Date Square + Main Info */}
+                  <div className="flex items-start gap-4 flex-1 min-w-0">
+                    <div
+                      className={`w-16 h-20 rounded-2xl flex flex-col items-center justify-center shrink-0 shadow-xs ${dateBoxTheme}`}
+                    >
+                      <span className="text-[10px] font-bold tracking-wider opacity-90">{monthShort}</span>
+                      <span className="text-2xl font-extrabold leading-none my-0.5">{dStr}</span>
+                      <span className="text-[11px] font-mono font-bold opacity-95">{ev.time}</span>
                     </div>
 
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                          isColeta ? 'bg-sky-100 text-sky-800 border border-sky-200' : 'bg-purple-100 text-purple-800 border border-purple-200'
-                        }`}>
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {statusBadge}
+                        <span
+                          className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                            isColeta
+                              ? 'bg-sky-50 text-sky-800 border-sky-200'
+                              : 'bg-purple-50 text-purple-800 border-purple-200'
+                          }`}
+                        >
                           {isColeta ? 'Coleta Transportadora' : 'Instalação na Loja'}
                         </span>
                         {getRelativeDayBadge(ev.date)}
-                      </div>
-
-                      <div className="font-mono text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-[#EA580C]" />
-                        <span>{ev.date.split('-').reverse().join('/')} às {ev.time}</span>
-                      </div>
-
-                      {ev.orderCode && (
-                        <span className="text-[11px] font-mono text-slate-500 font-bold">
-                          {ev.orderCode}
+                        <span className="text-[11px] text-slate-400 font-medium capitalize hidden sm:inline">
+                          {weekdayFull}
                         </span>
-                      )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-bold text-slate-900 text-sm truncate">{ev.clientName}</span>
+                        {ev.orderCode && (
+                          <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                            {ev.orderCode}
+                          </span>
+                        )}
+                        {ev.clientPhone && (
+                          <span className="text-xs text-slate-500 flex items-center gap-1">
+                            <Phone className="w-3 h-3 text-slate-400" />
+                            <span>{ev.clientPhone}</span>
+                          </span>
+                        )}
+                        {renderOriginIcon(ev.origin)}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-600">
+                        <span className="flex items-center gap-1.5 font-semibold text-slate-800">
+                          {renderVehicleIcon(iconType)}
+                          <span>{ev.vehicleModel}</span>
+                        </span>
+                        {ev.itemsSummary && (
+                          <>
+                            <span className="text-slate-300">•</span>
+                            <span className="text-slate-500 truncate max-w-md">{ev.itemsSummary}</span>
+                          </>
+                        )}
+                        {ev.totalWeightKg && (
+                          <>
+                            <span className="text-slate-300">•</span>
+                            <span className="flex items-center gap-1 font-mono text-[11px] text-slate-500">
+                              <Weight className="w-3 h-3 text-slate-400" />
+                              {ev.totalWeightKg} kg
+                            </span>
+                          </>
+                        )}
+                        {isColeta && ev.shippingCarrierName && (
+                          <>
+                            <span className="text-slate-300">•</span>
+                            <span className="flex items-center gap-1 text-[11px] text-sky-700 font-medium">
+                              <Truck className="w-3 h-3" />
+                              {ev.shippingCarrierName}
+                            </span>
+                          </>
+                        )}
+                        {isColeta && ev.shippingAddress?.city && (
+                          <>
+                            <span className="text-slate-300">•</span>
+                            <span className="flex items-center gap-1 text-[11px] text-slate-500">
+                              <MapPin className="w-3 h-3 text-slate-400" />
+                              {ev.shippingAddress.city} - {ev.shippingAddress.state}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Center: Client, Vehicle & Cargo Info (No Prices!) */}
-                  <div className="flex-1 space-y-1 text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 text-sm">{ev.clientName}</span>
-                      {renderOriginIcon(ev.origin)}
-                    </div>
-
-                    <div className="flex items-center gap-2 text-slate-600 font-medium">
-                      <span>{renderVehicleIcon(iconType)}</span>
-                      <span className="font-semibold text-slate-800">{ev.vehicleModel}</span>
-                      <span>•</span>
-                      <span className="text-slate-500 truncate max-w-xs">{ev.itemsSummary}</span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
-                      {ev.totalWeightKg && (
-                        <span className="flex items-center gap-1 font-mono">
-                          <Weight className="w-3 h-3 text-slate-400" />
-                          Peso: {ev.totalWeightKg} kg
-                        </span>
-                      )}
-                      {isColeta && ev.shippingAddress?.city && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-slate-400" />
-                          Destino: {ev.shippingAddress.city} - {ev.shippingAddress.state}
-                        </span>
-                      )}
-                      {!isColeta && (
-                        <span className="flex items-center gap-1 text-purple-700 font-medium">
-                          <Store className="w-3 h-3" />
-                          Instalação — Loja Física
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right: Read-Only Action Button */}
-                  <div className="shrink-0 self-start md:self-center">
+                  {/* Right: Actions */}
+                  <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                    {whatsappUrl && (
+                      <a
+                        href={whatsappUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Chamar no WhatsApp"
+                        className="p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors"
+                      >
+                        <FaWhatsapp className="w-4 h-4" />
+                      </a>
+                    )}
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation()
                         handleSelectEvent(ev)
                       }}
-                      className="px-4 py-2 rounded-full border border-slate-200 hover:border-[#EA580C] hover:text-[#EA580C] text-slate-700 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-[#EA580C] text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
                     >
-                      <Lock className="w-3 h-3 text-slate-400" />
-                      <span>Ficha Operacional</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Abrir Detalhes</span>
                     </button>
                   </div>
                 </div>

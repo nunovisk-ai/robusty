@@ -59,6 +59,21 @@ a:focus-visible {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Campos somente leitura ou desabilitados com aparência acinzentada clara de bloqueio */
+input:disabled,
+select:disabled,
+textarea:disabled,
+input[readonly],
+textarea[readonly],
+fieldset:disabled input,
+fieldset:disabled select,
+fieldset:disabled textarea {
+  background-color: #e2e8f0 !important;
+  color: #64748b !important;
+  border-color: #cbd5e1 !important;
+  cursor: not-allowed !important;
+}
+
 /* Custom smooth discreet scrollbars for Kanban */
 ::-webkit-scrollbar {
   width: 5px;
