@@ -84,9 +84,7 @@ export function App() {
   }, [])
 
   const lostOpportunitiesCount = useMemo(() => {
-    return opportunities.filter(
-      (o) => o.stage === 'venda_perdida' || Boolean(o.closed_at) || Boolean(o.lost_reason)
-    ).length
+    return opportunities.filter((o) => o.stage === 'venda_perdida').length
   }, [opportunities])
 
   const loadCrmData = useCallback(async () => {
@@ -599,8 +597,9 @@ export function App() {
       const updated = await reopenOpportunityInSupabase(oppId, authorName)
       setOpportunities((prev) => prev.map((o) => (o.id === oppId ? updated : o)))
       if (editingOpportunity?.id === oppId) {
-        setEditingOpportunity(updated)
+        setEditingOpportunity(null)
       }
+      setActiveTab('kanban')
       showToast('success', 'Oportunidade reativada! Retornou para Novo Lead no Funil de Vendas.')
     } catch (err) {
       showToast(

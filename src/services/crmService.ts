@@ -998,6 +998,8 @@ export async function reopenOpportunityInSupabase(
   const updateFields: Record<string, any> = {
     stage: 'novo_lead',
     closed_at: null,
+    lost_reason: null,
+    lost_reason_details: null,
     history: updatedHistory,
     updated_at: now,
   }

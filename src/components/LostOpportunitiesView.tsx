@@ -76,11 +76,9 @@ export const LostOpportunitiesView: React.FC<LostOpportunitiesViewProps> = ({
   const [oppToReactivate, setOppToReactivate] = useState<Opportunity | null>(null)
   const [isReactivating, setIsReactivating] = useState(false)
 
-  // Oportunidades perdidas/encerradas
+  // Oportunidades perdidas/encerradas: apenas oportunidades com stage === 'venda_perdida'
   const lostOpps = useMemo(() => {
-    return opportunities.filter(
-      (o) => o.stage === 'venda_perdida' || Boolean(o.closed_at) || Boolean(o.lost_reason)
-    )
+    return opportunities.filter((o) => o.stage === 'venda_perdida')
   }, [opportunities])
 
   // Fechar popover ao clicar fora

@@ -40,7 +40,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentUser,
   onLogout
 }) => {
-  const navItems = [
+  interface NavItem {
+    id: ActiveTab
+    label: string
+    icon: React.ReactNode
+    badge?: number
+  }
+
+  const navItems: NavItem[] = [
     {
       id: 'kanban' as ActiveTab,
       label: 'Funil de Vendas',
@@ -55,7 +62,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'lost_opportunities' as ActiveTab,
       label: 'Oportunidades Perdidas',
       icon: <ArchiveX className="w-5 h-5" />,
-      badge: lostCount > 0 ? lostCount : undefined,
     },
     {
       id: 'catalog' as ActiveTab,
