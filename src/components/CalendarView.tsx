@@ -729,20 +729,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             {viewMode === 'day' && currentDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
           </div>
 
-          {/* Jump to specific date */}
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={selectedDateStr}
-              onChange={(e) => {
-                if (e.target.value) {
-                  const [y, m, d] = e.target.value.split('-').map(Number)
-                  setCurrentDate(new Date(y, m - 1, d))
-                }
-              }}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-slate-700 focus:outline-none focus:border-[#EA580C]"
-            />
-          </div>
+          {/* Balancing spacer to keep period title centered */}
+          <div className="w-[104px] hidden sm:block" aria-hidden="true" />
         </div>
       )}
 
