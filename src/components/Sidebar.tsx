@@ -1,15 +1,10 @@
 import React from 'react'
 import { 
-  LayoutDashboard,
-  Calculator, 
   Package, 
   Truck, 
   Calendar, 
-  Settings,
   X,
-  SlidersHorizontal,
   Filter,
-  Bot,
   LogOut,
   ArchiveX
 } from 'lucide-react'
@@ -52,16 +47,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'kanban' as ActiveTab,
       label: 'Funil de Vendas',
       icon: <Filter className="w-5 h-5" />,
+      badge: leadCount > 0 ? leadCount : undefined,
     },
     {
       id: 'orders' as ActiveTab,
       label: 'Pedidos & Coleta',
       icon: <Truck className="w-5 h-5" />,
+      badge: orderCount > 0 ? orderCount : undefined,
     },
     {
       id: 'lost_opportunities' as ActiveTab,
       label: 'Oportunidades Perdidas',
       icon: <ArchiveX className="w-5 h-5" />,
+      badge: lostCount > 0 ? lostCount : undefined,
     },
     {
       id: 'catalog' as ActiveTab,

@@ -4,8 +4,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Info,
-  X,
-  Trash2
+  X
 } from 'lucide-react'
 
 export type AlertModalType = 'warning' | 'danger' | 'success' | 'info'

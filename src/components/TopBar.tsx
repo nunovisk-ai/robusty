@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
-import { Menu, Plus, Bell, Check, Clock, Calendar, AlertTriangle, ExternalLink, X } from 'lucide-react'
+import { Menu, Plus, Bell, Check, ExternalLink, X } from 'lucide-react'
 import { FaStore, FaUser } from 'react-icons/fa6'
 import type { ActiveTab } from './Sidebar'
 import type { CurrentUser } from './LoginView'
@@ -21,8 +21,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   activeTab, 
   onToggleMobile, 
   onNewLeadClick,
-  currentUser,
-  onLogout,
+  currentUser: _currentUser,
+  onLogout: _onLogout,
   opportunities = [],
   onSelectOpportunity,
   onToggleTask
@@ -47,7 +47,6 @@ export const TopBar: React.FC<TopBarProps> = ({
   // Extrair todas as tarefas pendentes de todas as oportunidades
   const allPendingTasks = useMemo(() => {
     const list: Array<{ task: OpportunityTask; opportunity: Opportunity }> = []
-    const today = new Date().toISOString().split('T')[0]
 
     opportunities.forEach((opp) => {
       if (opp.tasks && opp.tasks.length > 0) {
@@ -67,7 +66,13 @@ export const TopBar: React.FC<TopBarProps> = ({
     })
   }, [opportunities])
 
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], [])
+  const [todayStr] = useState(() => {
+    const d = new Date()
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  })
 
   // Tarefas urgentes (atrasadas ou hoje)
   const urgentCount = useMemo(() => {

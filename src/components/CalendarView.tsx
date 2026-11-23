@@ -6,7 +6,6 @@ import {
   Clock,
   Wrench,
   Truck,
-  User,
   Lock,
   X,
   Search,
@@ -14,15 +13,12 @@ import {
   ChevronLeft,
   ChevronRight,
   MapPin,
-  Package,
   Weight,
   Phone,
   Store,
   CalendarDays,
   List,
-  AlertCircle,
   ExternalLink,
-  ShieldAlert,
   CheckCircle2,
   CalendarX2,
   Hourglass
@@ -66,6 +62,13 @@ export interface CalendarEvent {
   notes?: string
   opportunityRef?: Opportunity
   appointmentRef?: Appointment
+}
+
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 interface CalendarViewProps {
@@ -321,13 +324,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       events: CalendarEvent[]
     }> = []
 
-    const todayStr = new Date().toISOString().split('T')[0]
+    const todayStr = toLocalDateStr(new Date())
 
     // Preencher dias anteriores do mês anterior
     for (let i = firstDayIndex - 1; i >= 0; i--) {
       const dayNum = daysInPrevMonth - i
       const prevDate = new Date(year, month - 1, dayNum)
-      const dateStr = prevDate.toISOString().split('T')[0]
+      const dateStr = toLocalDateStr(prevDate)
       const dayEvents = filteredEvents.filter((e) => e.date === dateStr)
       cells.push({
         dayNumber: dayNum,
@@ -341,7 +344,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     // Preencher dias do mês atual
     for (let dayNum = 1; dayNum <= daysInCurrentMonth; dayNum++) {
       const curDate = new Date(year, month, dayNum)
-      const dateStr = curDate.toISOString().split('T')[0]
+      const dateStr = toLocalDateStr(curDate)
       const dayEvents = filteredEvents.filter((e) => e.date === dateStr)
       cells.push({
         dayNumber: dayNum,
@@ -356,7 +359,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     const remaining = (7 - (cells.length % 7)) % 7
     for (let dayNum = 1; dayNum <= remaining; dayNum++) {
       const nextDate = new Date(year, month + 1, dayNum)
-      const dateStr = nextDate.toISOString().split('T')[0]
+      const dateStr = toLocalDateStr(nextDate)
       const dayEvents = filteredEvents.filter((e) => e.date === dateStr)
       cells.push({
         dayNumber: dayNum,
@@ -383,12 +386,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     }> = []
 
     const names = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-    const todayStr = new Date().toISOString().split('T')[0]
+    const todayStr = toLocalDateStr(new Date())
 
     for (let i = 0; i < 7; i++) {
       const d = new Date(firstDayOfWeek)
       d.setDate(d.getDate() + i)
-      const dateStr = d.toISOString().split('T')[0]
+      const dateStr = toLocalDateStr(d)
       days.push({
         dayName: names[i],
         dateStr,
@@ -403,7 +406,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   // Day View Hours Slots (08:00 às 18:00)
   const DAY_HOURS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00']
-  const selectedDateStr = currentDate.toISOString().split('T')[0]
+  const selectedDateStr = toLocalDateStr(currentDate)
   const dayEvents = useMemo(() => {
     return filteredEvents.filter((e) => e.date === selectedDateStr)
   }, [filteredEvents, selectedDateStr])

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { AlertTriangle, X, Check, ArrowRight } from 'lucide-react'
+import { AlertTriangle, X, Check } from 'lucide-react'
 
 export const COMMON_LOSS_REASONS = [
   'Preço / Orçamento fora do esperado',

@@ -14,7 +14,6 @@ import type {
   OpportunityHistoryEvent,
   OpportunityTask,
   PersonType,
-  DocumentType,
   PaymentSplit,
   CashPaymentSubtype
 } from '../types'
@@ -37,9 +36,7 @@ import {
   formatCurrency, 
   getCleanVehicleModel, 
   formatOrderCode,
-  formatCPF,
   formatCNPJ,
-  formatRG,
   formatDocumentBy,
   formatIE,
   formatCurrencyInput,
@@ -60,8 +57,6 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  XCircle,
-  Weight,
   CreditCard,
   Banknote,
   ReceiptText,
@@ -69,7 +64,6 @@ import {
   FileText,
   Paperclip,
   Upload,
-  Eye,
   User,
   Building2,
   Share2,
@@ -181,13 +175,6 @@ interface BudgetBuilderViewProps {
   ) => Promise<void>
   onClose?: () => void
 }
-
-const TIME_SLOTS = [
-  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', 
-  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', 
-  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', 
-  '17:00', '17:30', '18:00'
-]
 
 const BRAZILIAN_STATES = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 
@@ -746,7 +733,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       ...(fulfillment === 'transportadora_envio' && resolvedDimensions ? [`*Dimensões do Volume:* ${resolvedDimensions}`] : []),
       ...(fulfillment === 'transportadora_envio' && shippingTrackingCode ? [`*Código de Rastreio:* ${shippingTrackingCode}`] : []),
       ...(fulfillment === 'transportadora_envio' && pickupDate ? [`*Previsão de Coleta:* ${pickupDate.split('-').reverse().join('/')}${pickupTime ? ` às ${pickupTime}` : ' (horário a definir)'}`] : []),
-      ...(fulfillment === 'instalacao_loja' && installationDate ? [`*Agendamento Instalação:* ${installationDate.split('-').reverse().join('/')} às ${installationTime}`] : []),
+      ...(fulfillment === 'instalacao_loja' && installationDate ? [`*Agendamento Instalação:* ${installationDate.split('-').reverse().join('/')}${installationTime ? ` às ${installationTime}` : ' (horário a definir)'}`] : []),
       ``,
       `*ITENS DO ORÇAMENTO:*`,
       ...items.map(
@@ -2642,7 +2629,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
                     {/* Campos de endereço completos */}
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                      <div className="sm:col-span-8">
+                      <div className="sm:col-span-6">
                         <label className="text-xs font-bold text-slate-500 block mb-0.5">Rua / Logradouro:</label>
                         <input
                           type="text"
@@ -2652,13 +2639,23 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                           className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
                         />
                       </div>
-                      <div className="sm:col-span-4">
+                      <div className="sm:col-span-3">
                         <label className="text-xs font-bold text-slate-500 block mb-0.5">Número:</label>
                         <input
                           type="text"
                           placeholder="Ex: 1420"
                           value={number}
                           onChange={(e) => setNumber(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <label className="text-xs font-bold text-slate-500 block mb-0.5">Complemento:</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Bloco B, Sala 4"
+                          value={complement}
+                          onChange={(e) => setComplement(e.target.value)}
                           className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#EA580C]"
                         />
                       </div>
@@ -4423,27 +4420,44 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {/* Botão Salvar (Cria/atualiza o card no Funil de Vendas) */}
-                  <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="py-3 px-3 rounded-xl text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
-                  >
-                    {savingAction === 'save' ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Save className="w-4 h-4 shrink-0" />}
-                    <span>{savingAction === 'save' ? 'Salvando...' : 'Salvar'}</span>
-                  </button>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Botão Salvar (Cria/atualiza o card no Funil de Vendas) */}
+                    <button
+                      type="button"
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="py-3 px-3 rounded-xl text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+                    >
+                      {savingAction === 'save' ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Save className="w-4 h-4 shrink-0" />}
+                      <span>{savingAction === 'save' ? 'Salvando...' : 'Salvar'}</span>
+                    </button>
 
-                  {/* Botão Gerar Pedido (Integra diretamente com o Funil de Pedidos) */}
+                    {/* Botão Gerar Pedido (Integra diretamente com o Funil de Pedidos) */}
+                    <button
+                      type="button"
+                      onClick={handleGenerateOrderAction}
+                      disabled={isSaving}
+                      className="py-3 px-3 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+                    >
+                      {savingAction === 'order' ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Truck className="w-4 h-4 shrink-0" />}
+                      <span>{savingAction === 'order' ? 'Gerando...' : 'Gerar Pedido'}</span>
+                    </button>
+                  </div>
+
+                  {/* Botão Copiar Proposta Comercial WhatsApp */}
                   <button
                     type="button"
-                    onClick={handleGenerateOrderAction}
-                    disabled={isSaving}
-                    className="py-3 px-3 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+                    onClick={handleCopyProposal}
+                    className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 ${
+                      copied
+                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm'
+                        : 'bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border-emerald-200'
+                    }`}
+                    title="Copiar texto oficial da proposta formatado para envio no WhatsApp"
                   >
-                    {savingAction === 'order' ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Truck className="w-4 h-4 shrink-0" />}
-                    <span>{savingAction === 'order' ? 'Gerando...' : 'Gerar Pedido'}</span>
+                    <FaWhatsapp className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>{copied ? '✓ Proposta Copiada para o WhatsApp!' : 'Copiar Proposta p/ WhatsApp'}</span>
                   </button>
                 </div>
               )}

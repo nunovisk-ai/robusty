@@ -4,8 +4,7 @@ import {
   Truck, 
   Wrench, 
   FileText, 
-  CheckCircle, 
-  PackageCheck
+  CheckCircle 
 } from 'lucide-react'
 
 interface OrdersViewProps {
