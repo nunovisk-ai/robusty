@@ -192,7 +192,16 @@ export function App() {
 
   // Open existing Opportunity/Order in Gerador de Orçamento
   const handleSelectOpportunityToEdit = (opp: Opportunity) => {
-    setReturnTab(activeTab === 'budget' ? returnTab : activeTab)
+    const isOppAnOrder =
+      opp.stage === 'venda_ganha' ||
+      orders.some((o) => o.opportunity_id === opp.id || o.order_number === opp.order_number)
+    const targetReturnTab =
+      activeTab === 'budget'
+        ? returnTab
+        : activeTab === 'orders' || (activeTab !== 'kanban' && isOppAnOrder)
+        ? 'orders'
+        : activeTab
+    setReturnTab(targetReturnTab)
     setEditingOpportunity(opp)
     setCalendarViewingAppointment(null)
     setBudgetInstanceKey(Date.now())
@@ -317,13 +326,13 @@ export function App() {
 
   // Move status inside Funil de Pedidos with bidirectional sync in Supabase
   const handleUpdateOrderStatus = async (ordId: string, nextSt: OrderStatus) => {
-    const targetOrder = orders.find((o) => o.id === ordId)
+    const targetOrder = orders.find((o) => o.id === ordId || o.opportunity_id === ordId)
     if (!targetOrder) return
 
     const prevOrders = orders
     const prevOpportunities = opportunities
 
-    setOrders((prev) => prev.map((o) => (o.id === ordId ? { ...o, status: nextSt } : o)))
+    setOrders((prev) => prev.map((o) => (o.id === targetOrder.id ? { ...o, status: nextSt } : o)))
 
     if (nextSt === 'pedido_cancelado') {
       setOpportunities((prev) =>
@@ -344,7 +353,7 @@ export function App() {
     }
 
     try {
-      await updateOrderStatusInSupabase(ordId, nextSt, undefined, targetOrder.opportunity_id)
+      await updateOrderStatusInSupabase(targetOrder.id, nextSt, undefined, targetOrder.opportunity_id)
       if (nextSt === 'pedido_cancelado' || nextSt === 'pedido_concluido') {
         const freshAppointments = await fetchAppointments()
         setAppointments(freshAppointments)
@@ -820,13 +829,17 @@ export function App() {
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col font-sans selection:bg-[#EA580C] selection:text-white">
       {/* Sidebar Navigation */}
       <Sidebar
-        activeTab={activeTab}
+        activeTab={activeTab === 'budget' ? returnTab : activeTab}
         setActiveTab={(tab) => {
-          if (tab === 'budget') setEditingOpportunity(null)
+          if (activeTab === 'budget') {
+            setEditingOpportunity(null)
+            setCalendarViewingAppointment(null)
+          }
+          setReturnTab(tab)
           setActiveTab(tab)
         }}
-        leadCount={opportunities.length}
-        orderCount={orders.length}
+        leadCount={opportunities.filter((o) => o.stage !== 'venda_ganha' && o.stage !== 'venda_perdida').length}
+        orderCount={orders.filter((o) => o.status !== 'pedido_concluido' && o.status !== 'pedido_cancelado').length || orders.length}
         lostCount={lostOpportunitiesCount}
         isMobileOpen={isMobileSidebarOpen}
         setIsMobileOpen={setIsMobileSidebarOpen}
@@ -837,7 +850,7 @@ export function App() {
       {/* Main Area */}
       <div className={`md:pl-64 flex-1 flex flex-col min-w-0 ${(activeTab === 'kanban' || activeTab === 'orders') ? 'h-screen overflow-hidden' : ''}`}>
         <TopBar
-          activeTab={activeTab}
+          activeTab={activeTab === 'budget' ? returnTab : activeTab}
           onToggleMobile={() => setIsMobileSidebarOpen(true)}
           onNewLeadClick={handleOpenNewOpportunity}
           currentUser={currentUser}
@@ -924,6 +937,7 @@ export function App() {
                   existingAppointments={appointments}
                   currentUser={currentUser}
                   calendarReadOnly={Boolean(calendarViewingAppointment)}
+                  pipelineMode={returnTab === 'orders' ? 'pedidos' : 'vendas'}
                   activeAppointment={
                     calendarViewingAppointment
                       ? appointments.find((a) => a.id === calendarViewingAppointment.id) || calendarViewingAppointment
@@ -934,6 +948,7 @@ export function App() {
                   onSaveToKanban={handleSaveOpportunity}
                   onAutoSaveOpportunity={handleAutoSaveOpportunity}
                   onChangeStage={handleMoveStage}
+                  onUpdateOrderStatus={handleUpdateOrderStatus}
                   onGenerateOrder={handleGenerateOrderFromBudget}
                   onDeleteOpportunity={handleDeleteOpportunity}
                   onMarkLost={handleCloseOpportunity}

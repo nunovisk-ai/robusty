@@ -8,6 +8,7 @@ import type {
   OpportunityStage,
   LeadOrigin, 
   Order, 
+  OrderStatus,
   Appointment, 
   AttachedDocument,
   OpportunityComment,
@@ -107,7 +108,13 @@ import {
   FaCalculator,
   FaPaperPlane,
   FaComments,
-  FaCreditCard
+  FaCreditCard,
+  FaFileLines,
+  FaBoxesPacking,
+  FaClock as FaClock6,
+  FaTruckFast,
+  FaCircleCheck,
+  FaBan
 } from 'react-icons/fa6'
 
 type BudgetFormTab = 'contact' | 'products' | 'fulfillment' | 'history' | 'attachments'
@@ -138,6 +145,33 @@ const normalizePipelineStage = (rawStage?: string): OpportunityStage => {
   return 'novo_lead'
 }
 
+interface OrderPipelineStageOption {
+  id: OrderStatus
+  title: string
+  color: string
+  Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>
+}
+
+const ORDER_PIPELINE_STAGES: OrderPipelineStageOption[] = [
+  { id: 'pedido_gerado', title: 'Pedido Gerado', color: '#3B82F6', Icon: FaFileLines },
+  { id: 'em_preparacao', title: 'Em preparação', color: '#8B5CF6', Icon: FaBoxesPacking },
+  { id: 'aguardando_coleta_instalacao', title: 'Aguardando Coleta/Instalação', color: '#0284C7', Icon: FaClock6 },
+  { id: 'em_entrega_instalacao', title: 'Em entrega/Instalação', color: '#06B6D4', Icon: FaTruckFast },
+  { id: 'pedido_concluido', title: 'Pedido Concluído', color: '#10B981', Icon: FaCircleCheck },
+  { id: 'pedido_cancelado', title: 'Pedido Cancelado', color: '#EF4444', Icon: FaBan },
+]
+
+const normalizeOrdStatus = (status?: string): OrderStatus => {
+  if (status === 'pedido_recebido') return 'pedido_gerado'
+  if (status === 'em_preparacao_loja') return 'em_preparacao'
+  if (status === 'aguardando_coleta_transportadora' || status === 'aguardando_instalacao_agendada') return 'aguardando_coleta_instalacao'
+  if (status === 'em_transporte_ou_instalacao' || status === 'aguardando_emissao_nf') return 'em_entrega_instalacao'
+  if (status && ORDER_PIPELINE_STAGES.some((s) => s.id === status)) {
+    return status as OrderStatus
+  }
+  return 'pedido_gerado'
+}
+
 interface BudgetBuilderViewProps {
   initialVehicleId?: string
   initialOpportunity?: Opportunity | null
@@ -148,9 +182,11 @@ interface BudgetBuilderViewProps {
   currentUser?: CurrentUser | null
   calendarReadOnly?: boolean
   activeAppointment?: Appointment | null
+  pipelineMode?: 'vendas' | 'pedidos'
   onSaveToKanban?: (opportunityData: any, options?: { stayOnPage?: boolean }) => Promise<Opportunity | null> | void
   onAutoSaveOpportunity?: (opportunityData: any) => Promise<Opportunity | null> | void
   onChangeStage?: (oppId: string, newStage: OpportunityStage) => Promise<void> | void
+  onUpdateOrderStatus?: (orderId: string, newStatus: OrderStatus) => Promise<void> | void
   onGenerateOrder?: (opportunityData: any) => Promise<void> | void
   onDeleteOpportunity?: (oppId: string) => Promise<void> | void
   onMarkLost?: (oppId: string, reason: string, details?: string) => Promise<void> | void
@@ -192,9 +228,11 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   currentUser,
   calendarReadOnly = false,
   activeAppointment = null,
+  pipelineMode = 'vendas',
   onSaveToKanban,
   onAutoSaveOpportunity,
   onChangeStage,
+  onUpdateOrderStatus,
   onGenerateOrder,
   onDeleteOpportunity,
   onMarkLost,
@@ -223,6 +261,43 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [savingAction, setSavingAction] = useState<'save' | 'order' | null>(null)
   const isSaving = savingAction !== null
 
+  // Identificar se há um pedido vinculado no banco
+  const linkedOrder = useMemo(() => {
+    return existingOrders.find((ord) => {
+      const oppId = opportunityId || initialOpportunity?.id
+      if (oppId && (ord.id === oppId || ord.opportunity_id === oppId)) {
+        return true
+      }
+      if (orderNumber && ord.order_number === orderNumber) {
+        return true
+      }
+      return false
+    })
+  }, [existingOrders, opportunityId, initialOpportunity?.id, orderNumber])
+
+  // Determinar se estamos visualizando no contexto de Pedidos & Coleta
+  const isOrderMode =
+    pipelineMode === 'pedidos' ||
+    (Boolean(linkedOrder) && (initialOpportunity?.stage === 'venda_ganha' || pipelineMode !== 'vendas'))
+
+  // Etapa atual do Funil de Pedidos
+  const [orderStatus, setOrderStatus] = useState<OrderStatus>(() => {
+    if (linkedOrder?.status) {
+      return normalizeOrdStatus(linkedOrder.status)
+    }
+    return 'pedido_gerado'
+  })
+  const [orderStatusToConfirm, setOrderStatusToConfirm] = useState<OrderStatus | null>(null)
+  const [isUpdatingOrderStatus, setIsUpdatingOrderStatus] = useState(false)
+
+  // Sincronizar status do pedido caso mude externamente
+  useEffect(() => {
+    if (linkedOrder?.status) {
+      const norm = normalizeOrdStatus(linkedOrder.status)
+      setOrderStatus((prev) => (prev !== norm ? norm : prev))
+    }
+  }, [linkedOrder?.status])
+
   // Controle de Agendamento Explícito (Salvar Agenda / Reagendar / Cancelar)
   const [isRescheduling, setIsRescheduling] = useState(false)
   const [isSavingSchedule, setIsSavingSchedule] = useState(false)
@@ -234,7 +309,10 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const [stage, setStage] = useState<OpportunityStage>(() =>
     normalizePipelineStage(initialOpportunity?.stage || 'novo_lead')
   )
-  const isReadOnly = stage === 'venda_perdida' || Boolean(calendarReadOnly)
+  const isReadOnly =
+    (!isOrderMode && stage === 'venda_perdida') ||
+    (isOrderMode && orderStatus === 'pedido_cancelado') ||
+    Boolean(calendarReadOnly)
   const [stageToConfirm, setStageToConfirm] = useState<OpportunityStage | null>(null)
   const [isUpdatingStage, setIsUpdatingStage] = useState(false)
 
@@ -810,7 +888,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
       orderNumber,
       orderCode: formatOrderCode(orderNumber),
       assignedTo,
-      stage: overrides?.stage ?? stage,
+      stage: overrides?.stage ?? (isOrderMode ? (orderStatus === 'pedido_cancelado' ? 'venda_perdida' : 'venda_ganha') : stage),
       customerName: customerName || 'Novo Cliente',
       customerPhone,
       commercialPhone: personType === 'juridica' ? commercialPhone : undefined,
@@ -1054,6 +1132,47 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
   const handleSelectStage = (nextStage: OpportunityStage) => {
     if (nextStage === stage || isUpdatingStage) return
     setStageToConfirm(nextStage)
+  }
+
+  // Solicitar confirmação ao clicar em uma etapa do pedido
+  const handleSelectOrderStatus = (nextStatus: OrderStatus) => {
+    if (nextStatus === orderStatus || isUpdatingOrderStatus) return
+    setOrderStatusToConfirm(nextStatus)
+  }
+
+  // Executar mudança de status do pedido após confirmação
+  const applyOrderStatusChange = async (nextStatus: OrderStatus) => {
+    if (nextStatus === orderStatus || isUpdatingOrderStatus) return
+
+    const prevStatus = orderStatus
+    const oldLabel = ORDER_PIPELINE_STAGES.find((s) => s.id === prevStatus)?.title || prevStatus
+    const newLabel = ORDER_PIPELINE_STAGES.find((s) => s.id === nextStatus)?.title || nextStatus
+    const authorName = currentUser?.name || assignedTo || 'Equipe'
+
+    const stageEvent: OpportunityHistoryEvent = {
+      id: `hist-order-${Date.now()}`,
+      opportunity_id: opportunityId || undefined,
+      type: 'stage_change',
+      description: `Movimentação de status do pedido: de "${oldLabel}" para "${newLabel}"`,
+      user: authorName,
+      created_at: new Date().toISOString(),
+    }
+
+    setOrderStatus(nextStatus)
+    setHistory((prev) => [stageEvent, ...prev])
+
+    const orderIdToUpdate = linkedOrder?.id || opportunityId || initialOpportunity?.id
+    if (orderIdToUpdate && onUpdateOrderStatus) {
+      setIsUpdatingOrderStatus(true)
+      try {
+        await onUpdateOrderStatus(orderIdToUpdate, nextStatus)
+      } catch (err) {
+        console.error('Erro ao atualizar status do pedido:', err)
+        setOrderStatus(prevStatus)
+      } finally {
+        setIsUpdatingOrderStatus(false)
+      }
+    }
   }
 
   // Detecção de Conflito de Instalação (ignorando o próprio registro/oportunidade)
@@ -1552,6 +1671,12 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           if (saved.order_number) setOrderNumber(saved.order_number)
         }
       }
+      if (isOrderMode && onUpdateOrderStatus) {
+        const orderIdToUpdate = linkedOrder?.id || opportunityId || initialOpportunity?.id
+        if (orderIdToUpdate) {
+          await onUpdateOrderStatus(orderIdToUpdate, orderStatus)
+        }
+      }
       setSavedSuccess(true)
       setTimeout(() => setSavedSuccess(false), 3000)
     } finally {
@@ -1656,7 +1781,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
             <button
               onClick={onClose}
               className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
-              title="Voltar ao Pipeline"
+              title={isOrderMode ? "Voltar aos Pedidos & Coleta" : "Voltar ao Funil de Vendas"}
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -1664,8 +1789,15 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
           <div>
             <div className="flex items-center gap-2.5">
               <h2 className="text-lg sm:text-xl font-bold text-slate-900">
-                Oportunidade {formatOrderCode(orderNumber)}
+                {isOrderMode ? 'Pedido ' : 'Oportunidade '}
+                {formatOrderCode(orderNumber)}
               </h2>
+              {isOrderMode && (
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  <Truck className="w-3 h-3" />
+                  <span>Pedidos & Coleta</span>
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -1771,8 +1903,39 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         </div>
       </div>
 
+      {/* Banner de Aviso caso Pedido Cancelado */}
+      {isOrderMode && orderStatus === 'pedido_cancelado' && (
+        <div className="bg-rose-50 border border-rose-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+              <FaBan className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold uppercase tracking-wider text-rose-800">
+                  Pedido Cancelado
+                </span>
+              </div>
+              <div className="text-xs text-rose-700 mt-0.5">
+                Este pedido está marcado como cancelado no Funil de Pedidos.
+              </div>
+            </div>
+          </div>
+          {onUpdateOrderStatus && (
+            <button
+              type="button"
+              onClick={() => void handleSelectOrderStatus('em_preparacao')}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reativar Pedido</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Banner de Aviso caso Oportunidade Perdida / Encerrada */}
-      {stage === 'venda_perdida' && (
+      {!isOrderMode && stage === 'venda_perdida' && (
         <div className="bg-rose-50 border border-rose-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
           <div className="flex items-start sm:items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
@@ -1834,49 +1997,86 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         </div>
       )}
 
-      {/* Barra de Progresso do Funil de Vendas (Chevron linear limpo) */}
+      {/* Barra de Progresso do Funil (Vendas ou Pedidos) */}
       <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-100 shadow-nexo">
         <div className="flex items-stretch overflow-x-auto no-scrollbar rounded-xl border border-slate-200/80 bg-slate-100/70 p-1 gap-0.5">
-          {SALES_PIPELINE_STAGES.map((st, idx) => {
-            const isActive = st.id === stage
+          {isOrderMode
+            ? ORDER_PIPELINE_STAGES.map((st, idx) => {
+                const isActive = st.id === orderStatus
+                const isFirst = idx === 0
+                const isLast = idx === ORDER_PIPELINE_STAGES.length - 1
+                const clipPath = isFirst
+                  ? 'polygon(0% 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 0% 100%)'
+                  : isLast
+                  ? 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 12px 50%)'
+                  : 'polygon(0% 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 0% 100%, 12px 50%)'
 
-            // Clip-path de Chevron que conecta perfeitamente cada etapa
-            const isFirst = idx === 0
-            const isLast = idx === SALES_PIPELINE_STAGES.length - 1
-            const clipPath = isFirst
-              ? 'polygon(0% 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 0% 100%)'
-              : isLast
-              ? 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 12px 50%)'
-              : 'polygon(0% 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 0% 100%, 12px 50%)'
+                return (
+                  <button
+                    key={st.id}
+                    type="button"
+                    disabled={isReadOnly || isUpdatingOrderStatus}
+                    onClick={() => {
+                      if (isReadOnly) return
+                      void handleSelectOrderStatus(st.id)
+                    }}
+                    title={isReadOnly ? `Etapa: ${st.title} (somente leitura)` : `Mover pedido para: ${st.title}`}
+                    style={{
+                      clipPath,
+                      ...(isActive ? { backgroundColor: st.color } : {}),
+                    }}
+                    className={`group relative flex-1 min-w-[130px] py-2.5 px-3.5 flex items-center justify-center gap-1.5 text-xs font-bold transition-all whitespace-nowrap select-none disabled:opacity-60 ${
+                      isActive
+                        ? 'text-white shadow-xs'
+                        : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    } ${isReadOnly ? 'cursor-default' : 'cursor-pointer'}`}
+                  >
+                    <st.Icon
+                      className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-white' : ''}`}
+                      style={!isActive ? { color: st.color } : undefined}
+                    />
+                    <span className="truncate">{st.title}</span>
+                  </button>
+                )
+              })
+            : SALES_PIPELINE_STAGES.map((st, idx) => {
+                const isActive = st.id === stage
+                const isFirst = idx === 0
+                const isLast = idx === SALES_PIPELINE_STAGES.length - 1
+                const clipPath = isFirst
+                  ? 'polygon(0% 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 0% 100%)'
+                  : isLast
+                  ? 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 12px 50%)'
+                  : 'polygon(0% 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 0% 100%, 12px 50%)'
 
-            return (
-              <button
-                key={st.id}
-                type="button"
-                disabled={isReadOnly || isUpdatingStage}
-                onClick={() => {
-                  if (isReadOnly) return
-                  void handleSelectStage(st.id)
-                }}
-                title={isReadOnly ? `Etapa: ${st.title} (somente leitura)` : `Mover lead para: ${st.title}`}
-                style={{
-                  clipPath,
-                  ...(isActive ? { backgroundColor: st.color } : {}),
-                }}
-                className={`group relative flex-1 min-w-[130px] py-2.5 px-3.5 flex items-center justify-center gap-1.5 text-xs font-bold transition-all whitespace-nowrap select-none disabled:opacity-60 ${
-                  isActive
-                    ? 'text-white shadow-xs'
-                    : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                } ${isReadOnly ? 'cursor-default' : 'cursor-pointer'}`}
-              >
-                <st.Icon
-                  className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-white' : ''}`}
-                  style={!isActive ? { color: st.color } : undefined}
-                />
-                <span className="truncate">{st.title}</span>
-              </button>
-            )
-          })}
+                return (
+                  <button
+                    key={st.id}
+                    type="button"
+                    disabled={isReadOnly || isUpdatingStage}
+                    onClick={() => {
+                      if (isReadOnly) return
+                      void handleSelectStage(st.id)
+                    }}
+                    title={isReadOnly ? `Etapa: ${st.title} (somente leitura)` : `Mover lead para: ${st.title}`}
+                    style={{
+                      clipPath,
+                      ...(isActive ? { backgroundColor: st.color } : {}),
+                    }}
+                    className={`group relative flex-1 min-w-[130px] py-2.5 px-3.5 flex items-center justify-center gap-1.5 text-xs font-bold transition-all whitespace-nowrap select-none disabled:opacity-60 ${
+                      isActive
+                        ? 'text-white shadow-xs'
+                        : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    } ${isReadOnly ? 'cursor-default' : 'cursor-pointer'}`}
+                  >
+                    <st.Icon
+                      className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-white' : ''}`}
+                      style={!isActive ? { color: st.color } : undefined}
+                    />
+                    <span className="truncate">{st.title}</span>
+                  </button>
+                )
+              })}
         </div>
       </div>
 
@@ -4421,8 +4621,8 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    {/* Botão Salvar (Cria/atualiza o card no Funil de Vendas) */}
+                  <div className={`grid ${isOrderMode ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
+                    {/* Botão Salvar (Cria/atualiza o card no Funil de Vendas ou Pedidos) */}
                     <button
                       type="button"
                       onClick={handleSave}
@@ -4430,19 +4630,21 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       className="py-3 px-3 rounded-xl text-xs font-bold bg-[#EA580C] hover:bg-[#C2410C] disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
                     >
                       {savingAction === 'save' ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Save className="w-4 h-4 shrink-0" />}
-                      <span>{savingAction === 'save' ? 'Salvando...' : 'Salvar'}</span>
+                      <span>{savingAction === 'save' ? 'Salvando...' : isOrderMode ? 'Salvar Pedido' : 'Salvar'}</span>
                     </button>
 
-                    {/* Botão Gerar Pedido (Integra diretamente com o Funil de Pedidos) */}
-                    <button
-                      type="button"
-                      onClick={handleGenerateOrderAction}
-                      disabled={isSaving}
-                      className="py-3 px-3 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
-                    >
-                      {savingAction === 'order' ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Truck className="w-4 h-4 shrink-0" />}
-                      <span>{savingAction === 'order' ? 'Gerando...' : 'Gerar Pedido'}</span>
-                    </button>
+                    {/* Botão Gerar Pedido (Apenas se ainda for oportunidade do Funil de Vendas) */}
+                    {!isOrderMode && (
+                      <button
+                        type="button"
+                        onClick={handleGenerateOrderAction}
+                        disabled={isSaving}
+                        className="py-3 px-3 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+                      >
+                        {savingAction === 'order' ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Truck className="w-4 h-4 shrink-0" />}
+                        <span>{savingAction === 'order' ? 'Gerando...' : 'Gerar Pedido'}</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Botão Copiar Proposta Comercial WhatsApp */}
@@ -4464,7 +4666,9 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
 
               {savedSuccess && (
                 <div className="text-center text-xs text-emerald-700 py-1 font-bold animate-fade-in bg-emerald-50 rounded-lg p-2 border border-emerald-200">
-                  ✓ Card de oportunidade salvo no Funil de Vendas ({formatOrderCode(orderNumber)})!
+                  {isOrderMode
+                    ? `✓ Dados do Pedido atualizados (${formatOrderCode(orderNumber)})!`
+                    : `✓ Card de oportunidade salvo no Funil de Vendas (${formatOrderCode(orderNumber)})!`}
                 </div>
               )}
 
@@ -4477,7 +4681,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
               {/* Ações Secundárias com Modal Padronizado */}
               {isOpportunitySaved && (
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                  {!isReadOnly && (
+                  {!isReadOnly && !isOrderMode && (
                     <button
                       type="button"
                       onClick={() => setLostModalOpen(true)}
@@ -4495,7 +4699,7 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
                       className="text-slate-400 hover:text-red-600 transition-colors cursor-pointer flex items-center gap-1 font-medium ml-auto"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      <span>Apagar Orçamento</span>
+                      <span>{isOrderMode ? 'Apagar Pedido' : 'Apagar Orçamento'}</span>
                     </button>
                   )}
                 </div>
@@ -4727,6 +4931,55 @@ export const BudgetBuilderView: React.FC<BudgetBuilderViewProps> = ({
         }}
         secondaryButtonText="Cancelar"
         onSecondaryAction={() => setStageToConfirm(null)}
+      />
+
+      {/* MODAL: CONFIRMAR MUDANÇA DE ETAPA DO PEDIDO */}
+      <CustomAlertModal
+        isOpen={!!orderStatusToConfirm}
+        onClose={() => setOrderStatusToConfirm(null)}
+        type={orderStatusToConfirm === 'pedido_cancelado' ? 'danger' : 'warning'}
+        title="Confirmar Mudança de Etapa do Pedido"
+        message={
+          orderStatusToConfirm ? (
+            <div className="space-y-3">
+              <p className="text-slate-600 text-sm">
+                Deseja alterar o status deste pedido ({formatOrderCode(orderNumber)} — {customerName || 'Cliente'}) de:
+              </p>
+              <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl">
+                <span className="font-bold text-slate-700 text-xs px-2.5 py-1 rounded-xl bg-slate-200/80">
+                  {ORDER_PIPELINE_STAGES.find((s) => s.id === orderStatus)?.title || orderStatus}
+                </span>
+                <ArrowRight className="w-4 h-4 text-slate-400 shrink-0" />
+                <span
+                  className="font-bold text-white text-xs px-2.5 py-1 rounded-xl shadow-2xs"
+                  style={{
+                    backgroundColor:
+                      ORDER_PIPELINE_STAGES.find((s) => s.id === orderStatusToConfirm)?.color || '#EA580C',
+                  }}
+                >
+                  {ORDER_PIPELINE_STAGES.find((s) => s.id === orderStatusToConfirm)?.title || orderStatusToConfirm}
+                </span>
+              </div>
+              {orderStatusToConfirm === 'pedido_cancelado' && (
+                <p className="text-xs text-rose-600 font-medium bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+                  Atenção: Ao cancelar o pedido, o card será movido para Cancelados e quaisquer agendamentos vinculados serão atualizados.
+                </p>
+              )}
+            </div>
+          ) : (
+            ''
+          )
+        }
+        primaryButtonText={orderStatusToConfirm === 'pedido_cancelado' ? 'Sim, Cancelar Pedido' : 'Confirmar Mudança'}
+        onPrimaryAction={() => {
+          if (orderStatusToConfirm) {
+            void applyOrderStatusChange(orderStatusToConfirm)
+          }
+          setOrderStatusToConfirm(null)
+        }}
+        secondaryButtonText="Cancelar"
+        onSecondaryAction={() => setOrderStatusToConfirm(null)}
+        isDangerAction={orderStatusToConfirm === 'pedido_cancelado'}
       />
 
       {/* MODAL: CONFIRMAR REAGENDAMENTO OU CANCELAMENTO DE AGENDA */}
